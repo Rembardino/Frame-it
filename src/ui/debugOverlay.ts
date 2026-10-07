@@ -9,6 +9,7 @@ import {
   type Component, type FrameInput, type View,
 } from '../scoring/scoring';
 import type { MomentTracker } from '../scoring/moment';
+import { numberText, t } from '../i18n';
 
 const KP_RADIUS = { head: 5, ball: 5, body: 4, goal: 4, area: 4, feet: 3.5, hands: 2 };
 
@@ -64,21 +65,21 @@ export class DebugOverlay {
       g.setLineDash([]);
       g.fillStyle = color;
       g.font = 'bold 12px system-ui, sans-serif';
-      g.fillText('IDEALE', sx(corners[3].x) + 6, sy(corners[3].y) + 16);
+      g.fillText(t('IDEALE'), sx(corners[3].x) + 6, sy(corners[3].y) + 16);
     }
 
     // Soggetto principale: dov'è -> dove dovrebbe stare.
-    const t = ev.leadTarget;
+    const target = ev.leadTarget;
     g.strokeStyle = color;
     g.lineWidth = 2;
     g.beginPath();
-    g.arc(sx(t.x), sy(t.y), 12, 0, Math.PI * 2);
+    g.arc(sx(target.x), sy(target.y), 12, 0, Math.PI * 2);
     g.stroke();
     if (ev.leadActual) {
       g.setLineDash([4, 4]);
       g.beginPath();
       g.moveTo(sx(ev.leadActual.x), sy(ev.leadActual.y));
-      g.lineTo(sx(t.x), sy(t.y));
+      g.lineTo(sx(target.x), sy(target.y));
       g.stroke();
       g.setLineDash([]);
     }
@@ -105,16 +106,16 @@ export class DebugOverlay {
       // Il Tempismo ha senso solo dopo l'istante decisivo.
       const v = frameValue[k] ?? (k === 'timing' && m && now < m.decisive ? undefined : partial?.components[k]);
       const off = !enabled.includes(k);
-      return `<div class="row${off ? ' off' : ''}"><span>${COMPONENT_LABEL[k]}</span><b style="--v:${v ?? 0}%"></b><em>${v === undefined ? '–' : Math.round(v)}</em></div>`;
+      return `<div class="row${off ? ' off' : ''}"><span>${t(COMPONENT_LABEL[k])}</span><b style="--v:${v ?? 0}%"></b><em>${v === undefined ? '–' : Math.round(v)}</em></div>`;
     }).join('');
-    const mag = (fov: number) => (Math.tan((CONFIG.camera.fovMax / 2) * Math.PI / 180) / Math.tan((fov / 2) * Math.PI / 180)).toFixed(1);
-    let head = `<div class="title" style="color:${color}">Libero <small>(non valutato)</small></div>`;
+    const mag = (fov: number) => numberText(Math.tan((CONFIG.camera.fovMax / 2) * Math.PI / 180) / Math.tan((fov / 2) * Math.PI / 180), 1);
+    let head = `<div class="title" style="color:${color}">${t('Libero')} <small>${t('(non valutato)')}</small></div>`;
     if (m) {
       const pct = (x: number) => Math.max(0, Math.min(100, ((x - m.start) / (m.end - m.start)) * 100));
-      head = `<div class="title" style="color:${color}">${m.label.toUpperCase()}</div>
+      head = `<div class="title" style="color:${color}">${t(m.label).toUpperCase()}</div>
         <div class="tl"><i style="left:${pct(m.decisive)}%"></i><u style="left:${pct(now)}%"></u></div>`;
     }
-    const score = partial ? `<div class="score">Provvisorio <b>${partial.score}</b> ${'★'.repeat(starsFor(partial.score))}</div>` : '';
-    this.panel.innerHTML = `${head}${rows}${score}<div class="zoom">zoom: tu x${mag(view.fov)} · ideale x${mag(ev.ideal.fov)}</div>`;
+    const score = partial ? `<div class="score">${t('Provvisorio')} <b>${partial.score}</b> ${'★'.repeat(starsFor(partial.score))}</div>` : '';
+    this.panel.innerHTML = `${head}${rows}${score}<div class="zoom">zoom: ${t('tu')} x${mag(view.fov)} · ${t('ideale')} x${mag(ev.ideal.fov)}</div>`;
   }
 }

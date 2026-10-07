@@ -9,6 +9,8 @@ import type { DirectorVoice } from '../director/voice';
 import type { MatchSummary } from '../scoring/summary';
 import type { Match } from '../sim/match';
 import { showAlbum } from './album';
+import { restartGame } from '../platform/navigation';
+import { numberText, t } from '../i18n';
 
 const $ = (id: string) => document.getElementById(id)!;
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
@@ -34,22 +36,22 @@ export class Hud {
 
   constructor(showFps: boolean) {
     this.fps.hidden = !showFps;
-    CONFIG.teams.forEach((t, i) => {
-      $(`t${i}`).textContent = t.short;
-      $(`c${i}`).style.background = hex(t.shirt);
+    CONFIG.teams.forEach((team, i) => {
+      $(`t${i}`).textContent = SPORT === 'boxe' ? t(team.name).slice(0, 3) : team.short;
+      $(`c${i}`).style.background = hex(team.shirt);
     });
   }
 
   update(dt: number, cam: CameraController, match: Match, voice: DirectorVoice, ended: boolean) {
-    this.zoom.textContent = `x${cam.magnification.toFixed(1)}`;
+    this.zoom.textContent = `x${numberText(cam.magnification, 1)}`;
     if (cam.hasInteracted) this.hint.classList.add('hidden');
 
     // Scoreboard: il tempo di gioco viene mostrato come una partita vera (90' calcio, 40' basket).
     const mins = CONFIG.match.clockMinutes;
     this.score.textContent = match.sportSimulation?.scoreText() ?? `${match.score[0]} - ${match.score[1]}`;
-    this.clock.textContent = ended ? 'FINE' : SPORT === 'boxe'
-      ? `R${Math.min(3, 1 + Math.floor(match.clock / (CONFIG.match.durationSec / 3)))}/3 · COLPI`
-      : SPORT === 'tennis' ? 'GAME · PUNTI' : SPORT === 'pallavolo' ? 'PUNTI'
+    this.clock.textContent = ended ? t('FINE') : SPORT === 'boxe'
+      ? `R${Math.min(3, 1 + Math.floor(match.clock / (CONFIG.match.durationSec / 3)))}/3 · ${t('COLPI')}`
+      : SPORT === 'tennis' ? t('GAME · PUNTI') : SPORT === 'pallavolo' ? t('PUNTI')
       : `${Math.min(mins, Math.floor((match.clock / CONFIG.match.durationSec) * mins))}'`;
 
     // Regista in cuffia.
@@ -82,7 +84,7 @@ export class Hud {
 
   /** Punti e stelle medie in alto a destra. */
   setTotals(points: number, avgStars: number) {
-    this.pts.innerHTML = `${points.toLocaleString('it-IT')} PT${avgStars ? ` · <span class="star">★</span> ${avgStars.toFixed(1)}` : ''}`;
+    this.pts.innerHTML = `${numberText(points)} PT${avgStars ? ` · <span class="star">★</span> ${numberText(avgStars, 1)}` : ''}`;
   }
 
   showResult(r: DirectorResult) {
@@ -96,44 +98,44 @@ export class Hud {
     this.resultTimer = r ? CONFIG.scoring.resultSec : CONFIG.scoring.resultSec * 0.6;
     this.result.classList.remove('hidden');
     if (!r) {
-      this.result.innerHTML = `<div class="r-head"><span class="r-label">Perso: ${label}</span></div>`;
+      this.result.innerHTML = `<div class="r-head"><span class="r-label">${t('Perso: {label}', { label: t(label) })}</span></div>`;
       return;
     }
-    const reasons = r.reasons.map((x) => `<li class="${x.good ? 'good' : 'bad'}">${x.text}</li>`).join('');
-    const comps = r.enabled.map((k) => `${COMPONENT_LABEL[k]} <b>${Math.round(r.components[k])}</b>`).join(' · ');
+    const reasons = r.reasons.map((x) => `<li class="${x.good ? 'good' : 'bad'}">${t(x.text)}</li>`).join('');
+    const comps = r.enabled.map((k) => `${t(COMPONENT_LABEL[k])} <b>${Math.round(r.components[k])}</b>`).join(' · ');
     const gain = bonus
-      ? `<div class="r-bonus">+${bonus} BONUS REGIA</div>`
+      ? `<div class="r-bonus">+${bonus} ${t('BONUS REGIA')}</div>`
       : multiplier
-        ? `<div class="r-bonus">+${points} pt · x${multiplier}: azione precedente ben ripresa!</div>`
+        ? `<div class="r-bonus">+${points} pt · x${multiplier}: ${t('azione precedente ben ripresa!')}</div>`
         : points ? `<span class="r-pts">+${points} pt</span>` : '';
     this.result.innerHTML = `
-      <div class="r-head"><span class="r-label">${label}</span><span class="r-stars">${stars(r.stars)}</span><span class="r-score">${r.score}</span></div>
+      <div class="r-head"><span class="r-label">${t(label)}</span><span class="r-stars">${stars(r.stars)}</span><span class="r-score">${r.score}</span></div>
       <ul>${reasons}</ul>
       <div class="r-comps">${comps} ${bonus || multiplier ? '' : gain}</div>${bonus || multiplier ? gain : ''}`;
   }
 
   /** Riepilogo di fine partita. */
   showSummary(s: MatchSummary, match: Match, record: number, isRecord: boolean) {
-    const t = CONFIG.teams;
-    const best = s.best.map((b) => `<li><span>${b.label}</span><span class="r-stars">${stars(b.stars)}</span><b>${b.score}</b></li>`).join('');
+    const teams = CONFIG.teams;
+    const best = s.best.map((b) => `<li><span>${t(b.label)}</span><span class="r-stars">${stars(b.stars)}</span><b>${b.score}</b></li>`).join('');
     const el = $('summary');
     el.innerHTML = `
       <div class="sum">
-        <div class="sum-title">FINE PARTITA</div>
-        <div class="sum-score">${t[0].name} <b>${match.score[0]} - ${match.score[1]}</b> ${t[1].name}</div>
+        <div class="sum-title">${t('FINE PARTITA')}</div>
+        <div class="sum-score">${t(teams[0].name)} <b>${match.score[0]} - ${match.score[1]}</b> ${t(teams[1].name)}</div>
         <div class="sum-grid">
-          <div><small>Punti</small><b>${s.points.toLocaleString('it-IT')}</b>${isRecord ? '<em>Nuovo record!</em>' : `<em>Record ${record.toLocaleString('it-IT')}</em>`}</div>
-          <div><small>Stelle medie</small><b class="star">★ ${s.avgStars.toFixed(1)}</b></div>
-          <div><small>Ordini eseguiti</small><b>${s.orders.done}/${s.orders.total}</b></div>
-          <div><small>Distrazioni riprese</small><b>${s.distractions.caught}/${s.distractions.total}</b></div>
-          <div><small>Clip rare</small><b>${s.rareClips}</b></div>
+          <div><small>${t('Punti')}</small><b>${numberText(s.points)}</b>${isRecord ? `<em>${t('Nuovo record!')}</em>` : `<em>${t('Record')} ${numberText(record)}</em>`}</div>
+          <div><small>${t('Stelle medie')}</small><b class="star">★ ${numberText(s.avgStars, 1)}</b></div>
+          <div><small>${t('Ordini eseguiti')}</small><b>${s.orders.done}/${s.orders.total}</b></div>
+          <div><small>${t('Distrazioni riprese')}</small><b>${s.distractions.caught}/${s.distractions.total}</b></div>
+          <div><small>${t('Clip rare')}</small><b>${s.rareClips}</b></div>
         </div>
-        <div class="sum-best"><small>Momenti migliori</small><ul>${best || '<li>Nessuno... ahia.</li>'}</ul></div>
-        <div class="sum-verdict"><span class="tag">REGIA</span> “${s.verdict}”</div>
-        <div class="sum-btns"><button id="again">Rigioca</button><button id="sum-album" class="ghost">Album</button></div>
+        <div class="sum-best"><small>${t('Momenti migliori')}</small><ul>${best || `<li>${t('Nessuno... ahia.')}</li>`}</ul></div>
+        <div class="sum-verdict"><span class="tag">${t('REGIA')}</span> “${t(s.verdict)}”</div>
+        <div class="sum-btns"><button id="again">${t('Rigioca')}</button><button id="sum-album" class="ghost">${t('Album')}</button></div>
       </div>`;
     el.classList.remove('hidden');
-    $('again').addEventListener('click', () => location.reload());
+    $('again').addEventListener('click', restartGame);
     $('sum-album').addEventListener('click', () => showAlbum());
   }
 }

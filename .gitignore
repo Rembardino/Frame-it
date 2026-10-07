@@ -1,2 +1,11 @@
 node_modules
 dist
+mobile/generated/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+mobile/dist/
+artifacts/
+*.jks
+*.keystore
+credentials.json

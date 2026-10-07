@@ -15,6 +15,7 @@ import type { Director, DirectorResult, EventInstance, Indicator } from '../even
 import { MomentTracker, actorSubject, areaSubject, frameInput, subjectCenter, type Subject } from '../scoring/moment';
 import { project, type Component, type ShotSize, type View } from '../scoring/scoring';
 import { LINES, ORDERS, type OrderDef } from './lines';
+import { LOCALE, t } from '../i18n';
 
 export interface VoiceLine {
   text: string;
@@ -61,7 +62,7 @@ export class DirectorVoice {
   constructor(private match: Match, private director: Director, private enabled: Component[]) {}
 
   say(text: string, kind: VoiceLine['kind'] = 'talk', dur = V().lineSec, urgent = false) {
-    const line = { text, kind, dur };
+    const line = { text: t(text), kind, dur };
     if (urgent) {
       // Ordini e indizi interrompono le chiacchiere.
       this.queue = this.queue.filter((l) => l.kind !== 'talk');
@@ -123,7 +124,7 @@ export class DirectorVoice {
       return;
     }
     if (Math.random() > V().commentChance) return;
-    if (!r.result) this.say(pick(LINES.missed).replace('{label}', r.label.toLowerCase()));
+    if (!r.result) this.say(t(pick(LINES.missed), { label: t(r.label).toLocaleLowerCase(LOCALE) }));
     else if (r.result.stars === 5) this.say(pick(LINES.great));
     else if (r.result.stars <= 1 && r.category === 'main') this.say(pick(LINES.bad));
   }
@@ -133,23 +134,24 @@ export class DirectorVoice {
   private hint(inst: EventInstance, view: View) {
     const f = inst.focus;
     if (!f) return;
+    const hint = t(inst.def.hint ?? '');
     this.hints++;
     if (inst.def.category === 'rare') {
-      this.say(`${inst.def.hint} ${pick(LINES.up)}`, 'hint', V().lineSec, true);
+      this.say(`${hint} ${t(pick(LINES.up))}`, 'hint', V().lineSec, true);
       return;
     }
     const pr = project(view, f);
     if (!pr.behind && Math.abs(pr.x) < 0.9 && Math.abs(pr.y) < 0.9) {
-      this.say(`${inst.def.hint} ${pick(LINES.here)}`, 'hint', V().lineSec, true);
+      this.say(`${hint} ${t(pick(LINES.here))}`, 'hint', V().lineSec, true);
       return;
     }
     const yaw = (Math.atan2(f.x - view.pos.x, -(f.z - view.pos.z)) * 180) / Math.PI;
     const side = yaw > view.yaw ? 'right' : 'left';
     const wrong = Math.random() > V().hintAccuracy;
     const said = wrong ? (side === 'right' ? 'left' : 'right') : side;
-    this.say(`${inst.def.hint} ${pick(LINES[said])}`, 'hint', V().lineSec, true);
+    this.say(`${hint} ${t(pick(LINES[said]))}`, 'hint', V().lineSec, true);
     // A volte si accorge dell'errore e si corregge.
-    if (wrong && Math.random() < 0.4) this.queue.splice(1, 0, { text: `${pick(LINES.oops)} ${LINES[side][0]}`, kind: 'hint', dur: 1.8 });
+    if (wrong && Math.random() < 0.4) this.queue.splice(1, 0, { text: `${t(pick(LINES.oops))} ${t(LINES[side][0])}`, kind: 'hint', dur: 1.8 });
   }
 
   // ---------------------------------------------------------------- ordini

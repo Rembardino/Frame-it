@@ -1,0 +1,27 @@
+{
+  "name": "frame-it-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "prestart": "npm run bundle:game",
+    "android": "expo run:android",
+    "preandroid": "npm run bundle:game",
+    "bundle:game": "node ../scripts/bundle-mobile.mjs",
+    "eas-build-post-install": "node ../scripts/prepare-eas.mjs",
+    "build:aab": "npx --yes eas-cli@24.11.0 build --platform android --profile production",
+    "prebuild:aab": "npm run bundle:game"
+  },
+  "dependencies": {
+    "expo": "~57.0.27",
+    "expo-keep-awake": "~57.0.2",
+    "expo-navigation-bar": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.4",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-webview": "13.16.1"
+  }
+}

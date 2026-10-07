@@ -1,0 +1,11 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #07112b; color: #ecf2fa; }
+body { margin: 0; line-height: 1.65; overflow-wrap: anywhere; }
+main { max-width: 800px; margin: auto; padding: 36px 24px 72px; }
+.brand { color: #ffd23f; font-weight: 900; letter-spacing: .12em; text-decoration: none; }
+h1 { font-size: clamp(26px, 5vw, 40px); line-height: 1.2; margin: 32px 0 20px; }
+h2 { margin-top: 36px; font-size: 21px; color: #ffd23f; }
+p { margin: 16px 0; }
+blockquote { margin: 24px 0; padding: 16px 20px; border-left: 4px solid #ffd23f; background: #17233b; }
+footer { margin-top: 40px; font-size: 14px; color: #adbed1; }
+a { color: #4fd1ff; }
+@media print { :root { background: #fff; color: #111; color-scheme: light; } h2, .brand { color: #111; } blockquote { background: #eee; } main { padding: 0; max-width: none; } }

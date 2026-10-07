@@ -20,12 +20,29 @@ import { addToAlbum, showAlbum } from './ui/album';
 import { actorSubject, ballSubject, frameInput } from './scoring/moment';
 import { summarize } from './scoring/summary';
 import type { Component } from './scoring/scoring';
+import { nativeMessage } from './platform/navigation';
+import { LANGUAGE, LANGUAGES, isLanguage, localizePage, saveLanguage, t } from './i18n';
 
 const params = new URLSearchParams(location.search);
 const debug = CONFIG.debug.enabled || params.has('debug');
 const level = Number(params.get('level')) || CONFIG.scoring.level;
 const enabled = (CONFIG.scoring.levels[level] ?? CONFIG.scoring.levels[3]) as Component[];
 const $ = (id: string) => document.getElementById(id)!;
+localizePage();
+saveLanguage(LANGUAGE);
+nativeMessage('language-ready', undefined, LANGUAGE);
+const languageSelect = $('language') as HTMLSelectElement;
+for (const language of LANGUAGES) languageSelect.add(new Option(language.name, language.id, false, language.id === LANGUAGE));
+$('language-picker').addEventListener('pointerup', event => event.stopPropagation());
+languageSelect.addEventListener('change', () => {
+  const language = languageSelect.value;
+  if (!isLanguage(language) || language === LANGUAGE) return;
+  saveLanguage(language);
+  if (nativeMessage('set-language', undefined, language)) return;
+  const query = new URLSearchParams(location.search);
+  query.set('lang', language);
+  location.search = query.toString();
+});
 
 const stage = createStage($('app'));
 const match = new Match();
@@ -210,11 +227,12 @@ startScreen.addEventListener('pointerup', start, { once: true });
 // Scelta dello sport: ricarica la pagina con ?sport=... (ogni sport ha campo, regole ed eventi suoi).
 for (const s of SPORT_LIST) {
   const b = document.createElement('button');
-  b.textContent = s.name;
+  b.textContent = t(s.name);
   b.className = s.id === SPORT ? 'on' : '';
   b.addEventListener('pointerup', (e) => {
     e.stopPropagation(); // non far partire la partita
     if (s.id === SPORT) return start();
+    if (nativeMessage('select-sport', s.id)) return;
     const p = new URLSearchParams(location.search);
     p.set('sport', s.id);
     location.search = p.toString();
@@ -228,7 +246,11 @@ $('album-btn').addEventListener('pointerup', (e) => {
 if (params.has('autostart')) start();
 
 let last = performance.now();
+let appPaused = false;
+addEventListener('frameit:pause', () => { appPaused = true; });
+addEventListener('frameit:resume', () => { appPaused = false; last = performance.now(); });
 stage.renderer.setAnimationLoop((now) => {
+  if (appPaused || document.hidden) { last = now; return; }
   // Il timestamp del primo RAF può precedere performance.now() registrato durante l'avvio.
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;

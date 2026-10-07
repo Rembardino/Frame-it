@@ -4,6 +4,7 @@
  * compaiono come caselle bloccate.
  */
 import { LIBRARY } from '../events/library';
+import { dateText, numberText, t } from '../i18n';
 
 export interface AlbumEntry {
   count: number;
@@ -29,7 +30,7 @@ export function addToAlbum(id: string, stars: number, score: number, thumb: stri
   const isBest = !prev || score > prev.best.score;
   album[id] = {
     count: (prev?.count ?? 0) + 1,
-    best: isBest ? { stars, score, date: new Date().toLocaleDateString('it-IT'), thumb } : prev.best,
+    best: isBest ? { stars, score, date: new Date().toISOString(), thumb } : prev.best,
   };
   try {
     localStorage.setItem(KEY, JSON.stringify(album));
@@ -42,18 +43,18 @@ export function showAlbum() {
   const rares = LIBRARY.filter((d) => d.category === 'rare');
   const cards = rares.map((d) => {
     const e = album[d.id];
-    if (!e) return `<div class="al-card locked"><div class="al-thumb">?</div><b>???</b><small>Non ancora catturata</small></div>`;
+    if (!e) return `<div class="al-card locked"><div class="al-thumb">?</div><b>???</b><small>${t('Non ancora catturata')}</small></div>`;
     const stars = '★'.repeat(e.best.stars) + '<span class="dim">' + '★'.repeat(5 - e.best.stars) + '</span>';
-    return `<div class="al-card"><img class="al-thumb" src="${e.best.thumb}" alt=""><b>${d.label}</b>
-      <small><span class="r-stars">${stars}</span> ${e.best.score} · ${e.best.date} · x${e.count}</small></div>`;
+    return `<div class="al-card"><img class="al-thumb" src="${e.best.thumb}" alt=""><b>${t(d.label)}</b>
+      <small><span class="r-stars">${stars}</span> ${e.best.score} · ${dateText(e.best.date)} · x${numberText(e.count)}</small></div>`;
   }).join('');
   const el = $('album');
   el.innerHTML = `
     <div class="sum">
-      <div class="sum-title">ALBUM CLIP RARE</div>
+      <div class="sum-title">${t('ALBUM CLIP RARE')}</div>
       <div class="al-grid">${cards}</div>
-      <p class="al-note">Altre clip rare in arrivo.</p>
-      <button id="album-close">Chiudi</button>
+      <p class="al-note">${t('Altre clip rare in arrivo.')}</p>
+      <button id="album-close">${t('Chiudi')}</button>
     </div>`;
   el.classList.remove('hidden');
   $('album-close').addEventListener('click', (ev) => {

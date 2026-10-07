@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
@@ -29,24 +29,25 @@
       <div id="pts" class="pts">0 PT</div>
       <div id="fps" class="fps"></div>
 
-      <div id="voice" class="voice hidden"><span class="tag">REGIA</span><span id="voice-text"></span><u id="voice-bar"></u></div>
+      <div id="voice" class="voice hidden"><span class="tag" data-i18n="REGIA">DIRECTOR</span><span id="voice-text"></span><u id="voice-bar"></u></div>
 
       <div id="zoom" class="zoom">x1.0</div>
       <div id="hint" class="hint">
-        <span class="hint-pointer">Trascina per inquadrare · Rotella per zoomare · E/+ avvicina · Q/− allontana</span>
-        <span class="hint-touch">Trascina per inquadrare · Pizzica o tieni premuto +/− per zoomare</span>
+        <span class="hint-pointer" data-i18n="Trascina per inquadrare · Rotella per zoomare · E/+ avvicina · Q/− allontana">Drag to frame · Wheel to zoom · E/+ zoom in · Q/− zoom out</span>
+        <span class="hint-touch" data-i18n="Trascina per inquadrare · Pizzica o tieni premuto +/− per zoomare">Drag to frame · Pinch or hold +/− to zoom</span>
       </div>
       <div id="result" class="result hidden"></div>
     </div>
 
-    <div id="zoomctl" class="hidden"><button id="zin" aria-label="Avvicina: E o più" title="Avvicina (E o +)">+</button><button id="zout" aria-label="Allontana: Q o meno" title="Allontana (Q o −)">−</button></div>
+    <div id="zoomctl" class="hidden"><button id="zin" data-i18n-aria="Avvicina: E o più" data-i18n-title="Avvicina (E o +)" aria-label="Zoom in: E or plus" title="Zoom in (E or +)">+</button><button id="zout" data-i18n-aria="Allontana: Q o meno" data-i18n-title="Allontana (Q o −)" aria-label="Zoom out: Q or minus" title="Zoom out (Q or −)">−</button></div>
 
     <div id="start" class="overlay">
       <div class="logo">FRAME IT<small>LIVE SPORTS TV</small></div>
-      <p class="tag">Live Sports &amp; Arcade Camera Game</p>
+      <p class="tag" data-i18n="Live Sports &amp; Arcade Camera Game">Live Sports &amp; Arcade Camera Game</p>
+      <div id="language-picker" class="language-picker"><label for="language" data-i18n="Lingua">Language</label><select id="language"></select></div>
       <div id="sports" class="sports"></div>
-      <p class="cta">Tocca per iniziare</p>
-      <button id="album-btn" class="ghost">Album clip rare</button>
+      <p class="cta" data-i18n="Tocca per iniziare">Tap to start</p>
+      <button id="album-btn" class="ghost" data-i18n="Album clip rare">Rare highlights album</button>
     </div>
 
     <div id="album" class="overlay hidden"></div>
@@ -55,12 +56,12 @@
       <div class="rp-bar top"></div><div class="rp-bar bottom"></div>
       <div class="rp-wipe"><span>REPLAY</span></div>
       <div class="rp-tag"><b>REPLAY</b><span id="rp-speed">x0.6</span></div>
-      <div class="rp-skip">Tocca per saltare</div>
+      <div class="rp-skip" data-i18n="Tocca per saltare">Tap to skip</div>
     </div>
 
     <div id="summary" class="overlay hidden"></div>
 
-    <div id="rotate" class="overlay">Ruota il telefono in orizzontale</div>
+    <div id="rotate" class="overlay" data-i18n="Ruota il telefono in orizzontale">Rotate your phone to landscape</div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

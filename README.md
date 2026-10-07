@@ -11,6 +11,8 @@ npm run dev
 
 Scegli lo sport nella schermata iniziale: Calcio, Basket, Boxe, Tennis o Pallavolo. Puoi anche aprire direttamente `?sport=boxe`, `?sport=tennis` o `?sport=pallavolo`.
 
+La lingua iniziale è l'inglese. Il menu Language permette di scegliere English, Italiano, Español, Français o Deutsch e salva la scelta sul dispositivo, senza cambiare record e clip. Puoi forzarla con `?lang=it` (combinabile con `sport`). Interfaccia, regia, voti e riepilogo sono tradotti; i nomi propri delle squadre rimangono invariati.
+
 ## Controlli
 
 - Trascinamento, frecce o WASD: inquadratura.
@@ -27,10 +29,17 @@ Scegli lo sport nella schermata iniziale: Calcio, Basket, Boxe, Tennis o Pallavo
 
 La regia, il replay, il voto dell'inquadratura e il record locale funzionano per ogni sport. Sono simulazioni arcade a copioni, con regole semplificate per dare priorità al lavoro di ripresa.
 
+## Android AAB (Expo)
+
+Il contenitore Expo in `mobile/` include il gioco offline e usa il progetto `@rembardino/frame-it`, package Android `come.frameitnow`.
+
+Dopo `npm ci` nella radice, entra in `mobile/`, esegui `npm ci`, quindi `npm run build:aab`. Il profilo `production` genera un AAB; il profilo `preview` genera un APK per test diretti. Le istruzioni e i limiti delle verifiche sono in [docs/android-build.md](docs/android-build.md).
+
 ## Verifiche e build
 
 ```sh
 npm run check
+npm run check:i18n
 npm run build
 ```
 
