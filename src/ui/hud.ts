@@ -1,7 +1,7 @@
 /**
  * Overlay broadcast in 2D (DOM sopra il canvas). Il markup sta in index.html, qui solo gli aggiornamenti.
  */
-import { CONFIG } from '../config';
+import { CONFIG, SPORT } from '../config';
 import type { CameraController } from '../camera/cameraController';
 import { COMPONENT_LABEL } from '../scoring/scoring';
 import type { DirectorResult } from '../events/director';
@@ -46,8 +46,11 @@ export class Hud {
 
     // Scoreboard: il tempo di gioco viene mostrato come una partita vera (90' calcio, 40' basket).
     const mins = CONFIG.match.clockMinutes;
-    this.score.textContent = `${match.score[0]} - ${match.score[1]}`;
-    this.clock.textContent = ended ? 'FINE' : `${Math.min(mins, Math.floor((match.clock / CONFIG.match.durationSec) * mins))}'`;
+    this.score.textContent = match.sportSimulation?.scoreText() ?? `${match.score[0]} - ${match.score[1]}`;
+    this.clock.textContent = ended ? 'FINE' : SPORT === 'boxe'
+      ? `R${Math.min(3, 1 + Math.floor(match.clock / (CONFIG.match.durationSec / 3)))}/3 · COLPI`
+      : SPORT === 'tennis' ? 'GAME · PUNTI' : SPORT === 'pallavolo' ? 'PUNTI'
+      : `${Math.min(mins, Math.floor((match.clock / CONFIG.match.durationSec) * mins))}'`;
 
     // Regista in cuffia.
     const line = voice.current;

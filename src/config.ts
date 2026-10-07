@@ -247,7 +247,7 @@ const BASE = {
 
 // ==================================================================== SPORT
 
-export type SportId = 'calcio' | 'basket';
+export type SportId = 'calcio' | 'basket' | 'boxe' | 'tennis' | 'pallavolo';
 type Base = typeof BASE;
 type Overrides = { [K in keyof Base]?: Base[K] extends unknown[] ? Base[K] : Partial<Base[K]> };
 
@@ -282,6 +282,51 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
         maxGoalLead: 10, goalBudget: 999, goalChance: 0.5,
       },
       crowd: { rowsFar: 7, rowsEnd: 5 },
+    },
+  },
+  boxe: {
+    name: 'Boxe',
+    over: {
+      pitch: { length: 6.1, width: 6.1, goalName: 'Ring' },
+      camera: { position: { x: 0, y: 3, z: 8.5 }, startPitch: -10, startFov: 45, fovMax: 65 },
+      match: { clockMinutes: 9, runSpeed: 2.8, sprintSpeed: 3.5, walkSpeed: 1, accel: 10 },
+      visuals: { playerScale: 1.05 },
+      teams: [
+        { name: 'ROSSO', short: 'ROS', shirt: 0xcc3547, shorts: 0xcc3547, socks: 0x202433, keeper: 0xcc3547 },
+        { name: 'BLU', short: 'BLU', shirt: 0x3878df, shorts: 0x3878df, socks: 0x202433, keeper: 0x3878df },
+      ],
+      director: { firstMainAt: 3, mainEvery: [9, 13], distractionMinDist: 2, goalBudget: 999 },
+      crowd: { rowsFar: 5, rowsEnd: 4 },
+    },
+  },
+  tennis: {
+    name: 'Tennis',
+    over: {
+      pitch: { length: 23.77, width: 10.97, goalName: 'Rete' },
+      camera: { position: { x: 1.8, y: 5, z: 18 }, startYaw: -5.7, startPitch: -12, startFov: 46, fovMax: 64 },
+      match: { clockMinutes: 30, runSpeed: 6, sprintSpeed: 7, accel: 18 },
+      visuals: { ballRadius: 0.034, ballScale: 3.5 },
+      teams: [
+        { name: 'ROSSI', short: 'ROS', shirt: 0xf27342, shorts: 0xffffff, socks: 0xffffff, keeper: 0xf27342 },
+        { name: 'BIANCHI', short: 'BIA', shirt: 0x64d5bd, shorts: 0x203653, socks: 0xffffff, keeper: 0x64d5bd },
+      ],
+      director: { firstMainAt: 3, mainEvery: [11, 15], distractionMinDist: 3, goalBudget: 999 },
+      crowd: { rowsFar: 6, rowsEnd: 4 },
+    },
+  },
+  pallavolo: {
+    name: 'Pallavolo',
+    over: {
+      pitch: { length: 18, width: 9, goalName: 'Rete' },
+      camera: { position: { x: 1.5, y: 4.5, z: 14 }, startYaw: -6.1, startPitch: -8, startFov: 46, fovMax: 66 },
+      match: { clockMinutes: 25, runSpeed: 4.5, sprintSpeed: 6, accel: 18 },
+      visuals: { playerScale: 1.1, ballRadius: 0.105, ballScale: 1.8 },
+      teams: [
+        { name: 'FALCHI', short: 'FAL', shirt: 0xf5bd32, shorts: 0x1d345a, socks: 0xffffff, keeper: 0xf5bd32 },
+        { name: 'AQUILE', short: 'AQU', shirt: 0xe95d78, shorts: 0x25344c, socks: 0xffffff, keeper: 0xe95d78 },
+      ],
+      director: { firstMainAt: 3, mainEvery: [11, 15], distractionMinDist: 3, goalBudget: 999 },
+      crowd: { rowsFar: 6, rowsEnd: 4 },
     },
   },
 };

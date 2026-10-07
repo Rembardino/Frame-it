@@ -197,11 +197,16 @@ export class DirectorVoice {
       case 'referee':
         subjects = target(m.referee, 'Arbitro');
         break;
+      case 'athlete':
+        subjects = target(pick(m.actors.filter((a) => a.role === 'mid').length
+          ? m.actors.filter((a) => a.role === 'mid') : m.actors), def.label);
+        break;
       case 'crowd': {
         // Una delle due curve, dietro le porte.
         const side = Math.random() < 0.5 ? -1 : 1;
         const x = side * (CONFIG.pitch.length / 2 + 8.5);
-        subjects = [areaSubject('Pubblico', { x, y: 0.8, z: -9 }, { x, y: 4, z: 9 })];
+        const z = Math.min(9, CONFIG.pitch.width / 2 + 1);
+        subjects = [areaSubject('Pubblico', { x, y: 0.8, z: -z }, { x, y: 3, z })];
         hotX = x;
         break;
       }

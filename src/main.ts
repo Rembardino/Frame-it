@@ -55,6 +55,7 @@ resize();
 
 /** Nel debug, quando non c'è un momento: "segui l'azione" (largo su chi ha palla), non valutato. */
 function ambientInput() {
+  if (SPORT === 'boxe') return frameInput(match.actors.map((a) => actorSubject(a, 'Pugile')), 0, 'medium');
   const b = match.ball;
   let near = match.actors[0];
   for (const a of match.actors) if (a.pos.distanceTo(b.pos) < near.pos.distanceTo(b.pos)) near = a;
@@ -228,7 +229,8 @@ if (params.has('autostart')) start();
 
 let last = performance.now();
 stage.renderer.setAnimationLoop((now) => {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  // Il timestamp del primo RAF può precedere performance.now() registrato durante l'avvio.
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;
 
   // Replay: la partita è in pausa, si rivede la clip registrata.

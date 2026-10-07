@@ -85,6 +85,7 @@ export class ActorViews {
       const shorts = new THREE.Mesh(geo.shorts, mat(c.shorts));
       shorts.position.y = 0.95;
       const torso = new THREE.Mesh(geo.torso, mat(c.shirt));
+      if (SPORT === 'boxe' && a.role === 'fwd') torso.material = skin;
       torso.position.y = 1.335;
       const armL = new THREE.Mesh(geo.arm, skin);
       armL.position.set(0, 1.57, 0.31);
@@ -93,6 +94,23 @@ export class ActorViews {
       const head = new THREE.Mesh(geo.head, skin);
       head.position.y = 1.78;
       body.add(legL, legR, shorts, torso, armL, armR, head);
+
+      if (SPORT === 'boxe' && a.role === 'fwd') {
+        for (const arm of [armL, armR]) {
+          const glove = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), mat(c.shorts));
+          glove.position.y = -0.56; arm.add(glove);
+        }
+      }
+      if (SPORT === 'tennis' && a.role === 'fwd') {
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.3, 6), mat(0x232735));
+        handle.position.y = -0.7;
+        const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.018, 6, 20), mat(c.shirt));
+        hoop.scale.y = 1.25; hoop.position.y = -1.05;
+        const strings = new THREE.Mesh(new THREE.CircleGeometry(0.21, 20),
+          new THREE.MeshBasicMaterial({ color: 0xd6e2ee, transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+        strings.scale.y = 1.25; strings.position.y = -1.05;
+        armR.add(handle, hoop, strings);
+      }
 
       const shadow = new THREE.Mesh(shadowGeo, shadowMat);
       shadow.scale.setScalar(1.3 * V.playerScale);
@@ -103,7 +121,9 @@ export class ActorViews {
     // Pallone sfaccettato bianco/nero (basket: arancione con cuciture scure): così si vede anche la rotazione.
     const ballGeo = new THREE.IcosahedronGeometry(BALL_RADIUS, 1);
     const colors: number[] = [];
-    const [light, dark] = SPORT === 'basket' ? [[0.93, 0.42, 0.1], [0.15, 0.08, 0.05]] : [[1, 1, 1], [0.12, 0.12, 0.12]];
+    const [light, dark] = SPORT === 'basket' ? [[0.93, 0.42, 0.1], [0.15, 0.08, 0.05]]
+      : SPORT === 'tennis' ? [[0.88, 1, 0.18], [0.96, 1, 0.72]]
+      : SPORT === 'pallavolo' ? [[1, 0.86, 0.25], [0.14, 0.35, 0.85]] : [[1, 1, 1], [0.12, 0.12, 0.12]];
     for (let f = 0; f < ballGeo.attributes.position.count / 3; f++) {
       const c = f % 4 === 0 ? dark : light;
       for (let k = 0; k < 3; k++) colors.push(...c);
@@ -112,6 +132,7 @@ export class ActorViews {
     this.ball = new THREE.Mesh(ballGeo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
     this.ballShadow = new THREE.Mesh(shadowGeo, shadowMat);
     scene.add(this.ball, this.ballShadow);
+    this.ball.visible = this.ballShadow.visible = SPORT !== 'boxe';
   }
 
   update(dt: number) {
@@ -161,6 +182,45 @@ export class ActorViews {
     const wiggle = (f: number, phase = 0) => Math.sin(t * f + a.id + phase);
 
     switch (a.pose) {
+      case 'guard':
+        p.armL = p.armR = 2; p.raiseL = p.raiseR = 0.2; p.lean = -0.08;
+        p.legSpread = 0.18;
+        break;
+      case 'jab':
+      case 'hook':
+      case 'uppercut': {
+        const k = Math.sin(clamp(pt / a.poseDur, 0, 1) * Math.PI);
+        p.armL = 2;
+        p.armR = a.pose === 'uppercut' ? 1.5 + k : 2 - k * 0.5;
+        p.raiseR = a.pose === 'hook' ? 0.85 * k : 0.15;
+        p.lean = -0.2 * k; p.tiltSide = a.pose === 'hook' ? 0.18 * k : 0;
+        break;
+      }
+      case 'recoil':
+        p.lean = 0.35 * Math.sin(clamp(pt / a.poseDur, 0, 1) * Math.PI);
+        p.armL = p.armR = 2;
+        break;
+      case 'racket':
+      case 'backhand': {
+        const k = Math.sin(clamp(pt / a.poseDur, 0, 1) * Math.PI);
+        p.armR = 1.4 + k; p.raiseR = a.pose === 'backhand' ? -0.8 * k : 0.7 * k;
+        p.armL = 0.7; p.lean = -0.12; break;
+      }
+      case 'serve':
+        p.armL = 2.7; p.armR = 2.9; p.lift = 0.2; p.lean = 0.1;
+        break;
+      case 'receive':
+        p.armL = p.armR = 1.5; p.lean = -0.3; p.lift = -0.12; p.legSpread = 0.35;
+        break;
+      case 'set':
+        p.armL = p.armR = 2.9; p.lift = 0.15; p.legSpread = 0.2;
+        break;
+      case 'spike':
+      case 'block': {
+        const k = Math.sin(clamp(pt / a.poseDur, 0, 1) * Math.PI);
+        p.lift = 0.9 * k; p.armR = 2.9; p.armL = a.pose === 'block' ? 2.9 : 1.3;
+        p.lean = -0.1 * k; p.legSwing = 0; break;
+      }
       case 'dive': {
         const k = clamp(pt * 5, 0, 1);
         // poseDir è il lato nel mondo; lo converto nel lato locale del portiere.

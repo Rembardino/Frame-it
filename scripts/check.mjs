@@ -1,15 +1,20 @@
 // Controlli rapidi senza grafica: partita automatica (3 minuti simulati) per ogni sport + Scoring Module.
 // Uso: npm run check
 import { createServer } from 'vite';
+import { checkSports } from './check-sports.mjs';
 
 const assert = (cond, msg) => { if (!cond) throw new Error('FALLITO: ' + msg); };
-for (const sport of ['calcio', 'basket']) {
+for (const sport of ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo']) {
 // Lo sport si sceglie dall'URL: qui lo simulo. Un server nuovo per sport = moduli ricaricati da zero.
 globalThis.location = { search: '?sport=' + sport };
 const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' });
 try {
   console.log(`
 ===== ${sport.toUpperCase()} =====`);
+  if (sport === 'boxe' || sport === 'tennis' || sport === 'pallavolo') {
+    await checkSports(server, sport);
+    continue;
+  }
   const { CONFIG } = await server.ssrLoadModule('/src/config.ts');
   const { LIBRARY } = await server.ssrLoadModule('/src/events/library.ts');
   const cat = (id) => LIBRARY.find((d) => d.id === id);

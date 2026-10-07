@@ -173,6 +173,9 @@ export class EventInstance {
       case 'pose':
         m.setPose(role(s.who), s.pose, s.dur, s.face ? role(s.face) : null);
         return true;
+      case 'sport':
+        m.sportSimulation?.action(s.action, role(s.who), s.target ? role(s.target) : undefined);
+        return true;
       case 'whistle':
         m.stopPlay();
         this.stoppedPlay = true;
@@ -438,6 +441,7 @@ export class Director {
         case 'holder': a = b.holder; break;
         case 'scorer': a = scorer; break;
         case 'referee': a = free(m.referee) ? m.referee : null; break;
+        case 'coach': a = m.coaches.find((x) => x.team === teamOf(r.side) && free(x)) ?? null; break;
         case 'keeper': a = m.actors.find((x) => x.role === 'gk' && x.team === teamOf(r.side) && !taken.has(x)) ?? null; break;
         case 'extra': a = m.spawnExtra(r.kind, resolvePoint(r.at, attack, mirror, roles)); if (a) spawned.push(a); break;
         case 'player': {

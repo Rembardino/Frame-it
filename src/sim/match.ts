@@ -12,6 +12,10 @@
  */
 import * as THREE from 'three';
 import { CONFIG, SPORT } from '../config';
+import { TennisSimulation } from './sports/tennis';
+import { VolleyballSimulation } from './sports/volleyball';
+import { BoxingSimulation } from './sports/boxing';
+import type { SportSimulation } from './sports/types';
 
 export type TeamId = 0 | 1;
 /** ref = arbitro, coach = allenatore a bordo campo; fan e steward compaiono solo durante l'invasione. */
@@ -21,7 +25,8 @@ export type Pose =
   | 'normal' | 'dive' | 'celebrate' | 'dejected' | 'fall' | 'tackle' | 'stumble'
   | 'protest' | 'argue' | 'shove' | 'card' | 'windUp' | 'kick' | 'crouch' | 'wave'
   /** Basket: tiro in sospensione e passaggio a due mani. */
-  | 'shoot' | 'throw';
+  | 'shoot' | 'throw' | 'racket' | 'backhand' | 'serve' | 'receive' | 'set' | 'spike' | 'block'
+  | 'guard' | 'jab' | 'hook' | 'uppercut' | 'recoil';
 export type MatchPhase = 'play' | 'goal' | 'reset' | 'dead';
 export type ShotOutcome = 'goal' | 'save' | 'wide';
 
@@ -101,7 +106,12 @@ const PARKING = new THREE.Vector3(0, 0, -80);
 const LOCKED: Pose[] = ['dive', 'fall', 'tackle'];
 
 /** Calcio a 7: 1-3-2-1. Metri su un campo 60x40, scalati sulla dimensione reale. */
-const FORMATION: { role: Role; x: number; z: number }[] = BASKET
+const FORMATION: { role: Role; x: number; z: number }[] = SPORT === 'tennis' || SPORT === 'boxe'
+  ? [{ role: 'fwd', x: 0, z: 0 }]
+  : SPORT === 'pallavolo'
+  ? [{ role: 'fwd', x: 0, z: 0 }, { role: 'mid', x: 0, z: 0 }, { role: 'fwd', x: 0, z: 0 },
+    { role: 'def', x: 0, z: 0 }, { role: 'def', x: 0, z: 0 }, { role: 'def', x: 0, z: 0 }]
+  : BASKET
   ? [
     // Basket: posizioni d'attacco, in metri dalla linea di fondo attaccata (x) e laterali (z).
     // mid = playmaker, fwd = ali, def = lunghi (sotto canestro).
@@ -157,6 +167,7 @@ function makeActor(id: number, team: TeamId, role: Role, base = { x: 0, z: 0 }):
 }
 
 export class Match {
+  readonly sportSimulation: SportSimulation | null;
   /** I 14 giocatori. */
   readonly actors: Actor[] = [];
   /** Arbitro, allenatori, tifoso, steward. */
@@ -225,7 +236,14 @@ export class Match {
       a.pos.copy(PARKING);
       this.extras.push(a);
     }
-    this.kickoff(0);
+    this.sportSimulation = SPORT === 'tennis' ? new TennisSimulation(this)
+      : SPORT === 'pallavolo' ? new VolleyballSimulation(this)
+      : SPORT === 'boxe' ? new BoxingSimulation(this) : null;
+    if (!this.sportSimulation) this.kickoff(0);
+    else {
+      this.referee.pos.set(0, 0, -(W / 2 + 1));
+      this.referee.target.copy(this.referee.pos);
+    }
   }
 
   /** Giocatori + extra attivi. */
@@ -238,6 +256,15 @@ export class Match {
     this.phaseTime += dt;
     this.excitement = Math.max(0, this.excitement - dt * 0.2);
     this.clock += dt;
+
+    if (this.sportSimulation) {
+      this.sportSimulation.update(dt);
+      this.updateCoaches();
+      const star = this.sky.star;
+      if (star.active && (star.t += dt) >= star.dur) star.active = false;
+      this.moveActors(dt);
+      return;
+    }
 
     switch (this.phase) {
       case 'play':
@@ -367,6 +394,7 @@ export class Match {
   endMatch() {
     this.stopPlay();
     this.restartTaker = null;
+    if (this.sportSimulation) this.everyone.forEach((a) => { a.target.copy(a.pos); a.vel.set(0, 0, 0); });
     this.setPose(this.referee, 'card', 2);
   }
 
@@ -823,7 +851,8 @@ export class Match {
 
       const sp = Math.hypot(a.vel.x, a.vel.z);
       const look = a.faceTarget?.pos ?? this.ball.pos;
-      const want = sp > 0.6 ? Math.atan2(a.vel.z, a.vel.x) : Math.atan2(look.z - a.pos.z, look.x - a.pos.x);
+      const facingOpponent = SPORT === 'boxe' && a.role === 'fwd' && a.faceTarget;
+      const want = sp > 0.6 && !facingOpponent ? Math.atan2(a.vel.z, a.vel.x) : Math.atan2(look.z - a.pos.z, look.x - a.pos.x);
       a.heading += wrapAngle(want - a.heading) * Math.min(1, dt * 8);
       a.runPhase += sp * dt * 2.2;
     }

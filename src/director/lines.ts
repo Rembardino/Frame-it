@@ -31,11 +31,33 @@ const BASKET_LINES: Partial<typeof CALCIO_LINES> = {
   end: ['Sirena finale. Vediamo cosa hai combinato.', 'Fine! Spegni tutto, si va al montaggio.'],
 };
 
-export const LINES = { ...CALCIO_LINES, ...(SPORT === 'basket' ? BASKET_LINES : {}) };
+const SPORT_LINES: Partial<Record<typeof SPORT, Partial<typeof CALCIO_LINES>>> = {
+  basket: BASKET_LINES,
+  tennis: {
+    kickoff: ['Si comincia! Servizio e risposta sempre in quadro.', 'Siamo live sul campo: segui lo scambio!'],
+    goal: ['Punto! Dammi la reazione del tennista!'],
+    bad: ['La palla passa la rete. La camera deve seguirla!', 'Hai perso la racchetta proprio sul colpo.'],
+    end: ['Fine della sessione. Vediamo i tuoi game migliori.'],
+  },
+  boxe: {
+    kickoff: ['Prima ripresa! Tieni entrambi i pugili in quadro.', 'Suona il gong: segui guantoni e volti!'],
+    goal: ['Colpo pulito! Stringi sulla reazione!'],
+    bad: ['Il colpo era nel ring. La camera era altrove.', 'Non tagliare il pugile quando parte la combinazione!'],
+    end: ['Gong finale. Vediamo le tue riprese migliori.'],
+  },
+  pallavolo: {
+    kickoff: ['Si parte dal servizio! Preparati ai tre tocchi.', 'Siamo live: ricezione, alzata, attacco!'],
+    goal: ['Punto! Dammi la squadra che esulta!'],
+    bad: ['La schiacciata è sopra la rete: alza la camera!', 'Devi passare dal palleggiatore allo schiacciatore!'],
+    end: ['Fine della sessione. Vediamo i tuoi scambi migliori.'],
+  },
+};
+export const LINES = { ...CALCIO_LINES, ...SPORT_LINES[SPORT] };
 
 /** Giudizio finale in base alle stelle medie (soglia minima -> frase). */
 export const VERDICTS: [number, string][] = [
-  [4.5, SPORT === 'basket' ? 'Ti voglio alle finali NBA.' : 'Ti voglio alla finale di Champions.'],
+  [4.5, ({ calcio: 'Ti voglio alla finale di Champions.', basket: 'Ti voglio alle finali NBA.',
+    tennis: 'Ti voglio a Wimbledon.', boxe: 'Ti voglio a bordo ring per il titolo.', pallavolo: 'Ti voglio alla finale mondiale.' })[SPORT]],
   [3.8, 'Niente male, ragazzo. Domani ti richiamo.'],
   [3.0, 'Ho visto di peggio. Non molto peggio.'],
   [2.0, 'La prossima volta la camera la tiene il magazziniere.'],
@@ -47,7 +69,7 @@ export interface OrderDef {
   id: string;
   label: string;
   lines: string[];
-  target: 'coach' | 'crowd' | 'keeper' | 'referee';
+  target: 'coach' | 'crowd' | 'keeper' | 'referee' | 'athlete';
   size: ShotSize;
 }
 
@@ -59,4 +81,13 @@ const ALL_ORDERS: OrderDef[] = [
 ];
 
 /** Il basket non ha portieri. */
-export const ORDERS = ALL_ORDERS.filter((o) => SPORT !== 'basket' || o.target !== 'keeper');
+export const ORDERS: OrderDef[] = [
+  ...ALL_ORDERS.filter((o) => SPORT === 'calcio' || o.target !== 'keeper').map((o) =>
+    SPORT === 'calcio' || SPORT === 'basket' ? o : { ...o, lines: o.target === 'coach'
+      ? ['Primo piano sul coach!'] : o.target === 'crowd' ? ['Stacca sul pubblico!'] : ['Inquadra l’arbitro!'] }),
+  ...(SPORT === 'boxe' || SPORT === 'tennis' || SPORT === 'pallavolo' ? [{
+    id: 'athlete', label: SPORT === 'boxe' ? 'Pugile' : SPORT === 'tennis' ? 'Tennista' : 'Palleggiatore',
+    lines: [SPORT === 'boxe' ? 'Primo piano sul pugile, guarda la guardia!' : SPORT === 'tennis' ? 'Stringi sul tennista prima del servizio!' : 'Dammi il palleggiatore!'],
+    target: 'athlete' as const, size: 'medium' as const,
+  }] : []),
+];

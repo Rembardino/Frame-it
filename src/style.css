@@ -70,7 +70,7 @@ html, body {
   color: #ffd23f;
 }
 .tag { margin-top: 14px; opacity: 0.75; font-size: 15px; }
-.sports { display: flex; gap: 10px; margin-top: 22px; }
+.sports { display: flex; flex-wrap: wrap; justify-content: center; max-width: min(620px, 92vw); gap: 10px; margin-top: 22px; }
 .sports button {
   padding: 9px 22px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.5);
   background: rgba(0, 0, 0, 0.3); color: #fff; font: 800 15px/1 system-ui, sans-serif; letter-spacing: 0.08em;
@@ -163,6 +163,9 @@ html, body {
   transition: opacity 0.25s;
 }
 .voice.hidden { opacity: 0; }
+@media (max-width: 1000px) {
+  .voice { top: calc(var(--gy) + 42px); max-width: 74vw; font-size: 16px; }
+}
 .voice .tag, .sum-verdict .tag {
   display: inline-block; margin-right: 8px; padding: 1px 6px; border-radius: 3px;
   background: #4fd1ff; color: #06101f; font-size: 11px; font-weight: 900; letter-spacing: 0.1em; vertical-align: 1px;

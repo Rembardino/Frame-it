@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG, SPORT } from '../config';
+import { sportCourt } from './sportCourts';
 
 const L = CONFIG.pitch.length;
 const W = CONFIG.pitch.width;
@@ -37,6 +38,7 @@ export function createStage(container: HTMLElement) {
 
   scene.add(sky(), stars(), ground(), floodlights(), adBoards());
   if (SPORT === 'basket') scene.add(court(renderer), hoop(1), hoop(-1));
+  else if (SPORT === 'boxe' || SPORT === 'tennis' || SPORT === 'pallavolo') scene.add(sportCourt(renderer));
   else scene.add(pitch(renderer), goal(1), goal(-1), cornerFlags());
   const { mesh: stands, rows: seatRows } = standsAndSeats();
   scene.add(stands);

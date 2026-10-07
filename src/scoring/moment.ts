@@ -57,12 +57,18 @@ export function actorSubject(a: Actor, label: string, weight = 1): Subject {
       } else if (a.pose === 'celebrate' || a.pose === 'wave') {
         head.y += 0.2; // saltelli
       }
+      if (a.pose === 'spike' || a.pose === 'block') {
+        const lift = 0.9 * Math.sin(Math.min(1, a.poseTime / a.poseDur) * Math.PI) * s;
+        head.y += lift; body.y += lift;
+      }
+      const raised = ['serve', 'set', 'spike', 'block'].includes(a.pose);
+      const handsY = raised ? head.y + (SPORT === 'tennis' ? 1.2 : 0.55) * s : 1 * s;
       return [
         { p: head, kind: 'head' },
         { p: body, kind: 'body' },
         { p: { x, y: 0.05, z }, kind: 'feet' },
-        { p: { x: x + rx, y: 1 * s, z: z + rz }, kind: 'hands' },
-        { p: { x: x - rx, y: 1 * s, z: z - rz }, kind: 'hands' },
+        { p: { x: x + rx, y: handsY, z: z + rz }, kind: 'hands' },
+        { p: { x: x - rx, y: handsY, z: z - rz }, kind: 'hands' },
       ];
     },
   };

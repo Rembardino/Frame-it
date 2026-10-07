@@ -5,6 +5,7 @@
  */
 import type { EffectName, Pose, Role, ShotOutcome } from '../sim/match';
 import type { ShotSize } from '../scoring/scoring';
+import type { SportAction } from '../sim/sports/types';
 
 /** order = ordine del regista (non sta in libreria: lo crea la Director Voice). */
 export type Category = 'main' | 'distraction' | 'rare' | 'order';
@@ -18,6 +19,7 @@ export type RolePick = { label: string } & (
   | { pick: 'player'; side: Side; roles?: Role[]; near?: string; farFromBall?: boolean; advanced?: boolean }
   | { pick: 'keeper'; side: Side }
   | { pick: 'referee' }
+  | { pick: 'coach'; side: Side }
   | { pick: 'extra'; kind: 'fan' | 'steward'; at: Point }
   | { pick: 'scorer' }                       // solo per eventi scatenati da un gol
 );
@@ -42,6 +44,7 @@ export type Step = { t: number } & (
   | { do: 'restart'; side: Side }                          // riprende il gioco
   | { do: 'release'; who?: string[] }                      // restituisce gli attori al gioco automatico (tutti se omesso)
   | { do: 'effect'; effect: EffectName }                   // effetto speciale (stella cadente...), preparato a inizio evento
+  | { do: 'sport'; action: SportAction; who: string; target?: string }
 );
 
 /**
