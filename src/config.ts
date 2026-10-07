@@ -276,7 +276,7 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
       ],
       /** Ritmo più alto: nel basket si cambia giocatore in continuazione. Punteggio in punti, non in gol. */
       director: {
-        firstMainAt: 3, mainEvery: [6, 9],
+        firstMainAt: 3, mainEvery: [8, 11],
         firstDistractionAt: 14, distractionEvery: [15, 24],
         distractionMinDist: 7,
         maxGoalLead: 10, goalBudget: 999, goalChance: 0.5,

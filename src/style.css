@@ -70,7 +70,14 @@ html, body {
   color: #ffd23f;
 }
 .tag { margin-top: 14px; opacity: 0.75; font-size: 15px; }
-.cta { margin-top: 28px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1.6s infinite; }
+.sports { display: flex; gap: 10px; margin-top: 22px; }
+.sports button {
+  padding: 9px 22px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.3); color: #fff; font: 800 15px/1 system-ui, sans-serif; letter-spacing: 0.08em;
+  text-transform: uppercase; cursor: pointer;
+}
+.sports button.on { background: #ffd23f; border-color: #ffd23f; color: #0b1230; }
+.cta { margin-top: 22px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; animation: blink 1.6s infinite; }
 
 #rotate { display: none; z-index: 10; font-size: 18px; font-weight: 700; padding: 24px; }
 @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }

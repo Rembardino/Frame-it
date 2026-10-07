@@ -16,10 +16,10 @@ export const BASKET: EventDef[] = [
     outcomeLabels: { goal: 'Contropiede e schiacciata!', save: 'Schiacciata sul ferro!', wide: 'Contropiede sprecato' },
     category: 'main',
     hint: 'Ripartenza! Corrono tutti!',
-    weight: 2.5,
+    weight: 1.2,
     importance: 1,
     ownsBall: true,
-    holderGoalDist: [12, 30],
+    holderGoalDist: [18, 24],
     roles: {
       carrier: { label: 'Portatore', pick: 'holder' },
       runner: { label: 'Schiacciatore', pick: 'player', side: 'attack', roles: ['fwd', 'mid'], advanced: true },
@@ -57,7 +57,7 @@ export const BASKET: EventDef[] = [
     weight: 3,
     importance: 0.8,
     ownsBall: true,
-    holderGoalDist: [4, 16],
+    holderGoalDist: [4, 22],
     roles: {
       passer: { label: 'Playmaker', pick: 'holder' },
       shooter: { label: 'Tiratore', pick: 'player', side: 'attack', roles: ['fwd'] },
@@ -95,7 +95,7 @@ export const BASKET: EventDef[] = [
     weight: 2.5,
     importance: 0.8,
     ownsBall: true,
-    holderGoalDist: [5, 14],
+    holderGoalDist: [5, 16],
     roles: {
       driver: { label: 'Attaccante', pick: 'holder' },
       defender: { label: 'Difensore', pick: 'player', side: 'defense', roles: [...ALL], near: 'driver' },
@@ -130,7 +130,7 @@ export const BASKET: EventDef[] = [
     weight: 2.5,
     importance: 0.9,
     ownsBall: true,
-    holderGoalDist: [4, 16],
+    holderGoalDist: [4, 20],
     roles: {
       a: { label: 'Playmaker', pick: 'holder' },
       b: { label: 'Ala', pick: 'player', side: 'attack', roles: ['fwd', 'mid'] },

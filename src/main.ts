@@ -2,7 +2,7 @@
  * Frame It: Live Sports TV — bootstrap e game loop.
  */
 import './style.css';
-import { CONFIG } from './config';
+import { CONFIG, SPORT, SPORT_LIST } from './config';
 import { createStage } from './render/stage';
 import { ActorViews } from './render/actors';
 import { Crowd, type CrowdState } from './render/crowd';
@@ -163,19 +163,23 @@ function onResult(r: DirectorResult) {
 /** Record salvato sul dispositivo (localStorage può non esserci: navigazione privata, iframe...). */
 function saveRecord(points: number) {
   let record = 0;
-  try { record = Number(localStorage.getItem('frameit.record')) || 0; } catch { /* niente salvataggi */ }
+  // Un record per sport (il calcio tiene la chiave storica).
+  const key = SPORT === 'calcio' ? 'frameit.record' : `frameit.record.${SPORT}`;
+  try { record = Number(localStorage.getItem(key)) || 0; } catch { /* niente salvataggi */ }
   const isRecord = points > record;
-  if (isRecord) try { localStorage.setItem('frameit.record', String(points)); } catch { /* idem */ }
+  if (isRecord) try { localStorage.setItem(key, String(points)); } catch { /* idem */ }
   return { record: Math.max(record, points), isRecord };
 }
 
 let ended = false;
 function checkEnd() {
+  if (ended || match.clock < CONFIG.match.durationSec) return;
+  // Allo scadere non programmare altre azioni; quella già in corso può finire normalmente.
+  director.stop();
   const mainBusy = director.active.some((i) => i.def.category === 'main');
-  if (ended || match.clock < CONFIG.match.durationSec || match.phase !== 'play' || mainBusy) return;
+  if (match.phase !== 'play' || mainBusy) return;
   ended = true;
   match.endMatch();
-  director.stop();
   voice.end();
   // Lascia finire i voti in corso e la battuta del regista, poi il riepilogo.
   setTimeout(() => {
@@ -191,6 +195,7 @@ function checkEnd() {
 let running = false;
 const startScreen = $('start');
 function start() {
+  if (running) return;
   startScreen.classList.add('hidden');
   $('zoomctl').classList.toggle('hidden', !CONFIG.camera.zoomButtons);
   running = true;
@@ -201,6 +206,20 @@ function start() {
     .catch(() => {}); // iOS / iframe: niente fullscreen, pazienza
 }
 startScreen.addEventListener('pointerup', start, { once: true });
+// Scelta dello sport: ricarica la pagina con ?sport=... (ogni sport ha campo, regole ed eventi suoi).
+for (const s of SPORT_LIST) {
+  const b = document.createElement('button');
+  b.textContent = s.name;
+  b.className = s.id === SPORT ? 'on' : '';
+  b.addEventListener('pointerup', (e) => {
+    e.stopPropagation(); // non far partire la partita
+    if (s.id === SPORT) return start();
+    const p = new URLSearchParams(location.search);
+    p.set('sport', s.id);
+    location.search = p.toString();
+  });
+  $('sports').append(b);
+}
 $('album-btn').addEventListener('pointerup', (e) => {
   e.stopPropagation(); // non far partire la partita
   showAlbum();

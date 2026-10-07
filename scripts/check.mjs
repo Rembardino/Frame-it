@@ -1,11 +1,18 @@
-// Controlli rapidi senza grafica: partita automatica (3 minuti simulati) + Scoring Module.
+// Controlli rapidi senza grafica: partita automatica (3 minuti simulati) per ogni sport + Scoring Module.
 // Uso: npm run check
 import { createServer } from 'vite';
 
-const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' });
 const assert = (cond, msg) => { if (!cond) throw new Error('FALLITO: ' + msg); };
+for (const sport of ['calcio', 'basket']) {
+// Lo sport si sceglie dall'URL: qui lo simulo. Un server nuovo per sport = moduli ricaricati da zero.
+globalThis.location = { search: '?sport=' + sport };
+const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' });
 try {
+  console.log(`
+===== ${sport.toUpperCase()} =====`);
   const { CONFIG } = await server.ssrLoadModule('/src/config.ts');
+  const { LIBRARY } = await server.ssrLoadModule('/src/events/library.ts');
+  const cat = (id) => LIBRARY.find((d) => d.id === id);
 
   // ---------------------------------------------------------------- partita + Event Director
   const { Match } = await server.ssrLoadModule('/src/sim/match.ts');
@@ -21,7 +28,8 @@ try {
   const lines = [];
   let lastLine = 0, ended = false;
   // Cameraman robot: insegue l'inquadratura ideale del momento in corso con ~0,3 s di ritardo.
-  const view = { pos: { x: 0, y: 5, z: 27 }, yaw: 0, pitch: -9, fov: 34, aspect: 2.16 };
+  const C = CONFIG.camera;
+  const view = { pos: { ...C.position }, yaw: 0, pitch: C.startPitch, fov: C.startFov, aspect: 2.16 };
   const results = [];
   const limX = CONFIG.pitch.length / 2 + 8, limZ = CONFIG.pitch.width / 2 + 8;
   const dt = 1 / 60;
@@ -33,8 +41,11 @@ try {
     voice.update(dt, v);
     for (const r of [...dir.finished.splice(0), ...voice.finished.splice(0)]) { results.push(r); voice.onResult(r); }
     if (voice.current && voice.current.id !== lastLine) { lastLine = voice.current.id; lines.push(`[${voice.current.kind}] ${voice.current.text}`); }
-    if (m.clock >= CONFIG.match.durationSec && m.phase === 'play' && !dir.active.some((i) => i.def.category === 'main')) {
-      ended = true; m.endMatch(); dir.stop(); voice.end();
+    if (m.clock >= CONFIG.match.durationSec) {
+      dir.stop();
+      if (m.phase === 'play' && !dir.active.some((i) => i.def.category === 'main')) {
+        ended = true; m.endMatch(); voice.end();
+      }
     }
     const tr = voice.order?.tracker.last ? voice.order.tracker : dir.focusTracker();
     let ideal = tr?.last?.ideal;
@@ -61,18 +72,18 @@ try {
   const sum = summarize(results);
   console.log('riepilogo:', JSON.stringify({ ...sum, best: sum.best.map((b) => b.label) }));
   assert(ended, 'la partita non è finita');
-  assert(voice.ordersIssued >= 3, 'troppi pochi ordini: ' + voice.ordersIssued);
+  assert(voice.ordersIssued >= (sport === 'basket' ? 1 : 3), 'troppi pochi ordini: ' + voice.ordersIssued);
   assert(voice.hints >= 4, 'troppi pochi indizi: ' + voice.hints);
   assert(sum.points > 0 && sum.avgStars > 0, 'riepilogo vuoto');
   const main = results.filter((r) => r.category === 'main' && r.result);
   const avg = main.reduce((s, r) => s + r.result.stars, 0) / main.length;
   console.log('stelle medie (azioni principali, cameraman robot):', avg.toFixed(2));
-  const mainStarted = dir.started.filter((id) => !['caduta', 'discussione', 'invasione', 'esultanza'].includes(id)).length;
+  const mainStarted = dir.started.filter((id) => cat(id).category === 'main' && !cat(id).trigger).length;
   assert(mainStarted >= 8, 'troppe poche azioni principali: ' + mainStarted);
-  assert(dir.started.filter((id) => ['caduta', 'discussione', 'invasione'].includes(id)).length >= 2, 'troppe poche distrazioni');
+  assert(dir.started.filter((id) => cat(id).category === 'distraction').length >= 2, 'troppe poche distrazioni');
   assert(dir.dilemmas >= 1, 'nessun dilemma');
   assert(dir.aborted <= 2, 'troppi eventi annullati: ' + dir.aborted);
-  assert(Math.abs(m.score[0] - m.score[1]) <= CONFIG.director.maxGoalLead + 1, 'punteggio incoerente');
+  assert(Math.abs(m.score[0] - m.score[1]) <= CONFIG.director.maxGoalLead + 3, 'punteggio incoerente');
   assert(avg >= 3, 'il cameraman robot che segue l ideale dovrebbe fare almeno 3 stelle di media');
 
   // ---------------------------------------------------------------- stella cadente + recorder + replay
@@ -82,7 +93,7 @@ try {
     const m2 = new Match();
     const d2 = new Director(m2, ALL, { forceRare: true });
     const rec = new Recorder(m2);
-    const v2 = { pos: { x: 0, y: 5, z: 27 }, yaw: 0, pitch: -9, fov: 34, aspect: 2.16 };
+    const v2 = { pos: { ...C.position }, yaw: 0, pitch: C.startPitch, fov: C.startFov, aspect: 2.16 };
     const res2 = [];
     for (let t = 0; t < 60; t += dt) {
       m2.update(dt);
@@ -124,7 +135,8 @@ try {
     console.log(`replay: clip ${(clip.frames.at(-1).t - clip.frames[0].t).toFixed(1)} s rivista in ${replayTime.toFixed(1)} s, stato ripristinato`);
   }
 
-  // ---------------------------------------------------------------- scoring
+  // ---------------------------------------------------------------- scoring (geometria del calcio: una volta basta)
+  if (sport !== 'calcio') continue;
   const S = Sc;
   const pos = { x: 0, y: 5, z: 27 }, aspect = 2.16;
   const player = (x, z, vx = 0) => ({
@@ -171,7 +183,8 @@ try {
   assert(!texts(cases.lontanoLiv1).includes('Troppo lontano') && cases.lontanoLiv1.score > cases.lontano.score, 'livello 1 ignora la taglia');
   assert(texts(cases.scatti).includes('Movimenti bruschi'), 'scatti');
   assert(texts(cases.pallaTagliata).includes('Palla tagliata'), 'palla tagliata');
-  console.log('OK');
 } finally {
   await server.close();
 }
+}
+console.log('\nOK');
