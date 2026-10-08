@@ -40,15 +40,21 @@
     </div>
 
     <div id="zoomctl" class="hidden"><button id="zin" data-i18n-aria="Avvicina: E o più" data-i18n-title="Avvicina (E o +)" aria-label="Zoom in: E or plus" title="Zoom in (E or +)">+</button><button id="zout" data-i18n-aria="Allontana: Q o meno" data-i18n-title="Allontana (Q o −)" aria-label="Zoom out: Q or minus" title="Zoom out (Q or −)">−</button></div>
+    <div id="gyro-controls" class="hidden"><button id="gyro-toggle" class="secondary" aria-pressed="false" data-i18n="Giroscopio: OFF">Gyroscope: OFF</button><button id="gyro-center" class="secondary hidden" data-i18n="Ricentra">Recenter</button></div>
+    <div id="gyro-feedback" class="gyro-feedback hidden" role="status"></div>
 
     <div id="start" class="overlay">
       <div class="logo">FRAME IT<small>LIVE SPORTS TV</small></div>
       <p class="tag" data-i18n="Live Sports &amp; Arcade Camera Game">Live Sports &amp; Arcade Camera Game</p>
       <div id="language-picker" class="language-picker"><label for="language" data-i18n="Lingua">Language</label><select id="language"></select></div>
       <div id="sports" class="sports"></div>
-      <p class="cta" data-i18n="Tocca per iniziare">Tap to start</p>
-      <button id="album-btn" class="ghost" data-i18n="Album clip rare">Rare highlights album</button>
+      <button id="start-btn" class="primary cta" data-i18n="Inizia la partita">Start match</button>
+      <div class="menu-actions"><button id="tutorial-btn" class="secondary" data-i18n="Tutorial">Tutorial</button><button id="practice-btn" class="secondary" data-i18n="Allenamento camera">Camera practice</button><button id="gyro-menu" class="secondary" aria-pressed="false" data-i18n="Giroscopio: OFF">Gyroscope: OFF</button><button id="album-btn" class="secondary" data-i18n="Album clip rare">Rare highlights album</button><button id="privacy-options" class="secondary hidden" data-i18n="Opzioni privacy">Privacy options</button></div>
+      <p id="gyro-status" class="gyro-status" role="status" data-i18n="Giroscopio opzionale: attivalo per muovere la camera con il telefono.">Optional gyroscope: turn it on to move the camera with your phone.</p>
+      <div id="app-update" class="app-update hidden" role="status"><p data-i18n="È disponibile una nuova versione dell’app.">A new app version is available.</p><button id="update-now" class="primary" data-i18n="Aggiorna">Update</button><button id="update-later" class="secondary" data-i18n="Più tardi">Later</button></div>
     </div>
+
+    <div id="tutorial" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title"></div>
 
     <div id="album" class="overlay hidden"></div>
 

@@ -16,6 +16,8 @@ import { TennisSimulation } from './sports/tennis';
 import { VolleyballSimulation } from './sports/volleyball';
 import { BoxingSimulation } from './sports/boxing';
 import type { SportSimulation } from './sports/types';
+import { actorMotion, type MotionPose } from '../animation/motion';
+import { steerActor, separateActors } from './locomotion';
 
 export type TeamId = 0 | 1;
 /** ref = arbitro, coach = allenatore a bordo campo; fan e steward compaiono solo durante l'invasione. */
@@ -58,6 +60,11 @@ export interface Actor {
   poseTime: number;
   /** Durata della posa (s), poi torna 'normal'. */
   poseDur: number;
+  previousPose: Pose;
+  previousPoseTime: number;
+  previousPoseDur: number;
+  poseBlendTime: number;
+  poseFrom: MotionPose | null;
   /** Lato del tuffo del portiere (segno lungo z del mondo). */
   poseDir: number;
   /** Da fermo guarda questo attore invece della palla. */
@@ -160,6 +167,9 @@ function makeActor(id: number, team: TeamId, role: Role, base = { x: 0, z: 0 }):
     pose: 'normal',
     poseTime: 0,
     poseDur: Infinity,
+    previousPose: 'normal', previousPoseTime: 0, previousPoseDur: Infinity,
+    poseBlendTime: CONFIG.visuals.poseBlendSec,
+    poseFrom: null,
     poseDir: 0,
     faceTarget: null,
     seed: Math.random() * 100,
@@ -289,7 +299,11 @@ export class Match {
           a.target.copy(this.kickoffSpot(a, this.kickoffTeam));
           a.speedLimit = M.runSpeed * 0.8;
         }
-        if (this.phaseTime > M.resetSec && this.ball.state === 'dead') this.kickoff(this.kickoffTeam);
+        {
+          const taker = this.actors.find(a => a.team === this.kickoffTeam && a.role === 'fwd')!;
+          if (this.phaseTime > M.resetSec && this.ball.state === 'dead' &&
+            xzDist(taker.pos, this.kickoffSpot(taker, this.kickoffTeam)) < 0.7) this.kickoff(this.kickoffTeam);
+        }
         break;
       case 'dead':
         this.updateFormation();
@@ -335,6 +349,11 @@ export class Match {
 
   /** Imposta una posa per dur secondi. Cadere o entrare in scivolata fa perdere la palla. */
   setPose(a: Actor, pose: Pose, dur = Infinity, face: Actor | null = null) {
+    a.poseFrom = actorMotion(a, this.time, this.ball.holder === a);
+    a.previousPose = a.pose;
+    a.previousPoseTime = a.poseTime;
+    a.previousPoseDur = a.poseDur;
+    a.poseBlendTime = 0;
     a.pose = pose;
     a.poseTime = 0;
     a.poseDur = dur;
@@ -488,9 +507,8 @@ export class Match {
 
   private kickoff(team: TeamId) {
     this.setPhase('play');
-    for (const a of this.actors) a.pose = 'normal';
+    for (const a of this.actors) this.setPose(a, 'normal');
     const taker = this.actors.find((a) => a.team === team && a.role === (BASKET ? 'mid' : 'fwd'))!;
-    taker.pos.set(-0.6 * dirOf(team), 0, 0);
     this.giveBall(taker, 0.6);
   }
 
@@ -558,7 +576,13 @@ export class Match {
     if (b.state === 'held' && b.holder) {
       const h = b.holder;
       const presser = this.nearest(b.pos, (a) => a.team !== h.team && a.role !== 'gk' && !a.scripted);
-      if (presser) presser.target.copy(b.pos);
+      if (presser) {
+        // Close the passing lane while leaving room for the ball carrier's feet.
+        tmp.subVectors(h.pos, presser.pos).setY(0).normalize();
+        presser.target.copy(h.pos).addScaledVector(h.vel, 0.22).addScaledVector(tmp, -0.95).setY(0);
+        presser.speedLimit = this.ballScripted ? M.jogSpeed : M.runSpeed;
+        if (BASKET) presser.faceTarget = h;
+      }
       if (this.ballScripted) return;
       this.updateHolder(h, dt);
       if (
@@ -584,7 +608,7 @@ export class Match {
     const sx = L / 60;
     for (const a of this.actors) {
       if (a.scripted || LOCKED.includes(a.pose)) continue;
-      a.speedLimit = M.runSpeed;
+      a.speedLimit = M.jogSpeed;
       const d = dirOf(a.team);
       if (a.role === 'gk') {
         a.target.set(-d * (L / 2 - 1), 0, clamp(b.z * 0.2, -GW + 0.6, GW - 0.6));
@@ -592,12 +616,15 @@ export class Match {
       }
       const inPoss = this.possession === a.team;
       const shift = clamp(b.x * d * 0.55 + (inPoss ? 5 : -3), -8 * sx, 18 * sx);
-      const x = clamp(a.base.x + shift + Math.sin(this.time * 0.4 + a.seed) * 1.5, -L / 2 + 3, L / 2 - 2);
+      const run = inPoss && a.role === 'fwd' ? Math.max(0, Math.sin(this.time * 0.6 + a.seed)) * 4 : 0;
+      let x = clamp(a.base.x + shift + run, -L / 2 + 3, L / 2 - 2);
+      if (inPoss && a.role === 'mid') x = clamp(b.x * d - 4, a.base.x + shift - 3, a.base.x + shift + 5);
       const z = clamp(
         a.base.z * (inPoss ? 1.2 : 0.85) + b.z * 0.3 + Math.cos(this.time * 0.33 + a.seed) * 1.5,
         -W / 2 + 1.5, W / 2 - 1.5,
       );
       a.target.set(x * d, 0, z);
+      if (xzDist(a.pos, a.target) > 5) a.speedLimit = M.runSpeed;
     }
   }
 
@@ -605,19 +632,25 @@ export class Match {
   private updateBasketFormation() {
     for (const a of this.actors) {
       if (a.scripted || LOCKED.includes(a.pose)) continue;
-      a.speedLimit = M.runSpeed;
+      a.speedLimit = M.jogSpeed;
       const d = dirOf(a.team);
       if (this.possession === a.team) {
-        const x = d * (L / 2 - a.base.x) + Math.sin(this.time * 0.5 + a.seed) * 1.2;
-        const z = a.base.z + Math.cos(this.time * 0.4 + a.seed) * 1.2;
+        a.faceTarget = null;
+        // One wing cuts at a time; the other keeps the floor wide for a pass.
+        const cutter = Math.floor(this.time / 4) % 2 === (a.base.z > 0 ? 1 : 0);
+        const cut = a.role === 'fwd' && cutter ? Math.pow(Math.max(0, Math.sin(this.time * Math.PI / 4)), 2) : 0;
+        const x = d * (L / 2 - a.base.x + cut * 2.5);
+        const z = a.base.z * (1 - cut * 0.72) + clamp(this.ball.pos.z * 0.12, -0.6, 0.6);
         a.target.set(x, 0, z);
         clampToPitch(a.target, 0.6);
       } else {
         // Il suo uomo: stesso posto in formazione nell'altra squadra. Si mette tra lui e il proprio canestro.
         const opp = this.actors[(a.id + TEAM_SIZE) % (2 * TEAM_SIZE)];
         tmp.set(hoopX(-d) - opp.pos.x, 0, -opp.pos.z).normalize();
-        a.target.copy(opp.pos).addScaledVector(tmp, 1.3).setY(0);
+        a.target.copy(opp.pos).addScaledVector(opp.vel, 0.18).addScaledVector(tmp, 1.15).setY(0);
+        a.faceTarget = opp;
       }
+      if (xzDist(a.pos, a.target) > 3) a.speedLimit = M.runSpeed;
     }
   }
 
@@ -817,14 +850,13 @@ export class Match {
   // ---------------------------------------------------------------- movimento
 
   private moveActors(dt: number) {
-    const maxDv = M.accel * dt;
     const all = this.everyone;
     for (const a of all) {
+      a.poseBlendTime = Math.min(CONFIG.visuals.poseBlendSec, a.poseBlendTime + dt);
       a.poseTime += dt;
       if (a.poseTime > a.poseDur) {
-        a.pose = 'normal';
-        a.poseDur = Infinity;
-        a.faceTarget = null;
+        this.setPose(a, SPORT === 'boxe' && a.role === 'fwd' ? 'guard' : 'normal', Infinity,
+          SPORT === 'boxe' && a.role === 'fwd' ? this.actors.find(opponent => opponent.team !== a.team)! : null);
       }
       if (a.pose === 'dive') {
         if (a.poseTime > 0) a.pos.z += clamp(a.target.z - a.pos.z, -7 * dt, 7 * dt);
@@ -837,40 +869,23 @@ export class Match {
         a.pos.addScaledVector(a.vel, dt);
         continue;
       }
-      // Velocità desiderata con frenata in arrivo, poi accelerazione limitata.
-      tmp.subVectors(a.target, a.pos).setY(0);
-      const dist = tmp.length();
-      // Mentre carica il calcio rallenta: è parte del segnale premonitore.
-      const limit = a.pose === 'windUp' ? Math.min(a.speedLimit, 2.2) : a.speedLimit;
-      if (dist > 1e-3) tmp.multiplyScalar(Math.min(limit, dist * 2.5) / dist);
-      tmp.sub(a.vel);
-      const dv = tmp.length();
-      if (dv > maxDv) tmp.multiplyScalar(maxDv / dv);
-      a.vel.add(tmp);
-      a.pos.addScaledVector(a.vel, dt);
+      steerActor(a, all, dt);
 
       const sp = Math.hypot(a.vel.x, a.vel.z);
       const look = a.faceTarget?.pos ?? this.ball.pos;
-      const facingOpponent = SPORT === 'boxe' && a.role === 'fwd' && a.faceTarget;
-      const want = sp > 0.6 && !facingOpponent ? Math.atan2(a.vel.z, a.vel.x) : Math.atan2(look.z - a.pos.z, look.x - a.pos.x);
-      a.heading += wrapAngle(want - a.heading) * Math.min(1, dt * 8);
-      a.runPhase += sp * dt * 2.2;
+      const netPlayer = (SPORT === 'tennis' || SPORT === 'pallavolo') && this.actors.includes(a);
+      const facingAction = (SPORT === 'boxe' && a.role === 'fwd') || (netPlayer && sp < 3.5) || !!a.faceTarget;
+      const ownsBall = this.ball.holder === a;
+      const want = sp > 0.6 && !facingAction ? Math.atan2(a.vel.z, a.vel.x)
+        : netPlayer && ownsBall && !a.faceTarget ? (a.team === 0 ? 0 : Math.PI)
+        : Math.atan2(look.z - a.pos.z, look.x - a.pos.x);
+      const turn = wrapAngle(want - a.heading) * (1 - Math.exp(-dt * 9));
+      a.heading += clamp(turn, -6 * dt, 6 * dt);
+      // Shorter steps for shuffles and ring footwork, longer strides at a sprint.
+      const cadence = SPORT === 'boxe' ? 5 : 2.6 - clamp(sp / M.sprintSpeed, 0, 1) * 0.55;
+      a.runPhase += sp * dt * cadence;
     }
-    // Separazione semplice: niente attori compenetrati (una ventina, O(n²) va benissimo).
-    for (let i = 0; i < all.length; i++) {
-      for (let j = i + 1; j < all.length; j++) {
-        const a = all[i].pos;
-        const b = all[j].pos;
-        const dx = b.x - a.x;
-        const dz = b.z - a.z;
-        const d2 = dx * dx + dz * dz;
-        if (d2 > 0.81 || d2 < 1e-6) continue;
-        const d = Math.sqrt(d2);
-        const push = (0.9 - d) / 2 / d;
-        a.x -= dx * push; a.z -= dz * push;
-        b.x += dx * push; b.z += dz * push;
-      }
-    }
+    separateActors(all, dt);
   }
 
   /** Attiva un extra (tifoso, steward) in una posizione. */
@@ -882,6 +897,7 @@ export class Match {
     a.target.copy(at);
     a.vel.set(0, 0, 0);
     a.pose = 'normal';
+    a.previousPose = 'normal'; a.poseBlendTime = CONFIG.visuals.poseBlendSec; a.poseFrom = null;
     return a;
   }
 

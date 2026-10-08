@@ -255,3 +255,135 @@ button.ghost {
 @keyframes wipe { from { left: -60%; } to { left: 110%; } }
 body.replaying #zoomctl, body.replaying .voice, body.replaying .hint, body.replaying .cross,
 body.replaying .edge-canvas, body.replaying .debug-canvas, body.replaying .debug-panel, body.replaying .pts { display: none; }
+
+/* Menu and guide remain reachable on short landscape screens, including with a banner. */
+.hidden { display: none !important; }
+button { touch-action: manipulation; }
+button:focus-visible { outline: 2px solid #ffd23f; outline-offset: 3px; }
+.primary, .secondary, .text-button {
+  min-height: 40px; padding: 9px 16px; border-radius: 999px; font: 700 13px/1.2 system-ui, sans-serif; cursor: pointer;
+}
+.primary { border: 1px solid #ffd23f; background: #ffd23f; color: #07112b; }
+.secondary { border: 1px solid rgba(255,255,255,.38); background: rgba(7,17,43,.32); color: #fff; }
+.secondary[aria-pressed="true"] { border-color: #ffd23f; color: #ffd23f; }
+.text-button { border: 0; background: transparent; color: #bcc8de; }
+button:disabled { opacity: .4; cursor: default; }
+#start { padding: 20px 16px; overflow-y: auto; touch-action: pan-y; justify-content: safe center; }
+#start > * { flex-shrink: 0; }
+#start .cta { animation: none; }
+.menu-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
+.gyro-status { max-width: 540px; margin-top: 10px; font-size: 12px; line-height: 1.4; color: #bcc8de; }
+.app-update { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid #ffd23f66; background: #0a1836; font-size: 13px; }
+#gyro-controls { position: fixed; bottom: max(10px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+#gyro-controls .secondary { min-height: 36px; padding: 6px 10px; font-size: 11px; background: rgba(8,14,32,.3); text-shadow: 0 1px 3px #000; }
+body.replaying #gyro-controls { display: none; }
+.gyro-feedback { position: fixed; bottom: 52px; left: 50%; transform: translateX(-50%); max-width: 48vw; padding: 6px 10px; border-radius: 8px; background: rgba(8,14,32,.55); text-align: center; font-size: 11px; line-height: 1.4; pointer-events: none; text-shadow: 0 1px 3px #000; }
+body.replaying .gyro-feedback { display: none; }
+#tutorial { z-index: 9; padding: 14px; }
+.tutorial-card { width: min(760px, 94vw); max-height: 94vh; overflow-y: auto; touch-action: pan-y; padding: 20px 24px; border: 1px solid #ffffff30; border-top: 3px solid #ffd23f; border-radius: 14px; background: #0b1731; text-align: left; }
+.tutorial-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #a8b5cd; font-size: 11px; letter-spacing: .05em; }
+.tutorial-card h2 { margin: 6px 0 14px; font-size: clamp(20px, 3vw, 30px); line-height: 1.15; }
+.tutorial-copy p { margin: 10px 0; font-size: 14px; line-height: 1.55; color: #d8e1f2; }
+.tutorial-copy .selected-sport { border-left: 3px solid #ffd23f; padding-left: 12px; color: #fff; }
+.tutorial-practice-note { margin-top: 14px; color: #ffd23f; font-size: 13px; line-height: 1.4; }
+.tutorial-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.tutorial-nav span { display: flex; gap: 6px; }
+.tutorial-nav i { width: 6px; height: 6px; border-radius: 50%; background: #ffffff30; }
+.tutorial-nav i.current { background: #ffd23f; }
+.shot-examples { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+.shot-demo { position: relative; height: 100px; overflow: hidden; border: 1px solid #ffffff60; border-radius: 6px; background: linear-gradient(#263c61 54%,#316347 54%); }
+.shot-demo span { position: absolute; bottom: 0; width: 100%; padding: 4px; text-align: center; font-size: 11px; background: #07112bcc; }
+.shot-person { position: absolute; left: 34%; top: 30%; width: 8px; height: 26px; background: #ffd23f; border-radius: 4px 4px 0 0; transform: scale(.6); transform-origin: top; }
+.shot-person::before { content: ''; position: absolute; width: 9px; height: 9px; top: -10px; left: 0; border-radius: 50%; background: #ffcfad; }
+.shot-person::after { content: ''; position: absolute; top: 20px; width: 8px; height: 16px; border-left: 3px solid #dfe8fc; border-right: 3px solid #dfe8fc; }
+.shot-ball { position: absolute; left: 63%; top: 62%; width: 6px; height: 6px; background: #fff; border-radius: 50%; }
+.shot-demo.medium .shot-person { transform: scale(1.4); top: 18px; left: 45%; }
+.shot-demo.close .shot-person { transform: scale(3.3); top: 39px; left: 46%; }
+.shot-demo.close .shot-ball { display: none; }
+
+/* Practice uses the real court and leaves its center available for camera input. */
+body.practicing #start, body.practicing #hud, body.practicing .debug-canvas,
+body.practicing .debug-panel, body.practicing .edge-canvas { display: none; }
+#camera-practice { position: fixed; inset: 0; pointer-events: none; z-index: 2; text-shadow: 0 1px 3px #000; }
+.practice-panel { padding: 10px 12px; border: 1px solid #ffffff30; border-radius: 9px; background: rgba(7,17,43,.58); }
+.practice-heading { position: absolute; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); max-width: 53vw; }
+.practice-heading small { color: #ffd23f; font-size: 11px; }
+.practice-heading h2 { font-size: clamp(16px, 2vw, 24px); margin: 3px 0; line-height: 1.15; }
+#practice-phase { font-size: 12px; color: #d6e4f8; }
+.practice-reference { position: absolute; right: max(10px, env(safe-area-inset-right)); top: 10px; width: clamp(140px, 24vw, 280px); padding: 5px; }
+.practice-reference figcaption { font-size: 11px; color: #ffd23f; padding: 2px 4px 4px; }
+.practice-reference canvas { display: block; width: 100%; height: auto; border-radius: 4px; }
+#practice-guides { position: absolute; inset: 0; width: 100%; height: 100%; }
+#practice-guides rect { fill: #ffd23f08; stroke: #ffd23f; stroke-width: 1.5; stroke-dasharray: 8 6; vector-effect: non-scaling-stroke; }
+#practice-guides text { fill: #ffd23f; font: 11px system-ui; paint-order: stroke; stroke: #07112b; stroke-width: 3px; }
+.practice-feedback { position: absolute; left: max(10px, env(safe-area-inset-left)); bottom: 60px; max-width: min(390px, 43vw); }
+#practice-score { font-size: 18px; color: #ffd23f; }
+#practice-components { font-size: 10px; color: #c8d5e9; margin-top: 4px; }
+.practice-feedback p { font-size: 12px; line-height: 1.35; margin-top: 6px; }
+#practice-advice { color: #fff; }
+#practice-hold { display: block; width: 100%; height: 5px; margin-top: 7px; accent-color: #ffd23f; }
+.practice-actions { position: absolute; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 6px; width: max-content; max-width: 90vw; flex-wrap: wrap; pointer-events: auto; }
+.practice-exit { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 110px; display: flex; gap: 4px; pointer-events: auto; }
+.practice-exit .text-button { padding: 6px 10px; min-height: 32px; font-size: 11px; background: rgba(7,17,43,.35); color: #fff; }
+body.practicing #gyro-controls { top: auto; bottom: 58px; left: auto; right: 10px; transform: none; }
+@media (max-height: 450px) {
+  .practice-panel { padding: 7px 9px; }
+  .practice-heading { max-width: 52vw; }
+  .practice-heading h2 { font-size: 16px; }
+  .practice-exit { top: 88px; }
+  .practice-feedback { bottom: 52px; max-width: 43vw; }
+  #practice-score { font-size: 15px; }
+  .practice-feedback p { font-size: 11px; margin-top: 4px; }
+  .practice-actions { gap: 4px; }
+  .practice-actions button { min-height: 32px; padding: 6px 8px; font-size: 11px; }
+  body.practicing #gyro-controls { bottom: 52px; }
+}
+@media (max-height: 450px) {
+  #start { padding: 12px 16px; }
+  #start .logo { font-size: 34px; }
+  #start .tag { margin-top: 6px; font-size: 11px; }
+  #start .language-picker { margin-top: 8px; }
+  .menu-actions { margin-top: 8px; gap: 6px; }
+  .gyro-status { margin-top: 6px; font-size: 11px; }
+  .primary, .secondary, .text-button { min-height: 36px; padding: 7px 12px; font-size: 12px; }
+  .tutorial-card { padding: 10px 18px; }
+  .tutorial-card h2 { margin-bottom: 8px; font-size: 22px; }
+  .tutorial-copy p { font-size: 12px; line-height: 1.45; margin: 8px 0; }
+  .shot-demo { height: 72px; }
+  .shot-demo.medium .shot-person { transform: scale(.9); top: 12px; }
+  .tutorial-nav { margin-top: 10px; }
+}
+
+/* Compact translucent camera ratings keep the live action visible on phones. */
+@media (pointer: coarse), (max-width: 760px), (max-height: 450px) {
+  #hud { --gx: max(10px, env(safe-area-inset-left)); --gy: 8px; }
+  .result { left: calc(var(--gx) + 8px); bottom: 38px; transform: none; min-width: 0; width: min(300px, 43vw); max-width: 43vw; padding: 7px 9px; background: rgba(8,14,32,.28); border-left-width: 2px; box-shadow: none; text-shadow: 0 1px 3px #000; }
+  .result.hidden { transform: translateY(8px); }
+  .r-head { gap: 6px; flex-wrap: wrap; }
+  .r-label, .result.missed .r-label { font-size: 11px; letter-spacing: .02em; flex: 1 1 100%; }
+  .r-stars { font-size: 14px; letter-spacing: 1px; }
+  .r-score { font-size: 16px; }
+  .result ul { margin-top: 3px; font-size: 11px; line-height: 1.35; }
+  .result li::before { width: 13px; }
+  .r-comps { margin-top: 4px; font-size: 10px; line-height: 1.3; opacity: .9; }
+  .r-bonus { margin-top: 4px; font-size: 10px; letter-spacing: .02em; }
+  .bug { left: calc(var(--gx) + 6px); height: 23px; font-size: 11px; line-height: 23px; background: rgba(8,14,32,.3); box-shadow: none; text-shadow: 0 1px 2px #000; }
+  .bug .team { gap: 4px; padding: 0 5px; }
+  .bug .team i { height: 12px; width: 3px; }
+  .bug .score { padding: 0 6px; background: rgba(255,255,255,.15); color: #fff; }
+  .bug .live { padding: 0 5px; font-size: 9px; background: rgba(224,38,43,.6); }
+  .bug .clock { padding: 0 5px; min-width: 30px; background: rgba(255,255,255,.06); }
+  .rec { font-size: 10px; }
+  .rec i { width: 7px; height: 7px; }
+  .pts { top: calc(var(--gy) + 25px); font-size: 10px; }
+  .voice { top: calc(var(--gy) + 30px); max-width: 70vw; padding: 5px 9px 7px; font-size: 12px; background: rgba(8,14,32,.4); text-shadow: 0 1px 3px #000; }
+  .voice .tag { margin-top: 0; padding: 1px 4px; font-size: 9px; }
+  .voice.k-order { background: rgba(70,52,0,.45); }
+  .hint { font-size: 11px; padding: 5px 9px; bottom: 58px; max-width: 85vw; white-space: normal; text-align: center; }
+  #zoomctl { gap: 10px; }
+  #zoomctl button { width: 46px; height: 46px; font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cta, .rec i { animation: none; }
+  .result, .voice, .hint { transition: none; }
+}

@@ -20,7 +20,11 @@ import { addToAlbum, showAlbum } from './ui/album';
 import { actorSubject, ballSubject, frameInput } from './scoring/moment';
 import { summarize } from './scoring/summary';
 import type { Component } from './scoring/scoring';
-import { nativeMessage } from './platform/navigation';
+import { nativeMessage, postNative } from './platform/navigation';
+import { bindNativeServices } from './platform/services';
+import { GyroscopeController } from './camera/gyroscope';
+import { Tutorial, tutorialSeen } from './ui/tutorial';
+import { CameraPractice } from './ui/cameraPractice';
 import { LANGUAGE, LANGUAGES, isLanguage, localizePage, saveLanguage, t } from './i18n';
 
 const params = new URLSearchParams(location.search);
@@ -31,6 +35,8 @@ const $ = (id: string) => document.getElementById(id)!;
 localizePage();
 saveLanguage(LANGUAGE);
 nativeMessage('language-ready', undefined, LANGUAGE);
+bindNativeServices();
+postNative({ type: 'screen', screen: 'menu' });
 const languageSelect = $('language') as HTMLSelectElement;
 for (const language of LANGUAGES) languageSelect.add(new Option(language.name, language.id, false, language.id === LANGUAGE));
 $('language-picker').addEventListener('pointerup', event => event.stopPropagation());
@@ -55,13 +61,19 @@ const sky = new SkyEffects(stage.scene, match);
 const cam = new CameraController(stage.camera, stage.renderer.domElement);
 cam.bindZoomButton($('zin'), -1);
 cam.bindZoomButton($('zout'), 1);
+cam.setEnabled(false);
+const gyro = new GyroscopeController(cam);
+const practice = new CameraPractice(stage, views, cam, () => syncCamera());
+const tutorial = new Tutorial((done, back, startsMatch) => practice.open(done, back, startsMatch));
+const cameraCanMove = () => (practice.active ? practice.inputActive : running && !ended && !replay.active) && !appPaused && !document.hidden;
+const syncCamera = () => gyro.setActive(cameraCanMove());
 const recorder = new Recorder(match);
 const replay = new ReplayPlayer();
 const hud = new Hud(debug || CONFIG.debug.showFps);
 const indicators = new EdgeIndicators();
 const debugOverlay = debug ? new DebugOverlay() : null;
 // In debug gli oggetti di gioco sono raggiungibili dalla console del browser (e dai test automatici).
-if (debug) Object.assign(window, { frameit: { match, director, voice, cam, recorder, replay } });
+if (debug) Object.assign(window, { frameit: { match, director, voice, cam, gyro, recorder, replay, stage, views, hud, practice } });
 
 function resize() {
   stage.renderer.setSize(innerWidth, innerHeight);
@@ -139,6 +151,7 @@ function startReplay(r: DirectorResult) {
   }
   replay.start(clip);
   cam.setEnabled(false);
+  syncCamera();
   lastReplay = match.time;
   document.body.classList.add('replaying');
   // Rimettendo il nodo, l'animazione della tendina "REPLAY" riparte.
@@ -156,7 +169,8 @@ function endReplay() {
     sky.update();
   }
   liveSnapshot = null;
-  cam.setEnabled(true);
+  cam.setEnabled(running && !ended && !appPaused && !document.hidden);
+  syncCamera();
   document.body.classList.remove('replaying');
   $('replay').classList.add('hidden');
 }
@@ -197,6 +211,10 @@ function checkEnd() {
   const mainBusy = director.active.some((i) => i.def.category === 'main');
   if (match.phase !== 'play' || mainBusy) return;
   ended = true;
+  cam.setEnabled(false);
+  syncCamera();
+  $('zoomctl').classList.add('hidden');
+  $('gyro-controls').classList.add('hidden');
   match.endMatch();
   voice.end();
   // Lascia finire i voti in corso e la battuta del regista, poi il riepilogo.
@@ -204,6 +222,8 @@ function checkEnd() {
     const s = summarize(history);
     const { record, isRecord } = saveRecord(s.points);
     hud.showSummary(s, match, record, isRecord);
+    postNative({ type: 'match-ended' });
+    postNative({ type: 'screen', screen: 'results' });
   }, 4500);
 }
 
@@ -217,13 +237,24 @@ function start() {
   startScreen.classList.add('hidden');
   $('zoomctl').classList.toggle('hidden', !CONFIG.camera.zoomButtons);
   running = true;
+  cam.setEnabled(true);
+  $('gyro-controls').classList.remove('hidden');
+  syncCamera();
+  postNative({ type: 'screen', screen: 'playing' });
   voice.start();
   document.documentElement
     .requestFullscreen?.({ navigationUI: 'hide' })
     .then(() => (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
     .catch(() => {}); // iOS / iframe: niente fullscreen, pazienza
 }
-startScreen.addEventListener('pointerup', start, { once: true });
+function requestStart() {
+  if (running) return;
+  if (tutorialSeen()) start();
+  else tutorial.open(start, true);
+}
+$('start-btn').addEventListener('click', requestStart);
+$('tutorial-btn').addEventListener('click', () => tutorial.open());
+$('practice-btn').addEventListener('click', () => practice.open(() => {}));
 // Scelta dello sport: ricarica la pagina con ?sport=... (ogni sport ha campo, regole ed eventi suoi).
 for (const s of SPORT_LIST) {
   const b = document.createElement('button');
@@ -231,7 +262,7 @@ for (const s of SPORT_LIST) {
   b.className = s.id === SPORT ? 'on' : '';
   b.addEventListener('pointerup', (e) => {
     e.stopPropagation(); // non far partire la partita
-    if (s.id === SPORT) return start();
+    if (s.id === SPORT) return requestStart();
     if (nativeMessage('select-sport', s.id)) return;
     const p = new URLSearchParams(location.search);
     p.set('sport', s.id);
@@ -243,17 +274,26 @@ $('album-btn').addEventListener('pointerup', (e) => {
   e.stopPropagation(); // non far partire la partita
   showAlbum();
 });
-if (params.has('autostart')) start();
-
 let last = performance.now();
 let appPaused = false;
-addEventListener('frameit:pause', () => { appPaused = true; });
-addEventListener('frameit:resume', () => { appPaused = false; last = performance.now(); });
+addEventListener('frameit:pause', () => { appPaused = true; cam.setEnabled(false); syncCamera(); });
+addEventListener('frameit:resume', () => { appPaused = false; last = performance.now(); cam.setEnabled(cameraCanMove()); syncCamera(); });
+document.addEventListener('visibilitychange', () => {
+  cam.setEnabled(cameraCanMove());
+  syncCamera();
+});
+if (params.has('autostart')) start();
 stage.renderer.setAnimationLoop((now) => {
   if (appPaused || document.hidden) { last = now; return; }
   // Il timestamp del primo RAF può precedere performance.now() registrato durante l'avvio.
-  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+  const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
   last = now;
+
+  if (practice.active) {
+    cam.update(dt);
+    practice.update(dt);
+    return;
+  }
 
   // Replay: la partita è in pausa, si rivede la clip registrata.
   if (replay.active) {
@@ -273,14 +313,16 @@ stage.renderer.setAnimationLoop((now) => {
     return;
   }
 
-  if (running) match.update(dt);
   cam.update(dt);
   const view = cam.view();
   if (running) {
-    director.update(dt, view);
-    voice.update(dt, view);
-    for (const r of [...director.finished.splice(0), ...voice.finished.splice(0)]) onResult(r);
-    checkEnd();
+    // Small simulation steps keep footwork and contacts stable when a render frame takes longer.
+    const steps = Math.max(1, Math.ceil(dt * 60)), step = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      match.update(step); director.update(step, view); voice.update(step, view);
+      for (const r of [...director.finished.splice(0), ...voice.finished.splice(0)]) onResult(r);
+      checkEnd(); recorder.tick(step, camNow(), worldNow());
+    }
   }
 
   views.update(dt);
@@ -291,7 +333,6 @@ stage.renderer.setAnimationLoop((now) => {
   debugOverlay?.draw(dt, match.time, view, director.focusTracker() ?? voice.order?.tracker ?? null, ambientInput(), enabled);
   stage.renderer.render(stage.scene, stage.camera);
 
-  if (running) recorder.tick(dt, camNow(), worldNow());
   if (pendingReplay) {
     startReplay(pendingReplay);
     pendingReplay = null;

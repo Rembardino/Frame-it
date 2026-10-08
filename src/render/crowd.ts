@@ -67,11 +67,13 @@ export class Crowd {
 
     const count = this.fans.length;
     const mat = new THREE.MeshLambertMaterial();
-    this.body = new THREE.InstancedMesh(new THREE.BoxGeometry(0.32, 0.6, 0.42).translate(0, 0.3, 0), mat, count);
-    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.24, 0.22).translate(0, 0.74, 0), mat, count);
+    this.body = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.135, 0.51, 7).scale(0.7, 1, 1).translate(0, 0.3, 0), mat, count);
+    const head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.115, 7, 5).scale(0.82, 1.16, 0.86).translate(0, 0.68, 0), mat, count);
     head.instanceMatrix = this.body.instanceMatrix; // stesse matrici, un solo upload
+    const hair = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.84, 0.88, 0.86).translate(-0.008, 0.71, 0), mat, count);
+    hair.instanceMatrix = this.body.instanceMatrix;
     // Braccio alzato, dalla spalla verso l'alto e un po' in avanti.
-    this.arms = new THREE.InstancedMesh(new THREE.BoxGeometry(0.15, 0.7, 0.15).translate(0.08, 0.92, 0.2), mat, count);
+    this.arms = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035, 0.048, 0.59, 6).translate(0.08, 0.97, 0.18), mat, count);
     // Telefono acceso in cima al braccio: stesse matrici del braccio.
     this.phones = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 0.2, 0.05).translate(0.08, 1.33, 0.2), new THREE.MeshBasicMaterial({ color: 0xeaf4ff }), count);
     this.phones.instanceMatrix = this.arms.instanceMatrix;
@@ -79,13 +81,14 @@ export class Crowd {
     for (let i = 0; i < count; i++) {
       this.body.setColorAt(i, c.set(shirts[i]));
       head.setColorAt(i, c.set(SKIN[i % SKIN.length]));
+      hair.setColorAt(i, c.set(i % 3 ? 0x30241e : 0x8c613c));
       this.arms.setColorAt(i, c.set(SKIN[i % SKIN.length]));
     }
     // I tifosi saltano: evito che il culling li faccia sparire ai bordi.
-    this.body.frustumCulled = head.frustumCulled = this.arms.frustumCulled = this.phones.frustumCulled = false;
+    this.body.frustumCulled = head.frustumCulled = hair.frustumCulled = this.arms.frustumCulled = this.phones.frustumCulled = false;
     this.arms.visible = this.phones.visible = false;
     this.update(0, { excitement: 0, hot: { x: 0, level: 0 }, lookUp: 0 });
-    scene.add(this.body, head, this.arms, this.phones);
+    scene.add(this.body, head, hair, this.arms, this.phones);
   }
 
   update(dt: number, s: CrowdState) {

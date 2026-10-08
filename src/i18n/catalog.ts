@@ -1,4 +1,6 @@
 import { CONTENT_ROWS } from './content';
+import { FEATURE_ROWS } from './features';
+import { PRACTICE_ROWS } from './practice';
 
 /** Stable source keys; every supported language has an explicit translation. */
 export const ROWS: [string, string, string, string, string][] = [
@@ -84,4 +86,6 @@ export const ROWS: [string, string, string, string, string][] = [
   ["Impossibile caricare il gioco. Tocca Riprova.", "Unable to load the game. Tap Retry.", "No se puede cargar el juego. Toca Reintentar.", "Impossible de charger le jeu. Touchez Réessayer.", "Das Spiel kann nicht geladen werden. Tippe auf Erneut versuchen."],
   ["Il gioco è stato chiuso da Android. Tocca Riprova.", "Android closed the game. Tap Retry.", "Android ha cerrado el juego. Toca Reintentar.", "Android a fermé le jeu. Touchez Réessayer.", "Android hat das Spiel geschlossen. Tippe auf Erneut versuchen."],
   ...CONTENT_ROWS,
+  ...FEATURE_ROWS,
+  ...PRACTICE_ROWS,
 ];

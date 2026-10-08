@@ -1,11 +1,13 @@
 /**
  * Scenografia statica: renderer, luci, cielo serale con stelle, campo, porte, tribune, cartelloni, torri faro.
- * Tutto generato nel codice con forme semplici e colori piatti.
+ * Materiali procedurali, illuminazione morbida e tribune generate nel codice.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { CONFIG, SPORT } from '../config';
 import { sportCourt } from './sportCourts';
+import { courtSurface, surfaceGrain, rod } from './surfaces';
 
 const L = CONFIG.pitch.length;
 const W = CONFIG.pitch.width;
@@ -23,25 +25,40 @@ export interface SeatRow {
 export function createStage(container: HTMLElement) {
   const renderer = new THREE.WebGLRenderer({ antialias: CONFIG.render.antialias, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, CONFIG.render.maxPixelRatio));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  renderer.shadowMap.enabled = CONFIG.render.shadows;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1d2c52);
-  scene.fog = new THREE.Fog(0x1d2c52, 160, 480);
+  scene.background = new THREE.Color(0x172c47);
+  scene.fog = new THREE.Fog(0x172c47, 100, 360);
 
   const camera = new THREE.PerspectiveCamera(CONFIG.camera.startFov, 1, 0.1, 1000);
 
-  scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x2a4a2a, 1.1));
-  const sun = new THREE.DirectionalLight(0xfff4e0, 1.8); // i fari
-  sun.position.set(-30, 60, 40);
-  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xdceaff, 0x55654d, 1.65));
+  const sun = new THREE.DirectionalLight(0xffefd8, 2.5);
+  sun.position.set(-L * 0.3, Math.max(18, L * 0.65), W * 0.65);
+  sun.castShadow = true;
+  sun.shadow.mapSize.setScalar(CONFIG.render.shadowMapSize);
+  sun.shadow.camera.left = -L * 0.68; sun.shadow.camera.right = L * 0.68;
+  sun.shadow.camera.top = Math.max(W, L) * 0.65; sun.shadow.camera.bottom = -Math.max(W, L) * 0.65;
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 150;
+  sun.shadow.normalBias = 0.035; sun.shadow.bias = -0.0002;
+  sun.shadow.intensity = 0.45;
+  const rim = new THREE.DirectionalLight(0x9dceff, 1.5);
+  rim.position.set(L * 0.4, 16, -W);
+  scene.add(sun, rim);
 
-  scene.add(sky(), stars(), ground(), floodlights(), adBoards());
+  scene.add(sky(), stars(), ground(), floodlights(), adBoards(), venueDetails());
   if (SPORT === 'basket') scene.add(court(renderer), hoop(1), hoop(-1));
   else if (SPORT === 'boxe' || SPORT === 'tennis' || SPORT === 'pallavolo') scene.add(sportCourt(renderer));
   else scene.add(pitch(renderer), goal(1), goal(-1), cornerFlags());
   const { mesh: stands, rows: seatRows } = standsAndSeats();
   scene.add(stands);
+  scene.add(stadiumSeats(seatRows), grandstandRoof());
 
   return { renderer, scene, camera, seatRows };
 }
@@ -52,9 +69,9 @@ function sky() {
   const geo = new THREE.SphereGeometry(450, 32, 16);
   const pos = geo.attributes.position;
   const colors: number[] = [];
-  const zenith = new THREE.Color(0x07112b);
-  const mid = new THREE.Color(0x1d2c52);
-  const horizon = new THREE.Color(0xd9774a); // ultimo bagliore del tramonto
+  const zenith = new THREE.Color(0x0b1934);
+  const mid = new THREE.Color(0x28476a);
+  const horizon = new THREE.Color(0xefad83); // ultimo bagliore del tramonto
   const below = new THREE.Color(0x121a2a);
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
@@ -96,9 +113,13 @@ function pitch(renderer: THREE.WebGLRenderer) {
   // Strisce del taglio dell'erba.
   const stripes = 14;
   for (let i = 0; i < stripes; i++) {
-    g.fillStyle = i % 2 ? '#3f8f3a' : '#4a9c42';
+    g.fillStyle = i % 2 ? '#33744a' : '#3d8451';
     g.fillRect((i * cw) / stripes, 0, cw / stripes + 1, ch);
   }
+  surfaceGrain(g, 0.07);
+  const shade = g.createLinearGradient(0, 0, 0, ch);
+  shade.addColorStop(0, 'rgba(5,29,24,0.18)'); shade.addColorStop(1, 'rgba(142,185,87,0.06)');
+  g.fillStyle = shade; g.fillRect(0, 0, cw, ch);
 
   const X = (x: number) => (x + L / 2 + margin) * ppm;
   const Y = (z: number) => (z + W / 2 + margin) * ppm;
@@ -115,13 +136,18 @@ function pitch(renderer: THREE.WebGLRenderer) {
       g.strokeRect(X(x0), Y(-width / 2), depth * ppm, width * ppm);
     }
     spot(side * (L / 2 - 0.15 * L));
+    const px = side * (L / 2 - 0.15 * L);
+    const a = Math.acos((0.2 * L - 0.15 * L) / 6);
+    g.beginPath();
+    g.arc(X(px), Y(0), 6 * ppm, side > 0 ? Math.PI - a : -a, side > 0 ? Math.PI + a : a);
+    g.stroke();
+    for (const z of [-W / 2, W / 2]) {
+      g.beginPath(); g.arc(X(side * L / 2), Y(z), ppm, side > 0 ? Math.PI / 2 : 0, side > 0 ? Math.PI : Math.PI / 2);
+      if (z > 0) { g.beginPath(); g.arc(X(side * L / 2), Y(z), ppm, side > 0 ? Math.PI : -Math.PI / 2, side > 0 ? Math.PI * 1.5 : 0); }
+      g.stroke();
+    }
   }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const geo = new THREE.PlaneGeometry(L + 2 * margin, W + 2 * margin).rotateX(-Math.PI / 2);
-  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex }));
+  return courtSurface(canvas, L + 2 * margin, W + 2 * margin, renderer);
 }
 
 // ------------------------------------------------------------------ basket
@@ -140,18 +166,23 @@ function court(renderer: THREE.WebGLRenderer) {
   const X = (x: number) => (x + L / 2 + margin) * ppm;
   const Y = (z: number) => (z + W / 2 + margin) * ppm;
 
-  g.fillStyle = '#2b4c86'; // fuori campo
+  g.fillStyle = '#173a50'; // fuori campo
   g.fillRect(0, 0, cw, ch);
   // Parquet: listoni lungo il campo, due toni.
   const plank = 0.6;
   for (let z = -W / 2, i = 0; z < W / 2; z += plank, i++) {
-    g.fillStyle = i % 2 ? '#c98d52' : '#d39a5f';
+    g.fillStyle = i % 2 ? '#c49360' : '#d7ab77';
     g.fillRect(X(-L / 2), Y(z), L * ppm, Math.min(plank, W / 2 - z) * ppm + 1);
+    g.strokeStyle = 'rgba(91,52,24,0.18)'; g.lineWidth = 0.8;
+    for (let x = -L / 2 + (i % 3) * 1.2; x < L / 2; x += 3.6) {
+      g.beginPath(); g.moveTo(X(x), Y(z)); g.lineTo(X(x), Y(Math.min(W / 2, z + plank))); g.stroke();
+    }
   }
+  surfaceGrain(g, 0.065);
   const key = 4.9, keyDepth = 5.8, r3 = P.threePoint, hb = P.hoopFromBaseline;
   for (const side of [-1, 1]) {
     // Area dipinta.
-    g.fillStyle = '#9b3a2e';
+    g.fillStyle = side < 0 ? '#684bab' : '#176e7f';
     const x0 = side > 0 ? L / 2 - keyDepth : -L / 2;
     g.fillRect(X(x0), Y(-key / 2), keyDepth * ppm, key * ppm);
   }
@@ -177,13 +208,15 @@ function court(renderer: THREE.WebGLRenderer) {
     if (side > 0) g.arc(X(hx), Y(0), r3 * ppm, Math.PI - a, Math.PI + a);
     else g.arc(X(hx), Y(0), r3 * ppm, -a, a);
     g.stroke();
+    for (const z of [-key / 2, key / 2]) for (const offset of [1.8, 2.7, 3.6, 4.5]) {
+      g.beginPath(); g.moveTo(X(base - side * offset), Y(z)); g.lineTo(X(base - side * offset), Y(z + Math.sign(z) * 0.22)); g.stroke();
+    }
+    g.beginPath(); g.arc(X(hx), Y(0), 1.25 * ppm, side > 0 ? Math.PI / 2 : -Math.PI / 2, side > 0 ? Math.PI * 1.5 : Math.PI / 2); g.stroke();
   }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const geo = new THREE.PlaneGeometry(L + 2 * margin, W + 2 * margin).rotateX(-Math.PI / 2);
-  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex }));
+  g.fillStyle = '#173a50'; g.beginPath(); g.arc(X(0), Y(0), 1.55 * ppm, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#faf1d5'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'italic bold 52px Arial';
+  g.fillText('FI', X(0), Y(0));
+  return courtSurface(canvas, L + 2 * margin, W + 2 * margin, renderer, 0.5);
 }
 
 /** Canestro: palo dietro la linea di fondo, braccio, tabellone trasparente, ferro arancione e retina. */
@@ -193,13 +226,14 @@ function hoop(side: 1 | -1) {
   const rim = P.rimHeight;
   const boardX = L / 2 - 1.2;
   const hx = L / 2 - P.hoopFromBaseline;
-  const grey = new THREE.MeshLambertMaterial({ color: 0x3a3f4a });
-  const pole = new THREE.Mesh(new THREE.BoxGeometry(0.25, rim + 0.6, 0.25), grey);
+  const grey = new THREE.MeshStandardMaterial({ color: 0x657888, roughness: 0.38, metalness: 0.6 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.17, rim + 0.6, 12), grey);
   pole.position.set(L / 2 + 1.2, (rim + 0.6) / 2, 0);
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 0.18), grey);
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.4, 12).rotateZ(Math.PI / 2), grey);
   arm.position.set(L / 2, rim + 0.5, 0);
   const pad = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.4, 1.2), new THREE.MeshLambertMaterial({ color: 0x1f3d7a }));
   pad.position.set(L / 2 + 1.2, 0.7, 0);
+  const brace = rod(new THREE.Vector3(L / 2 + 1.2, rim - 0.8, 0), new THREE.Vector3(boardX, rim + 0.5, 0), 0.055, grey);
 
   const board = new THREE.Mesh(
     new THREE.PlaneGeometry(1.8, 1.05).rotateY(-Math.PI / 2),
@@ -218,13 +252,14 @@ function hoop(side: 1 | -1) {
     new THREE.MeshBasicMaterial({ map: netTexture(6, 2), transparent: true, side: THREE.DoubleSide, depthWrite: false }),
   );
   net.position.set(hx, rim - 0.21, 0);
-  g.add(pole, arm, pad, board, edge, square, ring, net);
+  g.add(pole, arm, brace, pad, board, edge, square, ring, net);
   if (side < 0) g.rotation.y = Math.PI;
   return g;
 }
 
 function ground() {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(500, 500).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x24301f }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(500, 500).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: SPORT === 'calcio' ? 0x1d3a31 : 0x243a46, roughness: 1 }));
+  m.receiveShadow = true;
   m.position.y = -0.03;
   return m;
 }
@@ -328,7 +363,7 @@ function standsAndSeats() {
       });
     }
   }
-  const mesh = new THREE.Mesh(mergeGeometries(boxes), new THREE.MeshLambertMaterial({ color: 0x5b6170 }));
+  const mesh = new THREE.Mesh(mergeGeometries(boxes), new THREE.MeshStandardMaterial({ color: 0x333f50, roughness: 0.92 }));
   return { mesh, rows };
 }
 
@@ -384,6 +419,77 @@ function floodlights() {
     }
   }
   return g;
+}
+
+function stadiumSeats(rows: SeatRow[]) {
+  const positions: { point: THREE.Vector3; facing: number; index: number }[] = [];
+  for (const row of rows) {
+    const count = Math.floor(row.from.distanceTo(row.to) / CONFIG.crowd.spacing);
+    for (let i = 0; i <= count; i++) positions.push({ point: new THREE.Vector3().lerpVectors(row.from, row.to, i / count), facing: row.facing, index: i });
+  }
+  const cushion = new RoundedBoxGeometry(0.44, 0.055, 0.5, 1, 0.022).translate(-0.03, 0.05, 0);
+  const back = new RoundedBoxGeometry(0.065, 0.38, 0.5, 1, 0.022).translate(-0.23, 0.27, 0);
+  const seats = new THREE.InstancedMesh(mergeGeometries([cushion, back])!,
+    new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.05 }), positions.length);
+  cushion.dispose(); back.dispose();
+  const dummy = new THREE.Object3D(), color = new THREE.Color();
+  positions.forEach(({ point, facing, index }, i) => {
+    dummy.position.copy(point); dummy.rotation.y = facing; dummy.updateMatrix(); seats.setMatrixAt(i, dummy.matrix);
+    seats.setColorAt(i, color.setHex(index % 9 < 2 ? 0x7395a7 : index % 2 ? 0x254a64 : 0x315e78));
+  });
+  return seats;
+}
+
+/** A curved canopy and slender steel supports give the venue a distinct silhouette. */
+function grandstandRoof() {
+  const group = new THREE.Group();
+  const front = W / 2 + 5, depth = CONFIG.crowd.rowsFar * 0.9 + 3;
+  const height = 3.4 + CONFIG.crowd.rowsFar * 0.5;
+  const roof = new THREE.PlaneGeometry(L + 18, depth, 12, 8).rotateX(-Math.PI / 2);
+  const positions = roof.attributes.position;
+  for (let i = 0; i < positions.count; i++) {
+    const progress = (positions.getZ(i) + depth / 2) / depth;
+    positions.setY(i, height + Math.sin(progress * Math.PI) * 0.65 + progress * 0.5);
+    positions.setZ(i, -front - progress * depth);
+  }
+  roof.computeVertexNormals();
+  group.add(new THREE.Mesh(roof, new THREE.MeshStandardMaterial({ color: 0x68849a, roughness: 0.5, metalness: 0.45, side: THREE.DoubleSide })));
+  const steel = new THREE.MeshStandardMaterial({ color: 0x566b7c, roughness: 0.4, metalness: 0.65 });
+  const supports: THREE.BufferGeometry[] = [];
+  for (let x = -(L + 14) / 2; x <= (L + 14) / 2 + 0.1; x += (L + 14) / 6) {
+    const pole = rod(new THREE.Vector3(x, 0, -front - depth + 0.5), new THREE.Vector3(x, height + 0.5, -front - depth + 0.5), 0.09, steel);
+    pole.updateMatrix(); supports.push(pole.geometry.applyMatrix4(pole.matrix));
+    const beam = rod(new THREE.Vector3(x, height + 0.5, -front - depth + 0.5), new THREE.Vector3(x, height, -front), 0.065, steel);
+    beam.updateMatrix(); supports.push(beam.geometry.applyMatrix4(beam.matrix));
+  }
+  group.add(new THREE.Mesh(mergeGeometries(supports)!, steel)); supports.forEach(geometry => geometry.dispose());
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(L + 18, 0.045, 0.06), new THREE.MeshBasicMaterial({ color: 0xa4d9ee }));
+  strip.position.set(0, height, -front); group.add(strip);
+  return group;
+}
+
+function venueDetails() {
+  const group = new THREE.Group();
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(L + 12, W + 10).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x334752, roughness: 0.95 }));
+  apron.position.y = -0.025; apron.receiveShadow = true; group.add(apron);
+  const metal = new THREE.MeshStandardMaterial({ color: 0x748a9a, roughness: 0.38, metalness: 0.6 });
+  const benchWidth = Math.min(5, L * 0.25);
+  for (const side of [-1, 1]) {
+    const x = side * L * 0.3, z = -W / 2 - 4;
+    const seat = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, benchWidth, 3, 12).rotateZ(Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: CONFIG.teams[side < 0 ? 0 : 1].shirt, roughness: 0.65 }));
+    seat.scale.z = 2; seat.position.set(x, 0.5, z); group.add(seat);
+    for (const offset of [-benchWidth * 0.35, benchWidth * 0.35]) {
+      group.add(rod(new THREE.Vector3(x + offset, 0, z), new THREE.Vector3(x + offset, 0.5, z), 0.06, metal));
+    }
+    if (SPORT === 'calcio') {
+      const shelter = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, benchWidth + 0.6, 16, 1, true, 0, Math.PI).rotateZ(Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: 0x8bb1c8, roughness: 0.35, metalness: 0.15, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));
+      shelter.rotation.x = Math.PI / 2; shelter.position.set(x, 1.05, z); group.add(shelter);
+    }
+  }
+  return group;
 }
 
 /** Macchia radiale sfumata: alone dei fari, ombre finte sotto giocatori e palla. */

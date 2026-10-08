@@ -6,6 +6,8 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import gameHtml, { NATIVE_TEXT } from './generated/game';
+import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
+import { bannerUnitId, useNativeServices } from './services/useNativeServices';
 
 const BASE_URL = 'https://frameit.local/';
 const SPORTS = ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo'];
@@ -15,6 +17,7 @@ function Game() {
   useKeepAwake();
   const insets = useSafeAreaInsets();
   const webview = useRef(null);
+  const services = useNativeServices(webview);
   const [sport, setSport] = useState('calcio');
   // No initial URL language: the WebView can restore its saved choice on cold launch.
   const [language, setLanguage] = useState(null);
@@ -34,7 +37,6 @@ function Game() {
     immersive();
     const subscription = AppState.addEventListener('change', state => {
       const active = state === 'active';
-      webview.current?.injectJavaScript(`window.dispatchEvent(new Event('frameit:${active ? 'resume' : 'pause'}'));true;`);
       if (active) immersive();
     });
     // Let Android's Back button leave the app, not navigate an inline document.
@@ -46,6 +48,8 @@ function Game() {
   }, []);
 
   const restart = (nextSport = sport) => {
+    if (services.showingAd()) return;
+    services.reset();
     setError(null);
     setLoading(true);
     setSport(nextSport);
@@ -55,6 +59,7 @@ function Game() {
   const onMessage = ({ nativeEvent }) => {
     try {
       const message = JSON.parse(nativeEvent.data);
+      if (services.handle(message)) return;
       if (message.type === 'select-sport' && SPORTS.includes(message.sport)) restart(message.sport);
       else if (message.type === 'restart') restart();
       else if (message.type === 'language-ready' && LANGUAGES.includes(message.language)) setUiLanguage(message.language);
@@ -92,12 +97,18 @@ function Game() {
         onMessage={onMessage}
         onLoadEnd={() => {
           setLoading(false);
-          const active = AppState.currentState === 'active';
+          services.sync();
+          const active = AppState.currentState === 'active' && !services.showingAd();
           webview.current?.injectJavaScript(`window.dispatchEvent(new Event('frameit:${active ? 'resume' : 'pause'}'));true;`);
         }}
         onError={() => { setLoading(false); setError('Impossibile caricare il gioco. Tocca Riprova.'); }}
         onRenderProcessGone={() => { setLoading(false); setError('Il gioco è stato chiuso da Android. Tocca Riprova.'); }}
       />}
+      {!loading && !error && services.bannerVisible && <View style={styles.banner}><BannerAd
+        unitId={bannerUnitId}
+        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+        onAdFailedToLoad={failure => console.warn('[Frame It] Banner:', failure)}
+      /></View>}
       {loading && !error && <View style={styles.overlay}><ActivityIndicator size="large" color="#ffd23f" /><Text style={styles.text}>FRAME IT</Text></View>}
       {error && <View style={styles.overlay}><Text style={styles.text}>{NATIVE_TEXT[uiLanguage][error] ?? error}</Text><Pressable style={styles.button} onPress={() => restart()}><Text style={styles.buttonText}>{NATIVE_TEXT[uiLanguage]['Riprova']}</Text></Pressable></View>}
     </View>
@@ -111,6 +122,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#07112b' },
   webview: { flex: 1, backgroundColor: '#07112b' },
+  banner: { alignItems: 'center', backgroundColor: '#07112b' },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: '#07112b', padding: 32, gap: 20 },
   text: { color: '#ecf2fa', fontSize: 20, textAlign: 'center' },
   button: { backgroundColor: '#ffd23f', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 },

@@ -136,6 +136,6 @@ export class Hud {
       </div>`;
     el.classList.remove('hidden');
     $('again').addEventListener('click', restartGame);
-    $('sum-album').addEventListener('click', () => showAlbum());
+    $('sum-album').addEventListener('click', () => showAlbum('results'));
   }
 }

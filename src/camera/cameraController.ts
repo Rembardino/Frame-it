@@ -83,6 +83,28 @@ export class CameraController {
     this.zoomButtons.forEach((btn) => btn.classList.remove('on'));
   }
 
+  /** Whether live input can move the camera (false in menus, replay and background). */
+  get inputsEnabled() { return this.enabled; }
+
+  /** Place a demonstration camera, clearing inertia so the next exercise starts cleanly. */
+  setView(view: Pick<View, 'yaw' | 'pitch' | 'fov'>) {
+    this.tYaw = view.yaw; this.tPitch = view.pitch; this.tFov = view.fov;
+    this.vYaw = this.vPitch = 0;
+    this.clampTargets();
+    this.yaw = this.tYaw; this.pitch = this.tPitch; this.fov = this.tFov;
+    this.update(0);
+  }
+
+  /** Sensor movement shares the same bounds and smoothing as touch input. */
+  moveBy(yaw: number, pitch: number) {
+    if (!this.enabled || this.pointers.size) return;
+    this.tYaw += yaw;
+    this.tPitch += pitch;
+    this.vYaw = this.vPitch = 0;
+    if (Math.abs(yaw) + Math.abs(pitch) > 0.08) this.hasInteracted = true;
+    this.clampTargets();
+  }
+
   /** Ingrandimento rispetto allo zoom più largo (per l'HUD). */
   get magnification() {
     return Math.tan((C.fovMax / 2) * DEG) / Math.tan((this.fov / 2) * DEG);

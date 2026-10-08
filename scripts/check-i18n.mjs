@@ -32,6 +32,10 @@ for (const [language, column] of Object.entries(languages)) {
     const covered = key => { assert(catalog.has(key), `${sport}: missing ${key}`); assert.equal(i18n.t(key), catalog.get(key)[column]); };
     const { LIBRARY } = await server.ssrLoadModule('/src/events/library.ts');
     const { LINES, ORDERS, VERDICTS } = await server.ssrLoadModule('/src/director/lines.ts');
+    const { TUTORIAL_PAGES } = await server.ssrLoadModule('/src/ui/tutorial.ts');
+    TUTORIAL_PAGES.forEach(page => { covered(page.title); page.paragraphs.forEach(covered); });
+    const { LESSONS } = await server.ssrLoadModule('/src/tutorial/lessons.ts');
+    Object.values(LESSONS).flat().forEach(lesson => covered(lesson.tip));
     LIBRARY.forEach(def => {
       covered(def.label);
       if (def.hint) covered(def.hint);

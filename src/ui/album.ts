@@ -5,6 +5,7 @@
  */
 import { LIBRARY } from '../events/library';
 import { dateText, numberText, t } from '../i18n';
+import { postNative } from '../platform/navigation';
 
 export interface AlbumEntry {
   count: number;
@@ -38,7 +39,7 @@ export function addToAlbum(id: string, stars: number, score: number, thumb: stri
   return isBest;
 }
 
-export function showAlbum() {
+export function showAlbum(returnTo: 'menu' | 'results' = 'menu') {
   const album = loadAlbum();
   const rares = LIBRARY.filter((d) => d.category === 'rare');
   const cards = rares.map((d) => {
@@ -57,8 +58,10 @@ export function showAlbum() {
       <button id="album-close">${t('Chiudi')}</button>
     </div>`;
   el.classList.remove('hidden');
+  postNative({ type: 'screen', screen: 'album' });
   $('album-close').addEventListener('click', (ev) => {
     ev.stopPropagation();
     el.classList.add('hidden');
+    postNative({ type: 'screen', screen: returnTo });
   });
 }

@@ -30,7 +30,7 @@ if (html.includes('src="/src/main.ts"')) throw new Error('Failed to replace the 
 if (/<(?:script|link)\b[^>]*(?:src|href)=["'](?:https?:|\/assets\/)/i.test(html)) throw new Error('External runtime asset in mobile bundle');
 const outputDir = resolve(root, 'mobile/generated');
 // Use the same translations for native recovery screens and the in-game UI.
-const server = await createServer({ root, configFile: false, server: { middlewareMode: true }, appType: 'custom' });
+const server = await createServer({ root, configFile: false, server: { middlewareMode: true, hmr: false }, appType: 'custom' });
 let nativeText;
 try {
   const { ROWS } = await server.ssrLoadModule('/src/i18n/catalog.ts');

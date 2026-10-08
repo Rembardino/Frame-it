@@ -8,6 +8,8 @@ const BASE = {
     /** Limite al devicePixelRatio: 1.5 = buon compromesso nitidezza / 60 fps sui telefoni medi. */
     maxPixelRatio: 1.5,
     antialias: true,
+    shadows: true,
+    shadowMapSize: 1024,
   },
 
   pitch: {
@@ -90,6 +92,8 @@ const BASE = {
     playerScale: 1.12,
     ballRadius: 0.11,
     ballScale: 2,
+    /** Breve raccordo fra due gesti, registrato anche nei replay. */
+    poseBlendSec: 0.14,
     /** Colori di arbitro, steward e tifoso invasore. */
     referee: { shirt: 0x161616, shorts: 0x161616, socks: 0x161616 },
     steward: { shirt: 0xff8a1f, shorts: 0x2a2f3a, socks: 0x2a2f3a },

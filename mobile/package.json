@@ -1,7 +1,7 @@
 {
   "name": "frame-it-mobile",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -15,13 +15,20 @@
   },
   "dependencies": {
     "expo": "~57.0.27",
+    "expo-constants": "~57.0.21",
+    "expo-in-app-updates": "0.12.0",
     "expo-keep-awake": "~57.0.2",
     "expo-navigation-bar": "~57.0.3",
+    "expo-sensors": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
     "react": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-google-mobile-ads": "16.3.4",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-webview": "13.16.1"
+  },
+  "devDependencies": {
+    "@expo/config-plugins": "~57.0.10"
   }
 }

@@ -32,7 +32,7 @@ async function readBuild() {
   const result = await response.json();
   if (result.errors) throw new Error(result.errors.map(error => error.message).join('; '));
   const build = result.data.builds.byId;
-  if (build.app.slug !== 'frame-it' || build.app.ownerAccount.name !== 'rembardino' || build.appIdentifier !== 'come.frameitnow') {
+  if (build.app.slug !== 'frame-it' || build.app.ownerAccount.name !== 'rembardino' || build.appIdentifier !== 'com.frameitnow') {
     throw new Error('Build project or package does not match Frame It');
   }
   return build;

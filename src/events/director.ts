@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config';
 import { type Actor, type Match, type ShotOutcome, type TeamId, clampToPitch, dirOf, xzDist } from '../sim/match';
 import { MomentTracker, actorSubject, ballSubject, frameInput, goalSubject, starSubject, subjectCenter, type Subject } from '../scoring/moment';
-import type { Component, ScoreResult, Vec3, View } from '../scoring/scoring';
+import type { Component, FrameInput, ScoreResult, Vec3, View } from '../scoring/scoring';
 import { LIBRARY } from './library';
 import type { Category, Cue, EventDef, Point, ShotPhase, Speed, Step } from './types';
 
@@ -174,6 +174,8 @@ export class EventInstance {
         m.setPose(role(s.who), s.pose, s.dur, s.face ? role(s.face) : null);
         return true;
       case 'sport':
+        // Finish the incoming ball instead of replacing a trajectory mid-flight.
+        if (m.sportSimulation?.busy) return false;
         m.sportSimulation?.action(s.action, role(s.who), s.target ? role(s.target) : undefined);
         return true;
       case 'whistle':
@@ -213,8 +215,8 @@ export class EventInstance {
     else this.match.setPose(a, c.signal, c.dur ?? 0.8);
   }
 
-  /** Valuta il frame con l'inquadratura ideale della fase in corso. */
-  sample(now: number, view: View) {
+  /** The tutorial and live scoring share the exact subjects of the current shot phase. */
+  framingInput(): FrameInput {
     let phase = this.def.shots[0];
     for (const p of this.def.shots) if (p.from <= this.et) phase = p;
     let ps = this.phaseSubjects.get(phase);
@@ -225,8 +227,13 @@ export class EventInstance {
       ps = { subjects, lead };
       this.phaseSubjects.set(phase, ps);
     }
-    this.tracker.sample(now, view, frameInput(ps.subjects, ps.lead, phase.size));
     this.focus = subjectCenter(ps.subjects[ps.lead]);
+    return frameInput(ps.subjects, ps.lead, phase.size);
+  }
+
+  /** Valuta il frame con l'inquadratura ideale della fase in corso. */
+  sample(now: number, view: View) {
+    this.tracker.sample(now, view, this.framingInput());
   }
 
   private subject(ref: string | [string, number]): Subject {
