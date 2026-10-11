@@ -1,4 +1,8 @@
 /** Native SDK lifecycle, kept separate from React so placement/error paths can be verified. */
+export function bannerPlacementAllowed(screen, replayActive) {
+  return screen === 'menu' || (screen === 'playing' && replayActive === true);
+}
+
 export class AdManager {
   constructor({ enabled, consent, sdk, createInterstitial, events, onState, onPause, warn = console.warn }) {
     Object.assign(this, { enabled, consent, sdk, createInterstitial, events, onState, onPause, warn });

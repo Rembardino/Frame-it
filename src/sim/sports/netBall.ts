@@ -7,7 +7,7 @@ import { netContactPoint } from '../../animation/motion';
 export class NetBall {
   private flight: { from: THREE.Vector3; to: THREE.Vector3; elapsed: number; duration: number;
     arc: number; bounce: boolean; next: Actor | null; scored: TeamId | null;
-    actor: Actor; delay: number; contact: THREE.Vector3; prepared: boolean } | null = null;
+    actor: Actor; delay: number; contact: THREE.Vector3; prepared: boolean; bounced: boolean } | null = null;
   private heldHeight = 1;
   private catchFrom = new THREE.Vector3();
   private catchTime = 1;
@@ -42,7 +42,7 @@ export class NetBall {
     const contact = netContactPoint(actor, this.match.time + delay, delay);
     // The wind-up/toss reaches the contact point before the flight begins.
     this.flight = { from: b.pos.clone(), to: to.clone(), elapsed: 0, duration, arc, bounce, next, scored,
-      actor, delay, contact, prepared: false };
+      actor, delay, contact, prepared: false, bounced: false };
     b.state = 'held'; b.holder = actor; b.flight = null;
   }
 
@@ -70,6 +70,7 @@ export class NetBall {
     if (b.state !== 'flight') {
       f.contact.copy(netContactPoint(f.actor, this.match.time, f.delay));
       f.from.copy(f.contact); b.state = 'flight'; b.holder = null;
+      this.match.sound(SPORT === 'tennis' ? 'racket' : 'volley', f.contact);
     }
     const u = Math.min(1, (f.elapsed - f.delay) / f.duration);
     b.pos.lerpVectors(f.from, f.to, u);
@@ -80,6 +81,7 @@ export class NetBall {
       b.pos.y = u < land
         ? radius + (f.from.y - radius) * (1 - u / land) + 4 * f.arc * (u / land) * (1 - u / land)
         : radius + (f.to.y - radius) * ((u - land) / (1 - land));
+      if (!f.bounced && u >= 0.78) { f.bounced = true; this.match.sound('bounce', b.pos, 0.35); }
     } else b.pos.y += 4 * f.arc * u * (1 - u);
     b.pos.y = Math.max(CONFIG.visuals.ballRadius * CONFIG.visuals.ballScale, b.pos.y);
     b.vel.copy(b.pos).sub(old).divideScalar(Math.max(dt, 0.001));

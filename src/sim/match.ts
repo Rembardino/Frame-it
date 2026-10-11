@@ -18,22 +18,34 @@ import { BoxingSimulation } from './sports/boxing';
 import type { SportSimulation } from './sports/types';
 import { actorMotion, type MotionPose } from '../animation/motion';
 import { steerActor, separateActors } from './locomotion';
+import type { Speech } from '../audio/speech';
+import type { Shout } from '../audio/lines';
 
 export type TeamId = 0 | 1;
-/** ref = arbitro, coach = allenatore a bordo campo; fan e steward compaiono solo durante l'invasione. */
-export type Role = 'gk' | 'def' | 'mid' | 'fwd' | 'ref' | 'coach' | 'fan' | 'steward';
+/** ref = arbitro, coach = allenatore a bordo campo; fan e steward compaiono solo durante l'invasione;
+ *  spectator = spettatore protagonista di un momento segreto (in tribuna o a bordo campo). */
+export type Role = 'gk' | 'def' | 'mid' | 'fwd' | 'ref' | 'coach' | 'fan' | 'steward' | 'spectator';
 /** windUp = rallenta e carica la gamba prima di passare o tirare; kick = il calcio vero e proprio. */
 export type Pose =
   | 'normal' | 'dive' | 'celebrate' | 'dejected' | 'fall' | 'tackle' | 'stumble'
   | 'protest' | 'argue' | 'shove' | 'card' | 'windUp' | 'kick' | 'crouch' | 'wave'
   /** Basket: tiro in sospensione e passaggio a due mani. */
   | 'shoot' | 'throw' | 'racket' | 'backhand' | 'serve' | 'receive' | 'set' | 'spike' | 'block'
-  | 'guard' | 'jab' | 'hook' | 'uppercut' | 'recoil';
+  | 'guard' | 'jab' | 'hook' | 'uppercut' | 'recoil'
+  /** Spettatori dei momenti segreti. */
+  | 'hug' | 'hide' | 'kiss' | 'dance' | 'sleep' | 'kneel';
 export type MatchPhase = 'play' | 'goal' | 'reset' | 'dead';
 export type ShotOutcome = 'goal' | 'save' | 'wide';
 
 /** Effetti speciali (eventi rari). Per aggiungerne uno: nome qui, stato in Match.sky, disegno in render/skyEffects.ts. */
 export type EffectName = 'shootingStar';
+
+/** Suoni della partita (generati dall'audio, nessun file). */
+export type SoundName =
+  | 'kick' | 'shot' | 'net' | 'save' | 'ooh' | 'goal' | 'whistle' | 'whistleEnd' | 'bounce' | 'swish' | 'rim'
+  | 'racket' | 'volley' | 'punch' | 'knockdown' | 'bell' | 'point';
+/** Segnali per l'audio: un suono in un punto del campo, o una frase urlata da un personaggio. Chi li legge li svuota. */
+export type Cue = { type: 'sound'; sound: SoundName; at: THREE.Vector3; power: number } | { type: 'say'; actor: Actor; line: Shout };
 
 /** Fatti della partita letti dall'Event Director. */
 export type MatchEvent = { type: 'goal'; scorer: Actor; at: number };
@@ -70,7 +82,15 @@ export interface Actor {
   /** Da fermo guarda questo attore invece della palla. */
   faceTarget: Actor | null;
   seed: number;
+  /** Frase che sta dicendo (muove la bocca); la imposta l'audio quando sceglie le parole. */
+  say: Speech | null;
+  /** Spettatori: aspetto (vestiti normali, costume, mascotte). */
+  look?: SpectatorLook;
 }
+
+/** Aspetti degli spettatori dei momenti segreti (i colori e i cappelli stanno in render/athlete.ts). */
+export type SpectatorLook = 'plain' | 'banana' | 'dino' | 'clown' | 'astronaut' | 'mascot';
+export const COSTUMES: SpectatorLook[] = ['banana', 'dino', 'clown', 'astronaut'];
 
 interface Flight {
   from: THREE.Vector3;
@@ -173,6 +193,7 @@ function makeActor(id: number, team: TeamId, role: Role, base = { x: 0, z: 0 }):
     poseDir: 0,
     faceTarget: null,
     seed: Math.random() * 100,
+    say: null,
   };
 }
 
@@ -199,10 +220,16 @@ export class Match {
   phase: MatchPhase = 'play';
   /** 0..1: quanto è eccitato il pubblico. */
   excitement = 0;
+  /** Triplice fischio dato: niente più cartellini né proteste dell'arbitro. */
+  over = false;
+  /** Quanti stacchi televisivi ci sono stati (la grafica fa una breve dissolvenza a ogni nuovo stacco). */
+  cuts = 0;
   /** Tempo totale trascorso (s), base dei tempi dei momenti. */
   time = 0;
   /** Coda di eventi: chi la legge la svuota. */
   readonly events: MatchEvent[] = [];
+  /** Suoni e frasi per l'audio (main.ts la svuota a ogni fotogramma; senza audio resta corta). */
+  readonly cues: Cue[] = [];
   /** La palla la gestisce un evento: niente decisioni automatiche, contrasti, intercetti. */
   ballScripted = false;
   /** Cielo: stella cadente. from/to sono decisi quando l'evento parte, così il pubblico sa già dove guardare. */
@@ -218,6 +245,9 @@ export class Match {
   private onDeadEnd: (() => void) | null = null;
   /** Dopo un fischio: chi va a battere la punizione. */
   private restartTaker: Actor | null = null;
+  /** Palla appena ricevuta: scarto dal piede che si annulla in fretta, così non "salta" tra i piedi. */
+  private catchOffset = new THREE.Vector3();
+  private catchFrom: THREE.Vector3 | null = null;
   /** Basket: quanto vale il tiro in volo (2 o 3). */
   private shotPoints = 2;
 
@@ -242,6 +272,16 @@ export class Match {
     }
     for (const role of ['fan', 'steward', 'steward'] as Role[]) {
       const a = makeActor(id++, 0, role);
+      a.active = false;
+      a.pos.copy(PARKING);
+      this.extras.push(a);
+    }
+    // Spettatori dei momenti segreti: tre normali, uno in costume, e la mascotte dove ce n'è una.
+    const looks: SpectatorLook[] = ['plain', 'plain', 'plain', COSTUMES[Math.floor(Math.random() * COSTUMES.length)]];
+    if (SPORT === 'calcio' || BASKET) looks.push('mascot');
+    for (const look of looks) {
+      const a = makeActor(id++, 0, 'spectator');
+      a.look = look;
       a.active = false;
       a.pos.copy(PARKING);
       this.extras.push(a);
@@ -294,17 +334,19 @@ export class Match {
         this.updateCelebration();
         if (this.phaseTime > M.celebrateSec) this.startReset();
         break;
-      case 'reset':
+      case 'reset': {
+        // Si riparte solo con tutti nella propria metà campo, ai loro posti.
+        let ready = true;
         for (const a of this.actors) {
           a.target.copy(this.kickoffSpot(a, this.kickoffTeam));
           a.speedLimit = M.runSpeed * 0.8;
+          if (xzDist(a.pos, a.target) > 0.7) ready = false;
         }
-        {
-          const taker = this.actors.find(a => a.team === this.kickoffTeam && a.role === 'fwd')!;
-          if (this.phaseTime > M.resetSec && this.ball.state === 'dead' &&
-            xzDist(taker.pos, this.kickoffSpot(taker, this.kickoffTeam)) < 0.7) this.kickoff(this.kickoffTeam);
-        }
+        if (this.ball.state !== 'dead') break;
+        if (ready && this.phaseTime >= M.resetSec) this.kickoff(this.kickoffTeam);
+        else if (!ready && this.phaseTime > M.resetCutSec) this.cutToKickoff();
         break;
+      }
       case 'dead':
         this.updateFormation();
         if (this.restartTaker) {
@@ -358,13 +400,52 @@ export class Match {
     a.poseTime = 0;
     a.poseDur = dur;
     a.faceTarget = face;
+    const line = this.shoutFor(a, pose);
+    if (line) this.say(a, line);
     if (pose === 'tackle') a.vel.set(Math.cos(a.heading) * 7, 0, Math.sin(a.heading) * 7);
     if ((pose === 'fall' || pose === 'tackle') && this.ball.holder === a) this.looseBall(3, a.heading);
+  }
+
+  /** Un suono nel punto at (power 0..1 = intensità). */
+  sound(sound: SoundName, at: THREE.Vector3, power = 1) {
+    this.pushCue({ type: 'sound', sound, at: at.clone(), power });
+  }
+
+  /** Un personaggio urla una frase della categoria line (le parole le sceglie l'audio, nella lingua del gioco). */
+  say(actor: Actor, line: Shout) {
+    this.pushCue({ type: 'say', actor, line });
+  }
+
+  private pushCue(c: Cue) {
+    this.cues.push(c);
+    if (this.cues.length > 64) this.cues.shift(); // nessuno ascolta (test, simulazioni): non cresce all'infinito
+  }
+
+  /** Chi parla quando assume una posa, e cosa dice. */
+  private shoutFor(a: Actor, pose: Pose): Shout | null {
+    if (a.role === 'ref') return pose === 'card' ? (SPORT === 'boxe' ? 'count' : this.over ? null : 'card') : pose === 'protest' ? 'steward' : null;
+    if (a.role === 'steward') return pose === 'tackle' ? 'steward' : null;
+    if (a.role === 'fan') return pose === 'wave' ? 'fan' : pose === 'fall' ? 'ouch' : null;
+    if (a.role === 'spectator') {
+      const lines: Partial<Record<Pose, Shout>> = { hide: 'hide', wave: 'fan', dance: 'fan', stumble: 'ouch', fall: 'ouch', celebrate: 'yes', dejected: 'dejected' };
+      return lines[pose] ?? null;
+    }
+    if (a.role === 'coach') return pose === 'argue' ? 'coach' : pose === 'celebrate' ? 'celebrate' : pose === 'dejected' ? 'dejected' : null;
+    const lines: Partial<Record<Pose, Shout>> = {
+      protest: 'protest', argue: 'argue', shove: 'shove', stumble: 'ouch', fall: 'ouch', celebrate: 'celebrate', dejected: 'dejected',
+    };
+    return lines[pose] ?? null;
   }
 
   /** Fischio: gioco fermo finché un evento non chiama restartPlay(). */
   stopPlay() {
     if (this.phase !== 'play') return;
+    if (this.over) this.sound('whistleEnd', this.referee.pos);
+    else {
+      this.sound('whistle', this.referee.pos);
+      // "Fallo!", tranne quando si ferma il gioco per un invasore.
+      if (!this.extras.some((e) => e.role === 'fan' && e.active)) this.say(this.referee, 'foul');
+    }
     const b = this.ball;
     b.pos.y = BALL_RADIUS;
     b.state = 'dead';
@@ -411,6 +492,7 @@ export class Match {
 
   /** Triplice fischio: gioco fermo per sempre. */
   endMatch() {
+    this.over = true;
     this.stopPlay();
     this.restartTaker = null;
     if (this.sportSimulation) this.everyone.forEach((a) => { a.target.copy(a.pos); a.vel.set(0, 0, 0); });
@@ -505,8 +587,29 @@ export class Match {
     return new THREE.Vector3(x * dirOf(a.team), 0, z);
   }
 
+  /** Stacco televisivo: chi è ancora in ritardo "salta" al suo posto, e dopo un secondo si batte il calcio d'inizio. */
+  private cutToKickoff() {
+    for (const a of this.actors) a.target.copy(this.kickoffSpot(a, this.kickoffTeam));
+    this.cutToTargets();
+    this.ball.pos.set(0, BALL_RADIUS, 0);
+    this.phaseTime = M.resetSec - 1;
+  }
+
+  /** Stacco televisivo: tutti i giocatori saltano al loro target, fermi e rivolti verso il campo avversario. */
+  cutToTargets() {
+    for (const a of this.actors) {
+      a.pos.copy(a.target).setY(0);
+      a.vel.set(0, 0, 0);
+      a.heading = a.team === 0 ? 0 : Math.PI;
+      this.setPose(a, SPORT === 'boxe' ? 'guard' : 'normal');
+      a.poseBlendTime = CONFIG.visuals.poseBlendSec;
+    }
+    this.cuts++;
+  }
+
   private kickoff(team: TeamId) {
     this.setPhase('play');
+    this.sound('whistle', this.referee.pos, 0.7);
     for (const a of this.actors) this.setPose(a, 'normal');
     const taker = this.actors.find((a) => a.team === team && a.role === (BASKET ? 'mid' : 'fwd'))!;
     this.giveBall(taker, 0.6);
@@ -514,6 +617,9 @@ export class Match {
 
   private onGoal(scorer: Actor, points = 1) {
     this.score[scorer.team] += points;
+    this.sound('goal', scorer.pos);
+    // L'urlo del marcatore arriva prima di quello generico dell'esultanza.
+    this.say(scorer, BASKET ? 'basket' : 'goal');
     this.setPhase('goal');
     this.scorer = scorer;
     this.kickoffTeam = (1 - scorer.team) as TeamId;
@@ -526,6 +632,13 @@ export class Match {
       // Pugno al cielo mentre torna in difesa: la palla passa all'altra squadra.
       this.possession = this.kickoffTeam;
       this.setPose(scorer, 'celebrate', M.celebrateSec);
+      // I compagni vicini (tutti, su una tripla) alzano le braccia; chi difendeva lì vicino abbassa la testa.
+      for (const a of this.actors) {
+        const near = xzDist(a.pos, scorer.pos) < 5;
+        if (a === scorer) continue;
+        if (a.team === scorer.team && (near || points === 3)) this.setPose(a, 'celebrate', 1.3);
+        else if (a.team !== scorer.team && near) this.setPose(a, 'dejected', 1.2);
+      }
       return;
     }
     this.setPose(scorer, 'celebrate');
@@ -707,6 +820,7 @@ export class Match {
     }
     if (!best) { this.holdTimer = 0.5; return; }
 
+    if (Math.random() < 0.12) this.say(best, 'call');
     const to = best.pos.clone().addScaledVector(best.vel, 0.6);
     if (Math.random() < M.badPassChance) to.add(new THREE.Vector3(rand(-6, 6), 0, rand(-6, 6)));
     clampToPitch(to, 1).setY(BASKET ? 1.2 : BALL_RADIUS);
@@ -720,6 +834,7 @@ export class Match {
     b.holder = null;
     b.inHands = false;
     b.flight = { from: b.pos.clone(), to: to.clone(), t: 0, dur: Math.max(dur, 0.25), arc, kind, kicker, receiver, shot: null };
+    if (kicker && !BASKET) this.sound(kind === 'shot' ? 'shot' : 'kick', b.pos, Math.min(1, 0.4 + xzDist(b.pos, to) / 30));
     if (kicker && (kicker.pose === 'normal' || kicker.pose === 'windUp')) {
       if (!BASKET) this.setPose(kicker, 'kick', 0.35);
       else if (kind === 'shot') this.setPose(kicker, 'shoot', 0.6);
@@ -734,6 +849,7 @@ export class Match {
     b.inHands = inHands;
     b.flight = null;
     b.vel.set(0, 0, 0);
+    this.catchFrom = b.pos.clone();
     this.possession = a.team;
     this.holdTimer = hold;
   }
@@ -758,6 +874,7 @@ export class Match {
     }
     if (f.kind === 'shot' && BASKET) {
       const d = Math.sign(f.to.x);
+      this.sound(f.shot === 'goal' ? 'swish' : 'rim', f.to, f.shot === 'wide' ? 0.6 : 1);
       if (f.shot === 'goal') {
         // Attraverso la retina, giù sotto il canestro.
         this.launch(new THREE.Vector3(f.to.x, BALL_RADIUS, f.to.z), 0.45, 0, 'rest', null);
@@ -777,6 +894,7 @@ export class Match {
       const d = Math.sign(f.to.x);
       const defending: TeamId = f.to.x > 0 ? 1 : 0;
       const gk = this.actors.find((a) => a.team === defending && a.role === 'gk')!;
+      this.sound(f.shot === 'goal' ? 'net' : f.shot === 'save' ? 'save' : 'ooh', f.to);
       if (f.shot === 'save') {
         this.giveBall(gk, 1.6, true);
         this.excitement = Math.max(this.excitement, 0.7);
@@ -815,11 +933,16 @@ export class Match {
       } else if (BASKET) {
         // Palleggio: di lato, su e giù dal parquet.
         const bounce = Math.abs(Math.sin(this.time * 6 + h.seed));
+        // Il palleggio tocca terra quando il seno cambia segno.
+        if (Math.sin(this.time * 6 + h.seed) * Math.sin((this.time - dt) * 6 + h.seed) < 0) this.sound('bounce', h.pos, 0.6);
         b.pos.set(h.pos.x + cos * 0.35 - sin * 0.3, BALL_RADIUS + bounce * 0.85, h.pos.z + sin * 0.35 + cos * 0.3);
       } else {
         const reach = 0.5 + 0.15 * Math.sin(h.runPhase);
         b.pos.set(h.pos.x + cos * reach, BALL_RADIUS, h.pos.z + sin * reach);
       }
+      if (this.catchFrom) { this.catchOffset.subVectors(this.catchFrom, b.pos); this.catchFrom = null; }
+      this.catchOffset.multiplyScalar(Math.exp(-dt * 12));
+      b.pos.add(this.catchOffset);
     } else if (b.state === 'flight' && b.flight) {
       const f = b.flight;
       f.t += dt;
@@ -888,21 +1011,24 @@ export class Match {
     separateActors(all, dt);
   }
 
-  /** Attiva un extra (tifoso, steward) in una posizione. */
-  spawnExtra(role: 'fan' | 'steward', at: THREE.Vector3): Actor | null {
-    const a = this.extras.find((e) => e.role === role && !e.active);
+  /** Attiva un extra (tifoso, steward, spettatore) in una posizione; pick sceglie fra quelli liberi. */
+  spawnExtra(role: 'fan' | 'steward' | 'spectator', at: THREE.Vector3, pick: (a: Actor) => boolean = () => true): Actor | null {
+    const a = this.extras.find((e) => e.role === role && !e.active && pick(e));
     if (!a) return null;
     a.active = true;
     a.pos.copy(at);
     a.target.copy(at);
     a.vel.set(0, 0, 0);
-    a.pose = 'normal';
+    a.scripted = false;
+    a.faceTarget = null;
+    a.pose = 'normal'; a.poseTime = 0; a.poseDur = Infinity;
     a.previousPose = 'normal'; a.poseBlendTime = CONFIG.visuals.poseBlendSec; a.poseFrom = null;
+    a.say = null;
     return a;
   }
 
   despawnExtra(a: Actor) {
-    if (a.role !== 'fan' && a.role !== 'steward') return;
+    if (a.role !== 'fan' && a.role !== 'steward' && a.role !== 'spectator') return;
     a.active = false;
     a.scripted = false;
     a.pos.copy(PARKING);

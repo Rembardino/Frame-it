@@ -22,6 +22,10 @@ export class CameraController {
   fov = C.startFov;
   /** Diventa true al primo input del giocatore. */
   hasInteracted = false;
+  /** Testa motorizzata: punto da seguire quando nessuno tocca la camera (forza in CONFIG.camera.autoTrack). */
+  autoTarget: (() => THREE.Vector3 | null) | null = null;
+  /** Drone in volo: si gira a 360°, si guarda quasi in verticale, e W/A/S/D muovono il drone invece della camera. */
+  free = false;
 
   private tYaw = this.yaw;
   private tPitch = this.pitch;
@@ -128,6 +132,12 @@ export class CameraController {
       this.vYaw *= f;
       this.vPitch *= f;
     }
+    const p = C.autoTrack > 0 && !this.free && this.enabled && !this.pointers.size && !this.keys.size && !this.zoomHold ? this.autoTarget?.() : null;
+    if (p) {
+      const a = this.anglesTo(p), k = 1 - Math.exp(-dt * C.autoTrack);
+      this.tYaw += (a.yaw - this.tYaw) * k;
+      this.tPitch += (a.pitch - this.tPitch) * k;
+    }
     this.clampTargets();
 
     // La camera insegue il bersaglio (smorzamento esponenziale, indipendente dal frame rate).
@@ -147,18 +157,45 @@ export class CameraController {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Yaw e pitch (gradi) per guardare un punto dalla posizione attuale della camera. */
+  anglesTo(p: THREE.Vector3) {
+    const d = p.clone().sub(this.camera.position);
+    return { yaw: Math.atan2(d.x, -d.z) / DEG, pitch: Math.atan2(d.y, Math.hypot(d.x, d.z)) / DEG };
+  }
+
+  /** Il punto del terreno al centro dell'inquadratura (null se si guarda sopra l'orizzonte). */
+  groundAim(): THREE.Vector3 | null {
+    const y = this.yaw * DEG, p = this.pitch * DEG;
+    const f = new THREE.Vector3(Math.sin(y) * Math.cos(p), Math.sin(p), -Math.cos(y) * Math.cos(p));
+    if (f.y > -0.02) return null;
+    return this.camera.position.clone().addScaledVector(f, -this.camera.position.y / f.y);
+  }
+
+  /** Dopo uno spostamento della camera continua a guardare lo stesso punto (il drone si muove, l'inquadratura no). */
+  keepLookingAt(p: THREE.Vector3) {
+    const a = this.anglesTo(p);
+    const dy = a.yaw - this.yaw, dp = a.pitch - this.pitch;
+    this.yaw += dy; this.tYaw += dy;
+    this.pitch += dp; this.tPitch += dp;
+  }
+
   private clampTargets() {
-    const y = clamp(this.tYaw, -C.yawLimit, C.yawLimit);
+    if (!this.free && Math.abs(this.tYaw) > 180) {
+      // Atterrato dopo qualche giro su se stesso: stesso angolo, riportato tra -180 e 180.
+      const turns = Math.round(this.tYaw / 360) * 360;
+      this.tYaw -= turns; this.yaw -= turns;
+    }
+    const y = this.free ? this.tYaw : clamp(this.tYaw, -C.yawLimit, C.yawLimit);
     if (y !== this.tYaw) { this.tYaw = y; this.vYaw = 0; }
-    const p = clamp(this.tPitch, C.pitchMin, C.pitchMax);
+    const p = clamp(this.tPitch, this.free ? -89 : C.pitchMin, this.free ? 70 : C.pitchMax);
     if (p !== this.tPitch) { this.tPitch = p; this.vPitch = 0; }
     this.tFov = clamp(this.tFov, C.fovMin, C.fovMax);
   }
 
   private applyKeys(dt: number) {
     const key = (...codes: string[]) => (codes.some((c) => this.keys.has(c)) ? 1 : 0);
-    const h = key('ArrowRight', 'KeyD') - key('ArrowLeft', 'KeyA');
-    const v = key('ArrowUp', 'KeyW') - key('ArrowDown', 'KeyS');
+    const h = key('ArrowRight', ...(this.free ? [] : ['KeyD'])) - key('ArrowLeft', ...(this.free ? [] : ['KeyA']));
+    const v = key('ArrowUp', ...(this.free ? [] : ['KeyW'])) - key('ArrowDown', ...(this.free ? [] : ['KeyS']));
     const z = key('KeyQ', 'Minus', 'NumpadSubtract') - key('KeyE', 'Equal', 'NumpadAdd');
     if (!h && !v && !z) return;
     this.hasInteracted = true;

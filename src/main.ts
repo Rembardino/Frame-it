@@ -2,13 +2,14 @@
  * Frame It: Live Sports TV — bootstrap e game loop.
  */
 import './style.css';
-import { CONFIG, SPORT, SPORT_LIST } from './config';
+import { CAREER, CONFIG, SPORT, SPORT_LIST } from './config';
 import { createStage } from './render/stage';
 import { ActorViews } from './render/actors';
 import { Crowd, type CrowdState } from './render/crowd';
 import { SkyEffects } from './render/skyEffects';
 import { Match } from './sim/match';
 import { Director, type DirectorResult } from './events/director';
+import { SecretMoments } from './events/secrets';
 import { DirectorVoice } from './director/voice';
 import { CameraController } from './camera/cameraController';
 import { Recorder, type CameraFrame, type Frame, type WorldFrame } from './recorder/recorder';
@@ -16,11 +17,16 @@ import { ReplayPlayer } from './recorder/replay';
 import { Hud } from './ui/hud';
 import { DebugOverlay } from './ui/debugOverlay';
 import { EdgeIndicators } from './ui/edgeIndicators';
+import { AssistFrame } from './ui/assistFrame';
+import { CareerHub, careerReport } from './ui/careerHub';
+import { loadCareer, saveCareer, setPending, settle, type PendingMatch } from './career/career';
+import { Drone } from './camera/drone';
+import { AudioEngine } from './audio/audio';
 import { addToAlbum, showAlbum } from './ui/album';
 import { actorSubject, ballSubject, frameInput } from './scoring/moment';
 import { summarize } from './scoring/summary';
 import type { Component } from './scoring/scoring';
-import { nativeMessage, postNative } from './platform/navigation';
+import { nativeMessage, postNative, restartGame } from './platform/navigation';
 import { bindNativeServices } from './platform/services';
 import { GyroscopeController } from './camera/gyroscope';
 import { Tutorial, tutorialSeen } from './ui/tutorial';
@@ -55,6 +61,8 @@ const match = new Match();
 // ?rare = stella cadente garantita dopo 20 secondi (per provarla).
 const director = new Director(match, enabled, { forceRare: params.has('rare') });
 const voice = new DirectorVoice(match, director, enabled);
+// Momenti segreti in tribuna e a bordo campo: mai annunciati, bonus e video virali se li riprendi.
+const secrets = new SecretMoments(match, stage.seatRows, params.get('secret'));
 const views = new ActorViews(stage.scene, match);
 const crowd = new Crowd(stage.scene, stage.seatRows);
 const sky = new SkyEffects(stage.scene, match);
@@ -63,17 +71,50 @@ cam.bindZoomButton($('zin'), -1);
 cam.bindZoomButton($('zout'), 1);
 cam.setEnabled(false);
 const gyro = new GyroscopeController(cam);
+const drone = new Drone(cam, stage.camera, stage.scene);
+const audio = new AudioEngine();
+// I browser fanno partire l'audio solo dopo un tocco del giocatore.
+addEventListener('pointerdown', () => audio.unlock(), { passive: true });
+function paintSound() {
+  document.querySelectorAll('.sound-toggle').forEach((b) => { b.textContent = t(audio.muted ? 'Audio: OFF' : 'Audio: ON'); });
+}
+document.querySelectorAll('.sound-toggle').forEach((b) => b.addEventListener('pointerup', (e) => {
+  e.stopPropagation(); // dal menu non deve far partire la partita
+  audio.unlock();
+  audio.setMuted(!audio.muted);
+  paintSound();
+}));
+paintSound();
+let spokenLine = 0;
+// Testa motorizzata (solo carriera, se comprata): segue la palla; nella boxe il centro tra i due pugili.
+cam.autoTarget = () => SPORT === 'boxe' ? match.actors[0].pos.clone().add(match.actors[1].pos).multiplyScalar(0.5).setY(1.2) : match.ball.pos;
 const practice = new CameraPractice(stage, views, cam, () => syncCamera());
 const tutorial = new Tutorial((done, back, startsMatch) => practice.open(done, back, startsMatch));
-const cameraCanMove = () => (practice.active ? practice.inputActive : running && !ended && !replay.active) && !appPaused && !document.hidden;
+const cameraCanMove = () => (practice.active ? practice.inputActive : running && !ended && !replay.active && !userPaused) && !appPaused && !document.hidden;
 const syncCamera = () => gyro.setActive(cameraCanMove());
 const recorder = new Recorder(match);
 const replay = new ReplayPlayer();
 const hud = new Hud(debug || CONFIG.debug.showFps);
 const indicators = new EdgeIndicators();
 const debugOverlay = debug ? new DebugOverlay() : null;
+// Modalità assistita (riquadro dell'inquadratura perfetta) o esperto (niente aiuti). Si sceglie nel menu.
+let assisted = false;
+try { assisted = localStorage.getItem('frameit.mode') === 'assist'; } catch { /* niente salvataggi */ }
+const assist = new AssistFrame();
+function setMode(on: boolean) {
+  assisted = on;
+  try { localStorage.setItem('frameit.mode', on ? 'assist' : 'expert'); } catch { /* idem */ }
+  $('mode-assist').classList.toggle('on', on);
+  $('mode-expert').classList.toggle('on', !on);
+  if (!on) assist.clear();
+}
+setMode(assisted);
+for (const [id, on] of [['mode-assist', true], ['mode-expert', false]] as const) {
+  $(id).addEventListener('pointerup', (e) => { e.stopPropagation(); setMode(on); });
+}
+let seenCuts = 0;
 // In debug gli oggetti di gioco sono raggiungibili dalla console del browser (e dai test automatici).
-if (debug) Object.assign(window, { frameit: { match, director, voice, cam, gyro, recorder, replay, stage, views, hud, practice } });
+if (debug) Object.assign(window, { frameit: { match, director, voice, cam, gyro, recorder, replay, stage, views, hud, practice, drone, audio, secrets, crowd } });
 
 function resize() {
   stage.renderer.setSize(innerWidth, innerHeight);
@@ -95,9 +136,14 @@ const worldNow = (): WorldFrame => ({
   excitement: match.excitement, hotX: director.crowdHot.x, hotLevel: director.crowdHot.level, lookUp: director.crowdLookUp,
 });
 const crowdState = (w: WorldFrame): CrowdState => ({ excitement: w.excitement, hot: { x: w.hotX, level: w.hotLevel }, lookUp: w.lookUp });
-const camNow = (): CameraFrame => ({ rx: stage.camera.rotation.x, ry: stage.camera.rotation.y, fov: stage.camera.fov });
+const camNow = (): CameraFrame => ({
+  rx: stage.camera.rotation.x, ry: stage.camera.rotation.y, fov: stage.camera.fov,
+  // La posizione serve solo a chi ha il drone (nel replay la camera torna dov'era in volo).
+  ...(drone.owned ? { x: stage.camera.position.x, y: stage.camera.position.y, z: stage.camera.position.z } : {}),
+});
 function setCamera(c: CameraFrame) {
   stage.camera.rotation.set(c.rx, c.ry, 0);
+  if (c.x !== undefined) stage.camera.position.set(c.x, c.y!, c.z!);
   stage.camera.fov = c.fov;
   stage.camera.updateProjectionMatrix();
 }
@@ -111,7 +157,8 @@ let liveSnapshot: Frame | null = null;
 function wantsReplay(r: DirectorResult) {
   const R = CONFIG.replay;
   if (!R.enabled || !r.result || ended || r.category === 'order') return false;
-  if (r.category === 'rare') return r.result.stars >= CONFIG.rare.captureStars; // le clip rare si rivedono sempre
+  // Le clip rare e i momenti virali si rivedono sempre.
+  if (r.category === 'rare' || r.category === 'secret') return r.result.stars >= CONFIG.rare.captureStars;
   return r.result.stars >= R.minStars && match.time - lastReplay > R.cooldown;
 }
 
@@ -132,7 +179,7 @@ function renderFrame(f: Frame) {
   const { cam: c, world } = recorder.apply(f, f, 0);
   setCamera(c);
   views.update(0);
-  crowd.update(0, crowdState(world));
+  crowd.update(0, crowdState(world), secrets.gaps);
   sky.update();
   stage.renderer.render(stage.scene, stage.camera);
 }
@@ -144,12 +191,13 @@ function startReplay(r: DirectorResult) {
   if (clip.frames.length < 2) return;
   liveSnapshot = recorder.capture(camNow(), worldNow());
   // Clip rara: la miniatura dell'album è il fotogramma dell'istante decisivo.
-  if (r.category === 'rare' && r.result) {
+  if ((r.category === 'rare' || r.category === 'secret') && r.result) {
     const f = clip.frames.reduce((p, q) => (Math.abs(q.t - w.decisive) < Math.abs(p.t - w.decisive) ? q : p));
     renderFrame(f);
     addToAlbum(r.id, r.result.stars, r.result.score, snapshot());
   }
   replay.start(clip);
+  postNative({ type: 'replay-active', active: true });
   cam.setEnabled(false);
   syncCamera();
   lastReplay = match.time;
@@ -161,11 +209,12 @@ function startReplay(r: DirectorResult) {
 }
 
 function endReplay() {
+  postNative({ type: 'replay-active', active: false });
   if (liveSnapshot) {
     const { cam: c, world } = recorder.apply(liveSnapshot, liveSnapshot, 0);
     setCamera(c);
     views.update(0);
-    crowd.update(0, crowdState(world));
+    crowd.update(0, crowdState(world), secrets.gaps);
     sky.update();
   }
   liveSnapshot = null;
@@ -196,7 +245,7 @@ function onResult(r: DirectorResult) {
 function saveRecord(points: number) {
   let record = 0;
   // Un record per sport (il calcio tiene la chiave storica).
-  const key = SPORT === 'calcio' ? 'frameit.record' : `frameit.record.${SPORT}`;
+  const key = (SPORT === 'calcio' ? 'frameit.record' : `frameit.record.${SPORT}`) + (assisted ? '.assist' : '') + (CAREER ? '.career' : '');
   try { record = Number(localStorage.getItem(key)) || 0; } catch { /* niente salvataggi */ }
   const isRecord = points > record;
   if (isRecord) try { localStorage.setItem(key, String(points)); } catch { /* idem */ }
@@ -208,6 +257,7 @@ function checkEnd() {
   if (ended || match.clock < CONFIG.match.durationSec) return;
   // Allo scadere non programmare altre azioni; quella già in corso può finire normalmente.
   director.stop();
+  secrets.stop();
   const mainBusy = director.active.some((i) => i.def.category === 'main');
   if (match.phase !== 'play' || mainBusy) return;
   ended = true;
@@ -222,10 +272,48 @@ function checkEnd() {
     const s = summarize(history);
     const { record, isRecord } = saveRecord(s.points);
     hud.showSummary(s, match, record, isRecord);
+    if (CAREER) showCareerResult(s.avgStars);
     postNative({ type: 'match-ended' });
     postNative({ type: 'screen', screen: 'results' });
   }, 4500);
 }
+
+// ---------------------------------------------------------------- carriera
+
+/** Fine partita di carriera: paga o pubblica i video, e mostra il risultato nel riepilogo. */
+function showCareerResult(avgStars: number) {
+  const state = loadCareer();
+  const shots = history.filter((r) => r.result && r.category !== 'order')
+    .map((r) => ({ label: r.label, stars: r.result!.stars, rare: r.category === 'rare', viral: r.category === 'secret' }));
+  const report = settle(state, CAREER!, shots, avgStars, assisted);
+  saveCareer(state);
+  const box = document.querySelector('#summary .sum-btns')!;
+  box.insertAdjacentHTML('beforebegin', careerReport(report, state));
+  box.innerHTML = `<button id="to-career">${t('Torna alla carriera')}</button>`;
+  $('to-career').addEventListener('click', () => {
+    try { localStorage.setItem('frameit.career.open', '1'); } catch { /* si torna al menu */ }
+    restartGame();
+  });
+}
+
+/** Una partita di carriera parte ricaricando il gioco con lo sport giusto (anche nell'app Android). */
+function playCareer(p: PendingMatch) {
+  setPending(p);
+  if (nativeMessage('select-sport', p.sport)) return;
+  const q = new URLSearchParams(location.search);
+  q.set('sport', p.sport);
+  if (q.toString() === location.search.slice(1)) location.reload();
+  else location.search = q.toString();
+}
+const careerHub = new CareerHub(playCareer, () => assisted);
+$('career-btn').addEventListener('pointerup', (e) => { e.stopPropagation(); careerHub.open(); });
+// La richiesta vale per questo caricamento soltanto: la prossima volta si torna alla modalità libera.
+if (CAREER) setPending(null);
+try {
+  if (localStorage.getItem('frameit.career.open')) { localStorage.removeItem('frameit.career.open'); careerHub.open(); }
+} catch { /* niente salvataggi */ }
+$('drone-btn').addEventListener('click', () => drone.toggle());
+addEventListener('keydown', (e) => { if (e.code === 'KeyF' && cameraCanMove()) drone.toggle(); });
 
 // ---------------------------------------------------------------- avvio e loop
 
@@ -234,11 +322,13 @@ let running = false;
 const startScreen = $('start');
 function start() {
   if (running) return;
+  audio.unlock();
   startScreen.classList.add('hidden');
   $('zoomctl').classList.toggle('hidden', !CONFIG.camera.zoomButtons);
   running = true;
   cam.setEnabled(true);
   $('gyro-controls').classList.remove('hidden');
+  $('drone-btn').classList.toggle('hidden', !drone.owned);
   syncCamera();
   postNative({ type: 'screen', screen: 'playing' });
   voice.start();
@@ -276,15 +366,32 @@ $('album-btn').addEventListener('pointerup', (e) => {
 });
 let last = performance.now();
 let appPaused = false;
-addEventListener('frameit:pause', () => { appPaused = true; cam.setEnabled(false); syncCamera(); });
-addEventListener('frameit:resume', () => { appPaused = false; last = performance.now(); cam.setEnabled(cameraCanMove()); syncCamera(); });
+// Pausa scelta dal giocatore (diversa da quella del telefono quando l'app va in background).
+let userPaused = false;
+function setUserPause(on: boolean) {
+  if (ended && on) return;
+  userPaused = on;
+  if (on) audio.pause(); else audio.resume();
+  last = performance.now();
+  $('pause').classList.toggle('hidden', !on);
+  cam.setEnabled(cameraCanMove());
+  syncCamera();
+}
+$('pause-btn').addEventListener('click', () => setUserPause(true));
+$('resume-btn').addEventListener('click', () => setUserPause(false));
+$('menu-btn').addEventListener('click', restartGame);
+addEventListener('frameit:pause', () => { appPaused = true; audio.pause(); cam.setEnabled(false); syncCamera(); });
+addEventListener('frameit:resume', () => { appPaused = false; if (!userPaused) audio.resume(); last = performance.now(); cam.setEnabled(cameraCanMove()); syncCamera(); });
+// Su PC: Esc o P mettono e tolgono la pausa.
+addEventListener('keydown', (e) => { if (running && !ended && (e.key === 'Escape' || e.key === 'p' || e.key === 'P')) setUserPause(!userPaused); });
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) audio.pause(); else if (!userPaused && !appPaused) audio.resume();
   cam.setEnabled(cameraCanMove());
   syncCamera();
 });
-if (params.has('autostart')) start();
+if (params.has('autostart') || CAREER) start();
 stage.renderer.setAnimationLoop((now) => {
-  if (appPaused || document.hidden) { last = now; return; }
+  if (appPaused || userPaused || document.hidden) { last = now; return; }
   // Il timestamp del primo RAF può precedere performance.now() registrato durante l'avvio.
   const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
   last = now;
@@ -301,8 +408,9 @@ stage.renderer.setAnimationLoop((now) => {
     if (st) {
       const { cam: c, world } = recorder.apply(st.a, st.b, st.u);
       setCamera(replay.angle(st.a, st.b, st.u, c));
+      drone.syncPilot();
       views.update(dt * replay.speed);
-      crowd.update(dt * replay.speed, crowdState(world));
+      crowd.update(dt * replay.speed, crowdState(world), secrets.gaps);
       sky.update();
       $('rp-speed').textContent = `x${replay.speed}`;
     } else {
@@ -313,23 +421,46 @@ stage.renderer.setAnimationLoop((now) => {
     return;
   }
 
+  if (running && !ended) drone.update(dt);
   cam.update(dt);
   const view = cam.view();
+  if (drone.owned) {
+    const btn = $('drone-btn');
+    btn.textContent = `DRONE ${Math.ceil(drone.battery)}s`;
+    btn.classList.toggle('on', drone.active);
+  }
   if (running) {
     // Small simulation steps keep footwork and contacts stable when a render frame takes longer.
     const steps = Math.max(1, Math.ceil(dt * 60)), step = dt / steps;
     for (let i = 0; i < steps; i++) {
-      match.update(step); director.update(step, view); voice.update(step, view);
-      for (const r of [...director.finished.splice(0), ...voice.finished.splice(0)]) onResult(r);
+      match.update(step); director.update(step, view); voice.update(step, view); secrets.update(view);
+      for (const r of [...director.finished.splice(0), ...voice.finished.splice(0), ...secrets.finished.splice(0)]) onResult(r);
       checkEnd(); recorder.tick(step, camNow(), worldNow());
     }
   }
 
+  audio.handle(match.cues, match);
+  audio.update(view, match.excitement, drone.airborne);
+  // Il regista parla: stessa battuta dei sottotitoli.
+  if (running && voice.current && voice.current.id !== spokenLine) {
+    spokenLine = voice.current.id;
+    audio.director(voice.current.text);
+  }
+
   views.update(dt);
-  crowd.update(dt, crowdState(worldNow()));
+  crowd.update(dt, crowdState(worldNow()), secrets.gaps);
   sky.update();
   hud.update(dt, cam, match, voice, ended);
   indicators.draw(view, [...director.indicators(), ...voice.indicators()]);
+  if (assisted) assist.draw(view, voice.order?.tracker.last ? voice.order.tracker : director.focusTracker());
+  if (match.cuts !== seenCuts) {
+    // Stacco TV (es. rimessa a centrocampo dopo un gol): nero e dissolvenza.
+    seenCuts = match.cuts;
+    const cut = $('cut');
+    cut.classList.add('on');
+    void cut.offsetWidth;
+    cut.classList.remove('on');
+  }
   debugOverlay?.draw(dt, match.time, view, director.focusTracker() ?? voice.order?.tracker ?? null, ambientInput(), enabled);
   stage.renderer.render(stage.scene, stage.camera);
 

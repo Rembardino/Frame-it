@@ -2,7 +2,7 @@
 
 Il progetto web rimane Vite/Three.js nella radice. `mobile/` contiene un'app Expo SDK 57 con React Native WebView che include il gioco offline nel bundle: non carica un sito esterno. Package name richiesto da Google Play: `com.frameitnow`. Progetto EAS: `@rembardino/frame-it`, ID `f7b9a919-96e9-48db-86db-bb866c41ff62`.
 
-Icona usata: `public/icons/frame-it-icon-concept-v3-action.png`. Orientamento landscape; camera/microfono e accesso ai file non richiesti. Salvataggi nel localStorage della WebView con origine stabile. Cambio sport e Rigioca usano un ponte con il contenitore, non URL remoti. App in background: simulazione sospesa. Giroscopio opzionale, AdMob/UMP predisposti ma pubblicità disattivate, avviso Google Play In-App Updates. Nessun acquisto in-app. Configurazione in [mobile-services.md](mobile-services.md).
+Icona usata: `public/icons/frame-it-icon-concept-v3-action.png`. Orientamento landscape; camera/microfono e accesso ai file non richiesti. Salvataggi nel localStorage della WebView con origine stabile. Cambio sport e Rigioca usano un ponte con il contenitore, non URL remoti. App in background: simulazione sospesa. Giroscopio opzionale, AdMob/UMP attivi con gli ID Frame It, avviso Google Play In-App Updates. Nessun acquisto in-app. Configurazione in [mobile-services.md](mobile-services.md).
 
 Lingua predefinita inglese, selettore English / Italiano / Español / Français / Deutsch nella schermata iniziale. Preferenza persistente nella WebView; il ponte permette di cambiare lingua offline e traduce anche i messaggi di recupero Android. Nessun caricamento remoto di traduzioni. Controllo deterministico: `npm run check:i18n` nella radice.
 
@@ -12,7 +12,7 @@ Lingua predefinita inglese, selettore English / Italiano / Español / Français 
 2. Dentro `mobile/`: `npm ci`, `npm run bundle:game`, `npx expo install --check`, `npx expo-doctor`.
 3. Verificare il bundle: `npx expo export --platform android`.
 4. Verificare accesso e progetto: `npx eas-cli@24.11.0 whoami`, `npx eas-cli@24.11.0 project:info`.
-5. AAB: `npm run build:aab`. Profilo `production`, versione app 1.0.1, versionCode incrementato da EAS, firma gestita da EAS.
+5. AAB: `npm run build:aab`. Profilo `production`, versione app 1.0.2, versionCode incrementato da EAS, firma gestita da EAS.
 6. APK installabile per prove su dispositivo: `npx eas-cli@24.11.0 build --platform android --profile preview`.
 
 `scripts/bundle-mobile.mjs` compila il gioco in IIFE e inserisce CSS e JS nell'HTML. Il risultato è `mobile/generated/game.js`, rigenerabile e ignorato da Git. L'hook EAS `eas-build-post-install` installa le dipendenze web dal lockfile e rigenera il gioco sul server prima del bundle nativo.

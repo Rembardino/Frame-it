@@ -14,7 +14,10 @@
     "check:practice": "node scripts/check-camera-practice.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
     "check:native": "node scripts/check-native-services.mjs",
-    "check:mobile": "node scripts/check-mobile-ui.mjs"
+    "check:mobile": "node scripts/check-mobile-ui.mjs",
+    "check:career": "node scripts/check-career.mjs",
+    "check:audio": "node scripts/check-audio.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"

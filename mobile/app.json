@@ -3,7 +3,7 @@
     "name": "Frame It: Live Sports TV",
     "slug": "frame-it",
     "owner": "rembardino",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "landscape",
     "platforms": [
       "android"
@@ -26,11 +26,11 @@
     "extra": {
       "frameit": {
         "ads": {
-          "enabled": false,
-          "testAds": true,
-          "appId": null,
-          "bannerId": null,
-          "interstitialId": null
+          "enabled": true,
+          "testAds": false,
+          "appId": "ca-app-pub-6724714927747840~8863376926",
+          "bannerId": "ca-app-pub-6724714927747840/6045641890",
+          "interstitialId": "ca-app-pub-6724714927747840/1585406726"
         }
       },
       "eas": {

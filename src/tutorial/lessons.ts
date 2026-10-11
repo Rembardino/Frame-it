@@ -98,8 +98,9 @@ export function lessonModel(input: FrameInput, view: View): View {
 
 export function lessonStartView(ideal: View): View {
   return { ...ideal,
-    yaw: Math.max(-CONFIG.camera.yawLimit, Math.min(CONFIG.camera.yawLimit, ideal.yaw + (ideal.yaw > 0 ? -1 : 1) * ideal.fov * 0.45)),
+    yaw: Math.max(-CONFIG.camera.yawLimit, Math.min(CONFIG.camera.yawLimit, ideal.yaw + (ideal.yaw > 0 ? -1 : 1) * ideal.fov * 0.6)),
     pitch: Math.max(CONFIG.camera.pitchMin, ideal.pitch - 2.5),
-    fov: Math.min(CONFIG.camera.fovMax, ideal.fov * 1.4),
+    // Troppo largo; se l'ideale è già quasi al massimo dell'apertura, troppo stretto.
+    fov: ideal.fov * 1.8 <= CONFIG.camera.fovMax ? ideal.fov * 1.8 : Math.max(CONFIG.camera.fovMin, ideal.fov / 1.8),
   };
 }

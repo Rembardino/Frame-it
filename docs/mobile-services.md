@@ -10,9 +10,15 @@ Il giroscopio si attiva esplicitamente nel menu o in diretta. È disattivato a o
 
 Android usa `expo-sensors` DeviceMotion a circa 30 Hz e invia le rotazioni al gioco offline. A questa frequenza i sensori di orientamento Android non richiedono un permesso runtime. Il permesso ACTIVITY_RECOGNITION del pacchetto è bloccato: il gioco non conta passi. Il browser usa DeviceOrientation, con richiesta del permesso su Safari dove applicabile, HTTPS e timeout se non arrivano eventi. In caso di errore rimangono i controlli touch; viene mostrato un messaggio.
 
-## Pubblicità: disattivate durante i test attuali
+## Pubblicità: attive dal 9 ottobre 2026
 
-`mobile/app.json` → `extra.frameit.ads` contiene `enabled: false` e `testAds: true`. Nessuna richiesta di consenso, inizializzazione JS dell’SDK o richiesta di annunci viene avviata quando `enabled` è false. Il modulo nativo è incluso nella build e usa l’App ID ufficiale di test, con inizializzazione della misurazione ritardata.
+`mobile/app.json` → `extra.frameit.ads` contiene `enabled: true` e `testAds: false`, con gli ID forniti per Frame It:
+
+- App Android: `ca-app-pub-6724714927747840~8863376926`.
+- Banner: `ca-app-pub-6724714927747840/6045641890`.
+- Interstitial: `ca-app-pub-6724714927747840/1585406726`.
+
+Le build di produzione usano questi ID; le sessioni di sviluppo usano unità di test. Impostando `enabled: false` vengono disattivate raccolta consenso, inizializzazione JS e richieste di annunci. La misurazione resta ritardata fino al consenso UMP.
 
 La configurazione può essere compilata nel JSON o tramite variabili d’ambiente lette da `mobile/app.config.js`:
 
@@ -28,7 +34,7 @@ Per verificare gli annunci in una build nativa di test, impostare `enabled: true
 
 Il flusso UMP segue FF: prima raccoglie il consenso, recupera il risultato UMP salvato se il refresh fallisce e permette gli annunci soltanto con `canRequestAds`. Quando richiesto da UMP, il menu offre Opzioni privacy; il risultato viene riletto e gli annunci precaricati vengono rimossi se il consenso non li consente più. Gli errori SDK restano visibili nei log nativi.
 
-Il banner è montato soltanto nel menu iniziale quando l’app è in primo piano; non compare nella guida, nell’album, nella partita o nei risultati. L’interstitial viene precaricato una volta durante ogni partita e ha una sola opportunità di visualizzazione al termine, dopo la chiusura delle valutazioni. A chiusura dell’annuncio il giocatore vede il riepilogo già preparato. Se non è pronto, manca consenso/rete, l’app è in background o l’SDK fallisce, il riepilogo rimane disponibile: nessuna attesa e nessun annuncio tardivo nella partita successiva. Nessun loop di retry né rewarded ad.
+Il banner è montato nel menu iniziale e durante i replay delle azioni della partita quando l’app è in primo piano. Alla fine o al salto del replay viene rimosso. Non compare nel tutorial, nell’album, durante il gioco in diretta o nei risultati. I messaggi `replay-active` non cambiano la sessione della partita e non riarmano l’interstitial. L’interstitial viene precaricato durante ogni partita e ha una sola opportunità di visualizzazione al termine, dopo la chiusura delle valutazioni. A chiusura dell’annuncio il giocatore vede il riepilogo già preparato. Se non è pronto, manca consenso/rete, l’app è in background o l’SDK fallisce, il riepilogo rimane disponibile: nessuna attesa e nessun annuncio tardivo nella partita successiva. Nessun loop di retry né rewarded ad.
 
 La versione di `react-native-google-mobile-ads` è fissata a **16.3.4**, come quella verificata nel riferimento FF, per evitare aggiornamenti automatici della dipendenza Android con Kotlin incompatibile. Google Play richiederà le dichiarazioni appropriate per gli SDK effettivamente inclusi/attivati prima della pubblicazione; le bozze legali esistenti restano da completare.
 

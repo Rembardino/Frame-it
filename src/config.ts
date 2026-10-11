@@ -1,3 +1,5 @@
+import { TEST, applyUpgrades, loadCareer, readPending } from './career/career';
+
 /**
  * FRAME IT — unico file di configurazione.
  * Tutti i numeri "da regolare" stanno qui. Unità: metri, secondi, gradi.
@@ -61,6 +63,12 @@ const BASE = {
     /** Micro-oscillazione da camera a spalla (gradi). 0 = disattivata. */
     shakeAmplitude: 0.05,
     shakeSpeed: 0.7,
+    /** Testa motorizzata (carriera): quanto in fretta la camera va da sola sulla palla quando non la tocchi (1/s). 0 = spenta. */
+    autoTrack: 0,
+    /** Drone (carriera): secondi di volo a partita (0 = non ce l'hai), velocità massima (m/s) e prontezza (1/s). */
+    droneBattery: 0,
+    droneSpeed: 7,
+    droneResponse: 0.9,
   },
 
   match: {
@@ -84,16 +92,20 @@ const BASE = {
     /** Pesi relativi dell'esito di un tiro quando l'evento non lo specifica. */
     shotOutcome: { goal: 0.35, save: 0.45, wide: 0.2 },
     celebrateSec: 4,
+    /** Dopo l'esultanza: secondi prima del calcio d'inizio. Se dopo resetCutSec qualcuno è ancora fuori posto, stacco TV: tutti al loro posto, 1 s di squadre schierate, fischio. */
     resetSec: 3.5,
+    resetCutSec: 2.5,
   },
 
   visuals: {
     /** Giocatori e palla un po' più grandi del reale, per leggibilità su schermo piccolo. */
     playerScale: 1.12,
+    /** Spettatori dei momenti segreti: a grandezza normale, non ingranditi come i giocatori (stanno tra il pubblico). */
+    spectatorScale: 0.92,
     ballRadius: 0.11,
     ballScale: 2,
     /** Breve raccordo fra due gesti, registrato anche nei replay. */
-    poseBlendSec: 0.14,
+    poseBlendSec: 0.18,
     /** Colori di arbitro, steward e tifoso invasore. */
     referee: { shirt: 0x161616, shorts: 0x161616, socks: 0x161616 },
     steward: { shirt: 0xff8a1f, shorts: 0x2a2f3a, socks: 0x2a2f3a },
@@ -126,6 +138,11 @@ const BASE = {
     sizeTargets: { wide: 0.1, medium: 0.3, close: 0.7 },
     /** Rapporto di zoom (troppo largo o troppo stretto) a cui la Taglia vale 0. */
     sizeTolerance: 2.5,
+    /** Zona "perfetta" (vale 100): zoom entro ±N volte l'ideale, soggetto entro N (frazione di mezzo schermo)
+     *  dal punto ideale, accelerazione della camera sotto N inquadrature/s². Più larghi = 100 più facile. */
+    perfectZoom: 1.25,
+    perfectComposition: 0.2,
+    perfectSmooth: 1.5,
     /** Margine attorno ai soggetti nell'inquadratura ideale. */
     framingMargin: 0.08,
     /** Spazio davanti a chi corre: il soggetto va sul terzo opposto (0.33 = regola dei terzi). */
@@ -207,6 +224,19 @@ const BASE = {
     captureStars: 3,
   },
 
+  secrets: {
+    /** Momenti segreti (in tribuna, a bordo campo): il primo dopo N secondi, poi uno ogni [min, max]. Mai annunciati. */
+    firstAt: 15,
+    every: [14, 26],
+    /** Si accorgono della camera (e il bonus è pieno) quando sono TUTTI nell'inquadratura (copertura ≥ noticeCoverage)
+     *  e alti almeno noticeScreen dello schermo (basta un filo di zoom). Tempo di reazione in s. */
+    noticeCoverage: 0.95,
+    noticeScreen: 0.06,
+    reactDelay: 0.35,
+    /** Moltiplicatore dei punti rispetto a un'azione normale. */
+    bonus: 2,
+  },
+
   recorder: {
     /** Fotogrammi registrati al secondo e secondi tenuti in memoria (il replay interpola tra i fotogrammi). */
     hz: 30,
@@ -226,6 +256,22 @@ const BASE = {
     speed: 0.6,
     slowSpeed: 0.3,
     slowWindow: 0.5,
+  },
+
+  audio: {
+    /** Volume generale (0..1) e dei singoli gruppi. */
+    master: 0.8,
+    crowd: 0.08,
+    sfx: 0.9,
+    voices: 0.9,
+    drone: 0.04,
+    /** 'auto' = voce vera del dispositivo quando c'è (altrimenti inventata); 'invented' = sempre voce inventata. */
+    voice: 'auto' as 'auto' | 'invented',
+    /** Altezza (Hz) della voce inventata del regista. */
+    directorPitch: 112,
+    /** Un personaggio non riparla prima di N secondi; al massimo N personaggi parlano insieme. */
+    sayCooldown: 2.5,
+    maxVoices: 3,
   },
 
   indicators: {
@@ -345,4 +391,8 @@ for (const [k, v] of Object.entries(over)) {
   const key = k as keyof Base;
   (BASE as Record<string, unknown>)[key] = Array.isArray(v) ? v : { ...BASE[key], ...(v as object) };
 }
+const pending = readPending();
+/** Partita della modalità Carriera (scelta dal menu Carriera); null = modalità libera, senza potenziamenti. */
+export const CAREER = pending && pending.sport === SPORT ? pending : null;
+if (CAREER || TEST) applyUpgrades(BASE as never, loadCareer(), SPORT);
 export const CONFIG = BASE;

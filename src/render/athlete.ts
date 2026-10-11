@@ -2,17 +2,22 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG, SPORT } from '../config';
-import type { Actor } from '../sim/match';
+import type { Actor, SpectatorLook } from '../sim/match';
 
 export interface Athlete {
   body: THREE.Group; torso: THREE.Group; head: THREE.Group;
   legL: THREE.Group; legR: THREE.Group; kneeL: THREE.Group; kneeR: THREE.Group;
   armL: THREE.Group; armR: THREE.Group; elbowL: THREE.Group; elbowR: THREE.Group;
   wristL: THREE.Group; wristR: THREE.Group;
+  /** Bocca: si apre in altezza quando il personaggio parla o urla. */
+  mouth: THREE.Mesh;
 }
 const SKIN = [0xe8b58d, 0xba8059, 0x805139, 0xd59b74, 0x593b2e];
 const HAIR = [0x241c19, 0x4a3022, 0x171a23, 0x9b6b38];
 const surface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0 });
+/** Bocca chiusa = una linea sottile; scalandola in altezza si apre (vedi render/actors.ts). */
+const mouthGeometry = new THREE.SphereGeometry(1, 10, 6).scale(0.008, 0.006, 0.021);
+const mouthMaterial = new THREE.MeshStandardMaterial({ color: 0x4a1d1f, roughness: 0.7 });
 const sphere = new THREE.SphereGeometry(1, 10, 7);
 const box = new RoundedBoxGeometry(1, 1, 1, 1, 0.1);
 const cylinder = new THREE.CylinderGeometry(1, 1, 1, 10);
@@ -73,14 +78,60 @@ function mesh(parts: Part[], castShadow = false) {
   return result;
 }
 
+/** Spettatori: colori dei vestiti normali e dei costumi interi (suit = anche braccia e gambe del costume). */
+const PLAIN_SHIRTS = [0xe8e2d0, 0x2b2f3a, 0xc23b4a, 0x3d7bd9, 0xf0b429, 0x5a8f5a, 0x8e5bc2];
+const LOOKS: Record<Exclude<SpectatorLook, 'plain' | 'mascot'>, { shirt: number; shorts: number; socks: number; suit?: number }> = {
+  banana: { shirt: 0xffd83a, shorts: 0xffd83a, socks: 0xffd83a, suit: 0xffd83a },
+  dino: { shirt: 0x3fa34d, shorts: 0x3fa34d, socks: 0x3fa34d, suit: 0x3fa34d },
+  clown: { shirt: 0xff3b3b, shorts: 0x2f6fde, socks: 0xffe14d },
+  astronaut: { shirt: 0xeef0f2, shorts: 0xeef0f2, socks: 0xeef0f2, suit: 0xeef0f2 },
+};
+
+/** Cappelli, nasi e teste finte dei costumi (coordinate della testa: +x = davanti). */
+function accessories(look: SpectatorLook | undefined, color: number): Part[] {
+  switch (look) {
+    case 'banana': return [band(0xffd83a, [0, 0.32, 0], [0.085, 0.36, 0.085]), oval(0x5a3d1a, [0, 0.51, 0], [0.03, 0.035, 0.03])];
+    case 'dino': return [
+      { geometry: hairCap, color: 0x3fa34d, at: [-0.03, 0.01, 0], size: [1.25, 1.35, 1.2] },
+      ...[0.2, 0.12, 0.02].map((y, i): Part => slab(0x2d7a37, [-0.08 - i * 0.05, y, 0], [0.06, 0.09, 0.02])),
+    ];
+    case 'clown': return [
+      oval(0xff2020, [0.145, -0.01, 0], [0.032, 0.032, 0.032]),
+      oval(0xff8c1a, [-0.01, 0.06, 0.12], [0.08, 0.09, 0.07]), oval(0xff8c1a, [-0.01, 0.06, -0.12], [0.08, 0.09, 0.07]),
+      oval(0x33cc66, [-0.02, 0.15, 0], [0.09, 0.06, 0.09]),
+    ];
+    case 'astronaut': return [
+      { geometry: hairCap, color: 0xf6f7f9, at: [-0.02, 0.0, 0], size: [1.3, 1.3, 1.3] },
+      band(0x9aa3ad, [0, 0.24, 0.06], [0.006, 0.12, 0.006]), oval(0xff4040, [0, 0.31, 0.06], [0.018, 0.018, 0.018]),
+    ];
+    case 'mascot': return [
+      // Testone di peluche del colore della squadra, con occhi grandi e orecchie.
+      oval(color, [0, 0.04, 0], [0.2, 0.21, 0.19]),
+      ...[-1, 1].flatMap((side): Part[] => [
+        oval(0xffffff, [0.18, 0.07, side * 0.07], [0.025, 0.05, 0.045]), oval(0x111111, [0.2, 0.07, side * 0.07], [0.012, 0.025, 0.022]),
+        oval(color, [-0.02, 0.21, side * 0.13], [0.05, 0.07, 0.05]),
+      ]),
+      oval(0x111111, [0.19, -0.06, 0], [0.012, 0.03, 0.07]),
+    ];
+    default: return [];
+  }
+}
+
 export function createAthlete(actor: Actor): Athlete {
-  const team = CONFIG.teams[actor.team], extra = ['coach', 'steward', 'fan'].includes(actor.role);
+  const team = CONFIG.teams[actor.team], extra = ['coach', 'steward', 'fan', 'spectator'].includes(actor.role);
+  const look = actor.role === 'spectator' ? actor.look ?? 'plain' : undefined;
+  const costume = look && look !== 'plain' && look !== 'mascot' ? LOOKS[look] : null;
   const player = !extra && actor.role !== 'ref', boxer = SPORT === 'boxe' && player;
   const sleeveless = player && (SPORT === 'basket' || SPORT === 'pallavolo' || boxer);
   const kit = actor.role === 'ref' ? CONFIG.visuals.referee : actor.role === 'steward' ? CONFIG.visuals.steward
     : actor.role === 'fan' ? CONFIG.visuals.fan : actor.role === 'coach' ? { shirt: team.socks, shorts: 0x252d3c, socks: 0x252d3c }
+    : look === 'mascot' ? { shirt: team.shirt, shorts: team.shirt, socks: team.shirt }
+    : costume ? costume
+    : look === 'plain' ? { shirt: PLAIN_SHIRTS[actor.id % PLAIN_SHIRTS.length], shorts: 0x2f3e5c, socks: 0x2a2a2a }
     : { shirt: actor.role === 'gk' ? team.keeper : team.shirt, shorts: team.shorts, socks: team.socks };
   const skin = SKIN[actor.id % SKIN.length], hair = HAIR[actor.id % HAIR.length];
+  /** Braccia e gambe: pelle, o il tessuto del costume intero. */
+  const limbSkin = look === 'mascot' ? team.shirt : costume?.suit ?? skin;
   const accent = actor.team === 0 ? 0xf3f6ff : 0xffddb0;
   const body = new THREE.Group(), torso = new THREE.Group(); torso.position.y = 1.04; body.add(torso);
   body.add(mesh([
@@ -104,7 +155,6 @@ export function createAthlete(actor: Actor): Athlete {
     shaped(nose, skin, [0.128, 0, 0]),
     oval(skin, [-0.01, -0.005, 0.112], [0.015, 0.03, 0.018]),
     oval(skin, [-0.01, -0.005, -0.112], [0.015, 0.03, 0.018]),
-    slab(0x70463b, [0.114, -0.085, 0], [0.005, 0.006, 0.039]),
   ];
   for (const side of [-1, 1]) {
     face.push(oval(0xf3eee0, [0.12, 0.016, side * 0.047], [0.004, 0.007, 0.011]));
@@ -114,12 +164,16 @@ export function createAthlete(actor: Actor): Athlete {
   if (actor.id % 3 === 0) face.push({ geometry: hairCap, color: hair, at: [-0.012, 0.012, 0], size: [1, 1.1, 1] });
   if (SPORT === 'tennis' && player) face.push(band(0xf5f2e9, [0, 0.049, 0], [0.121, 0.022, 0.114]));
   if (SPORT === 'pallavolo' && player && actor.id % 2 === 0) face.push(section(hair, [-0.135, 0.015, 0], [0.029, 0.18, 0.035]));
+  face.push(...accessories(look, team.shirt));
   head.add(mesh(face)); torso.add(head);
+  const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+  mouth.position.set(0.112, -0.085, 0);
+  head.add(mouth);
 
   const leg = (side: number) => {
     const root = new THREE.Group(); root.position.set(0, 0.92, side * 0.102);
     root.add(mesh([
-      section(skin, [0, -0.215, 0], [0.074, 0.43, 0.077]),
+      section(limbSkin, [0, -0.215, 0], [0.074, 0.43, 0.077]),
       section(kit.shorts, [0, -0.06, 0], [0.083, boxer ? 0.26 : 0.22, 0.088]),
       slab(accent, [0, -0.068, side * 0.078], [0.035, 0.15, 0.004]),
     ], true));
@@ -127,8 +181,8 @@ export function createAthlete(actor: Actor): Athlete {
     const highSock = SPORT === 'calcio' || boxer || extra || actor.role === 'ref';
     const shoe = player ? (actor.team === 0 ? 0xf4efdb : 0x20273a) : 0x20273a;
     const lower: Part[] = [
-      oval(skin, [0, 0, 0], [0.05, 0.052, 0.058]),
-      section(skin, [0, -0.2, 0], [0.056, 0.4, 0.06]),
+      oval(limbSkin, [0, 0, 0], [0.05, 0.052, 0.058]),
+      section(limbSkin, [0, -0.2, 0], [0.056, 0.4, 0.06]),
       section(kit.socks, [0, highSock ? -0.245 : -0.35, 0], [0.048, highSock ? 0.29 : 0.08, 0.055]),
       shaped(shoeShape, shoe, [0.054, -0.41, 0]),
       { geometry: shoeShape, color: 0xdce2ea, at: [0.054, -0.449, 0], size: [1.02, 0.25, 1.04] },
@@ -139,15 +193,15 @@ export function createAthlete(actor: Actor): Athlete {
   };
   const arm = (side: number) => {
     const root = new THREE.Group(); root.position.set(0, 0.5, side * 0.238);
-    const upper: Part[] = [section(skin, [0, -0.15, 0], [0.05, 0.3, 0.056])];
+    const upper: Part[] = [section(limbSkin, [0, -0.15, 0], [0.05, 0.3, 0.056])];
     if (!sleeveless) upper.push(section(kit.shirt, [0, -0.042, 0], [0.059, 0.13, 0.063]));
     root.add(mesh(upper));
     const elbow = new THREE.Group(); elbow.position.y = -0.3;
-    const lower: Part[] = [oval(skin, [0, 0, 0], [0.036, 0.043, 0.041]), section(skin, [0, -0.14, 0], [0.041, 0.28, 0.046])];
+    const lower: Part[] = [oval(limbSkin, [0, 0, 0], [0.036, 0.043, 0.041]), section(limbSkin, [0, -0.14, 0], [0.041, 0.28, 0.046])];
     if (SPORT === 'tennis' && player) lower.push(band(0xf4f0e8, [0, -0.24, 0], [0.032, 0.038, 0.036]));
     elbow.add(mesh(lower)); root.add(elbow); torso.add(root);
     const wrist = new THREE.Group(); wrist.position.y = -0.27; elbow.add(wrist);
-    const hand: Part[] = [shaped(handShape, skin, [0.01, 0, 0])];
+    const hand: Part[] = [shaped(handShape, limbSkin, [0.01, 0, 0])];
     if (boxer || actor.role === 'gk') {
       hand.push(band(0xf4efdf, [0, 0.005, 0], [0.039, 0.055, 0.042]));
       hand.push(slab(boxer ? kit.shorts : 0xe4f349, [0.027, -0.053, 0], boxer ? [0.14, 0.18, 0.124] : [0.055, 0.11, 0.09]));
@@ -161,7 +215,7 @@ export function createAthlete(actor: Actor): Athlete {
   body.children.forEach(child => { child.position.y -= 0.94; }); body.position.y = 0.94;
   return { body, torso, head, legL: leftLeg.root, legR: rightLeg.root, kneeL: leftLeg.knee,
     kneeR: rightLeg.knee, armL: leftArm.root, armR: rightArm.root, elbowL: leftArm.elbow, elbowR: rightArm.elbow,
-    wristL: leftArm.wrist, wristR: rightArm.wrist };
+    wristL: leftArm.wrist, wristR: rightArm.wrist, mouth };
 }
 
 function jerseyNumber(number: number) {

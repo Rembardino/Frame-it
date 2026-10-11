@@ -10,6 +10,8 @@ export class VolleyballSimulation implements SportSimulation {
   private touch = 0;
   private server: TeamId = 0;
   private blockedFlight: THREE.Vector3 | null = null;
+  /** Secondi dalla fine dell'ultimo punto (-1 = si gioca): festa in cerchio, tutti ai posti, battuta. */
+  private between = 1.8;
   get busy() { return this.ball.flying; }
   constructor(private match: Match) {
     this.ball = new NetBall(match);
@@ -19,6 +21,7 @@ export class VolleyballSimulation implements SportSimulation {
       a.pos.set((a.team === 0 ? -1 : 1) * a.base.x, 0, a.base.z); a.target.copy(a.pos);
     });
     this.ball.hold(match.actors[3]);
+    match.phase = 'reset';
   }
 
   update(dt: number) {
@@ -26,9 +29,14 @@ export class VolleyballSimulation implements SportSimulation {
     const winner = this.ball.update(dt);
     if (winner !== null) {
       this.match.score[winner]++; this.server = winner; this.touch = 0;
-      this.match.actors.filter((a) => a.team === winner).forEach((a) => this.match.setPose(a, 'celebrate', 1));
-      this.ball.hold(this.match.actors.find((a) => a.team === winner && a.role === 'def')!); this.wait = 1.5;
+      this.match.sound('point', this.match.ball.pos);
+      this.match.actors.forEach((a) => this.match.setPose(a, a.team === winner ? 'celebrate' : 'dejected', CONFIG.match.celebrateSec * 0.6));
+      this.ball.hold(this.servingPlayer);
+      this.between = 0;
+      this.match.phase = 'reset';
     }
+    // Mentre un copione ha la palla, comanda lui; la pausa tra i punti riprende dopo.
+    if (this.between >= 0 && !this.match.ballScripted) return this.betweenPoints(dt);
     for (const a of this.match.actors) {
       if (!a.scripted) {
         const incoming = this.ball.receiver === a ? this.ball.landing : null;
@@ -58,6 +66,38 @@ export class VolleyballSimulation implements SportSimulation {
     const next = this.match.actors.find((p) => p.team === team && p.role === role && p !== a)!;
     // Lo scambio di sottofondo resta in gioco; il punto decisivo viene dal copione.
     this.action(kind === 'spike' ? 'rallySpike' : kind, a, next); this.wait = 0.08;
+  }
+
+  private get servingPlayer() {
+    return this.match.actors.find((a) => a.team === this.server && a.role === 'def')!;
+  }
+
+  private betweenPoints(dt: number) {
+    const B = CONFIG.match;
+    this.between += dt;
+    const huddle = this.between < B.celebrateSec * 0.6;
+    this.match.actors.forEach((a, i) => {
+      const side = a.team === 0 ? -1 : 1;
+      if (huddle && a.team === this.server) {
+        // Chi ha fatto punto si stringe in cerchio a metà campo.
+        const ang = (i % 6) * (Math.PI / 3);
+        a.target.set(side * 3.2 + Math.cos(ang) * 0.9, 0, Math.sin(ang) * 0.9);
+        a.speedLimit = B.runSpeed;
+      } else {
+        a.target.set(side * (a === this.servingPlayer ? 9.05 : a.base.x), 0, a.base.z);
+        a.speedLimit = B.jogSpeed;
+      }
+    });
+    if (huddle) return;
+    const ready = this.match.actors.every((a) => a.pos.distanceTo(a.target) < 0.4);
+    if (!ready && this.between > B.resetSec + B.resetCutSec) { this.match.cutToTargets(); this.between = B.resetSec - 0.6; }
+    if (!ready || this.between < B.resetSec) return;
+    this.between = -1;
+    this.match.phase = 'play';
+    const server = this.servingPlayer;
+    this.match.sound('whistle', this.match.referee.pos, 0.6); // fischio per la battuta
+    this.ball.hold(server);
+    this.action('serve', server, this.match.actors.find((a) => a.team !== server.team && a.role === 'def'));
   }
 
   action(kind: SportAction, actor: Actor, target?: Actor) {

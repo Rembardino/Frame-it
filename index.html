@@ -12,6 +12,7 @@
   </head>
   <body>
     <div id="app"></div>
+    <div id="cut"></div>
 
     <div id="hud">
       <div class="vf tl"></div><div class="vf tr"></div><div class="vf bl"></div><div class="vf br"></div>
@@ -40,7 +41,8 @@
     </div>
 
     <div id="zoomctl" class="hidden"><button id="zin" data-i18n-aria="Avvicina: E o più" data-i18n-title="Avvicina (E o +)" aria-label="Zoom in: E or plus" title="Zoom in (E or +)">+</button><button id="zout" data-i18n-aria="Allontana: Q o meno" data-i18n-title="Allontana (Q o −)" aria-label="Zoom out: Q or minus" title="Zoom out (Q or −)">−</button></div>
-    <div id="gyro-controls" class="hidden"><button id="gyro-toggle" class="secondary" aria-pressed="false" data-i18n="Giroscopio: OFF">Gyroscope: OFF</button><button id="gyro-center" class="secondary hidden" data-i18n="Ricentra">Recenter</button></div>
+    <div id="dronepad" class="hidden"><div id="drone-stick"><span></span></div><div id="drone-alt"><button id="drone-up">▲</button><button id="drone-down">▼</button></div></div>
+    <div id="gyro-controls" class="hidden"><button id="pause-btn" class="secondary" data-i18n-aria="Pausa" aria-label="Pause">❚❚</button><button id="drone-btn" class="secondary hidden">DRONE</button><button id="sound-btn" class="secondary sound-toggle">Audio: ON</button><button id="gyro-toggle" class="secondary" aria-pressed="false" data-i18n="Giroscopio: OFF">Gyroscope: OFF</button><button id="gyro-center" class="secondary hidden" data-i18n="Ricentra">Recenter</button></div>
     <div id="gyro-feedback" class="gyro-feedback hidden" role="status"></div>
 
     <div id="start" class="overlay">
@@ -48,8 +50,10 @@
       <p class="tag" data-i18n="Live Sports &amp; Arcade Camera Game">Live Sports &amp; Arcade Camera Game</p>
       <div id="language-picker" class="language-picker"><label for="language" data-i18n="Lingua">Language</label><select id="language"></select></div>
       <div id="sports" class="sports"></div>
+      <div id="modes" class="sports modes"><button id="mode-assist" data-i18n="Assistita">Assisted</button><button id="mode-expert" data-i18n="Esperto">Expert</button></div>
       <button id="start-btn" class="primary cta" data-i18n="Inizia la partita">Start match</button>
-      <div class="menu-actions"><button id="tutorial-btn" class="secondary" data-i18n="Tutorial">Tutorial</button><button id="practice-btn" class="secondary" data-i18n="Allenamento camera">Camera practice</button><button id="gyro-menu" class="secondary" aria-pressed="false" data-i18n="Giroscopio: OFF">Gyroscope: OFF</button><button id="album-btn" class="secondary" data-i18n="Album clip rare">Rare highlights album</button><button id="privacy-options" class="secondary hidden" data-i18n="Opzioni privacy">Privacy options</button></div>
+      <button id="career-btn" class="primary career-cta" data-i18n="Carriera">Career</button>
+      <div class="menu-actions"><button id="tutorial-btn" class="secondary" data-i18n="Tutorial">Tutorial</button><button id="practice-btn" class="secondary" data-i18n="Allenamento camera">Camera practice</button><button id="gyro-menu" class="secondary" aria-pressed="false" data-i18n="Giroscopio: OFF">Gyroscope: OFF</button><button id="sound-menu" class="secondary sound-toggle">Audio: ON</button><button id="album-btn" class="secondary" data-i18n="Album clip rare">Rare highlights album</button><button id="privacy-options" class="secondary hidden" data-i18n="Opzioni privacy">Privacy options</button></div>
       <p id="gyro-status" class="gyro-status" role="status" data-i18n="Giroscopio opzionale: attivalo per muovere la camera con il telefono.">Optional gyroscope: turn it on to move the camera with your phone.</p>
       <div id="app-update" class="app-update hidden" role="status"><p data-i18n="È disponibile una nuova versione dell’app.">A new app version is available.</p><button id="update-now" class="primary" data-i18n="Aggiorna">Update</button><button id="update-later" class="secondary" data-i18n="Più tardi">Later</button></div>
     </div>
@@ -66,6 +70,13 @@
     </div>
 
     <div id="summary" class="overlay hidden"></div>
+
+    <div id="career" class="overlay hidden"></div>
+
+    <div id="pause" class="overlay hidden" role="dialog" aria-modal="true">
+      <div class="logo" data-i18n="PAUSA">PAUSED</div>
+      <div class="pause-actions"><button id="resume-btn" class="primary" data-i18n="Riprendi la partita">Resume match</button><button id="menu-btn" class="secondary" data-i18n="Torna al menu">Back to menu</button></div>
+    </div>
 
     <div id="rotate" class="overlay" data-i18n="Ruota il telefono in orizzontale">Rotate your phone to landscape</div>
 

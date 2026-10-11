@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
 import { DeviceMotion } from 'expo-sensors';
 import * as InAppUpdates from 'expo-in-app-updates';
 import mobileAds, { AdsConsent, AdsConsentPrivacyOptionsRequirementStatus, AdEventType, InterstitialAd, TestIds } from 'react-native-google-mobile-ads';
-import { AdManager } from './adManager';
+import { AdManager, bannerPlacementAllowed } from './adManager';
 
 const configuration = Constants.expoConfig?.extra?.frameit?.ads ?? { enabled: false, testAds: true };
 const testAds = __DEV__ || configuration.testAds !== false;
@@ -14,6 +14,7 @@ const STORE_ID = 'com.frameitnow';
 
 export function useNativeServices(webview) {
   const [screen, setScreen] = useState('menu');
+  const [replayActive, setReplayActive] = useState(false);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [adState, setAdState] = useState({ allowed: false, privacyOptionsRequired: false });
   const [update, setUpdate] = useState(null);
@@ -106,6 +107,7 @@ export function useNativeServices(webview) {
     setGyroEnabled(false);
     setCameraActive(false);
     setScreen('menu');
+    setReplayActive(false);
     manager.current?.setScreen('menu');
   };
 
@@ -113,11 +115,13 @@ export function useNativeServices(webview) {
     const ads = manager.current;
     if (message.type === 'screen' && ['menu', 'tutorial', 'album', 'playing', 'results'].includes(message.screen)) {
       setScreen(message.screen);
+      setReplayActive(false);
       ads?.setScreen(message.screen);
       return true;
     }
     if (message.type === 'camera-active') { setCameraActive(message.active === true); return true; }
-    if (message.type === 'match-ended') { ads?.matchEnded(); return true; }
+    if (message.type === 'replay-active') { setReplayActive(message.active === true); return true; }
+    if (message.type === 'match-ended') { setReplayActive(false); ads?.matchEnded(); return true; }
     if (message.type === 'privacy-options') { void ads?.refreshConsent(true); return true; }
     if (message.type === 'gyroscope') {
       const request = ++gyroRequest.current;
@@ -155,5 +159,5 @@ export function useNativeServices(webview) {
   };
 
   return { handle, reset, sync, showingAd: () => manager.current?.showing === true,
-    bannerVisible: adState.allowed && foreground && screen === 'menu' };
+    bannerVisible: adState.allowed && foreground && bannerPlacementAllowed(screen, replayActive) };
 }

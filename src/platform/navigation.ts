@@ -1,4 +1,5 @@
 export type NativeMessage =
+  | { type: 'replay-active'; active: boolean }
   | { type: 'screen'; screen: 'menu' | 'tutorial' | 'album' | 'playing' | 'results' }
   | { type: 'camera-active'; active: boolean }
   | { type: 'gyroscope'; enabled: boolean }

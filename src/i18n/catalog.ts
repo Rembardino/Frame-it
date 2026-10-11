@@ -1,6 +1,7 @@
 import { CONTENT_ROWS } from './content';
 import { FEATURE_ROWS } from './features';
 import { PRACTICE_ROWS } from './practice';
+import { CAREER_ROWS } from './career';
 
 /** Stable source keys; every supported language has an explicit translation. */
 export const ROWS: [string, string, string, string, string][] = [
@@ -76,6 +77,25 @@ export const ROWS: [string, string, string, string, string][] = [
   ["ROSSO", "RED", "ROJO", "ROUGE", "ROT"],
   ["BLU", "BLUE", "AZUL", "BLEU", "BLAU"],
   ["IDEALE", "IDEAL", "IDEAL", "IDÉAL", "IDEAL"],
+  ["Pausa", "Pause", "Pausa", "Pause", "Pause"],
+  ["Audio: ON", "Sound: ON", "Sonido: ON", "Son : ON", "Ton: AN"],
+  ["Audio: OFF", "Sound: OFF", "Sonido: OFF", "Son : OFF", "Ton: AUS"],
+  ["PAUSA", "PAUSED", "PAUSA", "PAUSE", "PAUSE"],
+  ["Riprendi la partita", "Resume match", "Reanudar partido", "Reprendre le match", "Spiel fortsetzen"],
+  ["Virale: {label}", "Viral: {label}", "Viral: {label}", "Viral : {label}", "Viral: {label}"],
+  ["Coppia beccata!", "Couple caught on camera!", "¡Pareja pillada!", "Couple pris sur le fait !", "Pärchen erwischt!"],
+  ["Bacio in diretta!", "Live kiss!", "¡Beso en directo!", "Bisou en direct !", "Kuss live!"],
+  ["Tifoso travestito!", "Fan in costume!", "¡Aficionado disfrazado!", "Supporter déguisé !", "Fan im Kostüm!"],
+  ["Proposta di matrimonio!", "Marriage proposal!", "¡Pedida de mano!", "Demande en mariage !", "Heiratsantrag!"],
+  ["Ballerino scatenato!", "Wild dancer!", "¡Bailarín desatado!", "Danseur déchaîné !", "Wilder Tänzer!"],
+  ["Dormiglione in tribuna!", "Sleeping in the stands!", "¡Dormilón en la grada!", "Endormi en tribune !", "Schläfer auf der Tribüne!"],
+  ["Che capitombolo!", "What a tumble!", "¡Menudo tropezón!", "Quelle gamelle !", "Was für ein Sturz!"],
+  ["La mascotte inciampa!", "The mascot trips!", "¡La mascota tropieza!", "La mascotte trébuche !", "Das Maskottchen stolpert!"],
+  ["Spettatore", "Spectator", "Espectador", "Spectateur", "Zuschauer"],
+  ["Tutto in quadro!", "All in frame!", "¡Todo en cuadro!", "Tout dans le cadre !", "Alles im Bild!"],
+  ["Spettatore fuori inquadratura", "Spectator out of frame", "Espectador fuera de cuadro", "Spectateur hors cadre", "Zuschauer nicht im Bild"],
+  ["Assistita", "Assisted", "Asistido", "Assisté", "Assistiert"],
+  ["Esperto", "Expert", "Experto", "Expert", "Experte"],
   ["Libero", "Free framing", "Encuadre libre", "Cadrage libre", "Freier Bildausschnitt"],
   ["(non valutato)", "(not scored)", "(sin puntuar)", "(non noté)", "(nicht bewertet)"],
   ["Provvisorio", "Provisional", "Provisional", "Provisoire", "Vorläufig"],
@@ -88,4 +108,5 @@ export const ROWS: [string, string, string, string, string][] = [
   ...CONTENT_ROWS,
   ...FEATURE_ROWS,
   ...PRACTICE_ROWS,
+  ...CAREER_ROWS,
 ];

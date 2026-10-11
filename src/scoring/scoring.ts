@@ -232,7 +232,9 @@ export function evaluateFrame(view: View, input: FrameInput): FrameEval {
   // Taglia: distanza (logaritmica) dallo zoom ideale. Conta solo per ciò che stai davvero inquadrando.
   const { view: ideal, dir } = idealView(view.pos, view.aspect, input);
   const zoomRatio = Math.log(view.fov / ideal.fov);
-  const size = (1 - clamp(Math.abs(zoomRatio) / Math.log(c.sizeTolerance), 0, 1)) * coverage;
+  // Entro perfectZoom vale pieno, poi scende fino a 0 a sizeTolerance.
+  const perfect = Math.log(c.perfectZoom);
+  const size = (1 - clamp((Math.abs(zoomRatio) - perfect) / (Math.log(c.sizeTolerance) - perfect), 0, 1)) * coverage;
 
   // Composizione: il soggetto principale sta dove lo mette l'inquadratura ideale?
   const lp = centroid(input.subjects[input.lead]);
@@ -245,7 +247,7 @@ export function evaluateFrame(view: View, input: FrameInput): FrameEval {
     leadActual = { x: actual.x, y: actual.y };
     if (insideValue(actual.x, actual.y) > 0.5) {
       const err = Math.hypot(actual.x - target.x, (actual.y - target.y) * 0.7);
-      composition = 1 - clamp((err - 0.1) / 0.5, 0, 1);
+      composition = 1 - clamp((err - c.perfectComposition) / 0.5, 0, 1);
       leadRoomBad = dir !== 0 && (actual.x - target.x) * dir > 0.25;
     }
   }
@@ -324,7 +326,8 @@ export function scoreMoment(samples: MomentSample[], decisiveT: number, enabled:
   }
   const span = samples[samples.length - 1].t - samples[0].t;
   // Una camera ferma sul nulla non è "fluida": la voce vale in proporzione a quanto hai inquadrato.
-  const smooth = (1 - clamp(accSum / Math.max(span, 0.5) / c.smoothAccelRef, 0, 1)) * cov;
+  // Sotto perfectSmooth i movimenti contano come perfettamente fluidi (un operatore vero si muove sempre un po').
+  const smooth = (1 - clamp((accSum / Math.max(span, 0.5) - c.perfectSmooth) / c.smoothAccelRef, 0, 1)) * cov;
 
   // Tempismo: da quanto eri già sul posto all'istante decisivo, o quanto sei arrivato tardi.
   const onTarget = samples.map((s) => s.ev.coverage >= c.onTargetCoverage);

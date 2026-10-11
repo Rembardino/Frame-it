@@ -51,8 +51,10 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
     p.raiseL = p.raiseR = 0.08; p.legSpread = 0.13; p.legL = 0.12; p.legR = -0.12;
     p.kneeL = -0.25 - Math.max(0, -swing) * speed * 0.18;
     p.kneeR = -0.25 - Math.max(0, swing) * speed * 0.18; p.lean = -0.08;
-    p.legSwing *= 0.38; p.strideSide *= 0.75; p.turn = -0.12;
-    p.lift = wiggle(5) * 0.01;
+    p.legSwing *= 0.38; p.strideSide *= 0.75;
+    // Saltella sulle punte e muove il busto, anche da fermo.
+    p.turn = -0.12 + wiggle(1.3) * 0.07; p.tiltSide = wiggle(1.9) * 0.05;
+    p.lift = Math.abs(Math.sin(time * 4.6 + a.id)) * 0.035;
   };
   switch (pose) {
     case 'normal':
@@ -154,6 +156,34 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
       else p.raiseL = p.raiseR = 1.5;
       p.armL = p.armR = 0; p.elbowL = p.elbowR = 0.12; break;
     case 'dejected': p.lean = -0.22; p.armL *= 0.3; p.armR *= 0.3; break;
+    // ---- spettatori dei momenti segreti
+    case 'hug':
+      // Da dietro, braccia avvolte davanti (come nella foto della coppia in tribuna), dondolando piano.
+      p.armL = p.armR = 1.4; p.elbowL = p.elbowR = 1.35; p.raiseL = p.raiseR = 1.35;
+      p.lean = -0.12; p.tiltSide = wiggle(1.1) * 0.05; p.turn = wiggle(0.8) * 0.06; break;
+    case 'hide': {
+      // Si abbassa di colpo, mani sul viso.
+      const k = ease(pt * 5);
+      p.armL = p.armR = 1.4 * k; p.elbowL = p.elbowR = 2.35 * k; p.raiseL = p.raiseR = -0.3 * k;
+      p.lean = -0.55 * k; p.legL = p.legR = 0.4 * k; p.kneeL = p.kneeR = -0.85 * k; p.lift -= 0.18 * k;
+      p.turn += wiggle(9) * 0.03; break;
+    }
+    case 'kiss':
+      p.armL = p.armR = 0.85; p.elbowL = p.elbowR = 0.95; p.raiseL = p.raiseR = -0.25;
+      p.lean = -0.3 * ease(pt * 3); p.lift = 0.03; break;
+    case 'dance':
+      p.armL = 2.3 + Math.sin(time * 7 + a.id) * 0.5; p.armR = 2.3 + Math.sin(time * 7 + a.id + Math.PI) * 0.5;
+      p.elbowL = p.elbowR = 0.5; p.raiseL = p.raiseR = 0.3;
+      p.tiltSide = Math.sin(time * 3.5 + a.id) * 0.16; p.turn = Math.sin(time * 3.5 + a.id) * 0.35;
+      p.lift = Math.abs(Math.sin(time * 7 + a.id)) * 0.09; p.legSwing = Math.sin(time * 7 + a.id) * 0.25; break;
+    case 'sleep':
+      // In piedi ma crollato: testa all'indietro di lato, braccia molli, respiro lento.
+      p.lean = 0.16; p.tiltSide = 0.13; p.armL = p.armR = 0.05; p.elbowL = p.elbowR = 0.1;
+      p.lift = Math.sin(time * 1.3 + a.id) * 0.012; break;
+    case 'kneel':
+      // In ginocchio, il braccio teso con l'anello.
+      p.bodyWeight = 0; p.legL = 1.45; p.kneeL = -1.5; p.legR = -0.15; p.kneeR = -1.65; p.lift = -0.42;
+      p.armR = 1.25; p.elbowR = 0.35; p.armL = 0.3; p.lean = -0.05; break;
   }
   return p;
 }

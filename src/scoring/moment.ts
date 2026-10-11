@@ -27,7 +27,7 @@ export interface Moment {
   end: number;
 }
 
-const S = () => CONFIG.visuals.playerScale;
+const S = (a?: Actor) => a?.role === 'spectator' ? CONFIG.visuals.spectatorScale : CONFIG.visuals.playerScale;
 
 export function actorSubject(a: Actor, label: string, weight = 1): Subject {
   return {
@@ -36,7 +36,7 @@ export function actorSubject(a: Actor, label: string, weight = 1): Subject {
     weight,
     vel: () => a.vel,
     points() {
-      const s = S();
+      const s = S(a);
       const { x, z } = a.pos;
       const fx = Math.cos(a.heading), fz = Math.sin(a.heading);
       // Mani ai lati del corpo (perpendicolari alla direzione in cui guarda).
@@ -56,6 +56,8 @@ export function actorSubject(a: Actor, label: string, weight = 1): Subject {
         body = { x: x - fx * 0.4 * s, y: 0.6 * s, z: z - fz * 0.4 * s };
       } else if (a.pose === 'celebrate' || a.pose === 'wave') {
         head.y += 0.2; // saltelli
+      } else if (a.pose === 'hide' || a.pose === 'kneel') {
+        head.y -= 0.45 * s; body.y -= 0.35 * s; // rannicchiato o in ginocchio
       }
       if (a.pose === 'spike' || a.pose === 'block') {
         const lift = 0.9 * Math.sin(Math.min(1, a.poseTime / a.poseDur) * Math.PI) * s;
@@ -63,12 +65,14 @@ export function actorSubject(a: Actor, label: string, weight = 1): Subject {
       }
       const raised = ['serve', 'set', 'spike', 'block'].includes(a.pose);
       const handsY = raised ? head.y + (SPORT === 'tennis' ? 1.2 : 0.55) * s : 1 * s;
+      // Gli spettatori in tribuna stanno più in alto del campo.
+      const y0 = a.pos.y;
       return [
-        { p: head, kind: 'head' },
-        { p: body, kind: 'body' },
-        { p: { x, y: 0.05, z }, kind: 'feet' },
-        { p: { x: x + rx, y: handsY, z: z + rz }, kind: 'hands' },
-        { p: { x: x - rx, y: handsY, z: z - rz }, kind: 'hands' },
+        { p: { ...head, y: head.y + y0 }, kind: 'head' },
+        { p: { ...body, y: body.y + y0 }, kind: 'body' },
+        { p: { x, y: 0.05 + y0, z }, kind: 'feet' },
+        { p: { x: x + rx, y: handsY + y0, z: z + rz }, kind: 'hands' },
+        { p: { x: x - rx, y: handsY + y0, z: z - rz }, kind: 'hands' },
       ];
     },
   };

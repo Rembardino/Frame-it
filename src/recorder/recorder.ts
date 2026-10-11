@@ -6,18 +6,22 @@
 import { CONFIG } from '../config';
 import type { Match, Pose, Ball } from '../sim/match';
 import type { MotionPose } from '../animation/motion';
+import type { Speech } from '../audio/speech';
 
 export interface ActorFrame {
-  x: number; z: number; vx: number; vz: number;
+  x: number; y: number; z: number; vx: number; vz: number;
   heading: number; runPhase: number;
   pose: Pose; poseTime: number; poseDur: number; poseDir: number;
   previousPose: Pose; previousPoseTime: number; previousPoseDur: number; poseBlendTime: number;
   poseFrom: MotionPose | null;
   active: boolean;
+  /** Frase in corso: nel replay la bocca si muove come dal vivo (senza audio). */
+  say: Speech | null;
 }
 
-/** Camera così come l'ha vista il giocatore (micro-oscillazione compresa). Angoli in radianti, fov in gradi. */
-export interface CameraFrame { rx: number; ry: number; fov: number }
+/** Camera così come l'ha vista il giocatore (micro-oscillazione compresa). Angoli in radianti, fov in gradi;
+ *  x, y, z = posizione, registrata solo quando la camera si sposta (drone). */
+export interface CameraFrame { rx: number; ry: number; fov: number; x?: number; y?: number; z?: number }
 
 /** Stato del pubblico e del cielo, che vivono fuori dalla partita. */
 export interface WorldFrame { excitement: number; hotX: number; hotLevel: number; lookUp: number }
@@ -66,13 +70,14 @@ export class Recorder {
       t: m.time,
       cam: { ...cam },
       actors: [...m.actors, ...m.extras].map((a) => ({
-        x: a.pos.x, z: a.pos.z, vx: a.vel.x, vz: a.vel.z,
+        x: a.pos.x, y: a.pos.y, z: a.pos.z, vx: a.vel.x, vz: a.vel.z,
         heading: a.heading, runPhase: a.runPhase,
         pose: a.pose, poseTime: a.poseTime, poseDur: a.poseDur, poseDir: a.poseDir,
         previousPose: a.previousPose, previousPoseTime: a.previousPoseTime,
         previousPoseDur: a.previousPoseDur, poseBlendTime: a.poseBlendTime,
         poseFrom: a.poseFrom,
         active: a.active,
+        say: a.say,
       })),
       ball: { x: m.ball.pos.x, y: m.ball.pos.y, z: m.ball.pos.z, spin: m.ball.spin,
         holderId: m.ball.holder?.id ?? null, state: m.ball.state, inHands: m.ball.inHands },
@@ -92,6 +97,7 @@ export class Recorder {
     [...m.actors, ...m.extras].forEach((actor, i) => {
       const fa = a.actors[i], fb = b.actors[i];
       actor.pos.x = lerp(fa.x, fb.x, u);
+      actor.pos.y = lerp(fa.y, fb.y, u);
       actor.pos.z = lerp(fa.z, fb.z, u);
       actor.vel.x = lerp(fa.vx, fb.vx, u);
       actor.vel.z = lerp(fa.vz, fb.vz, u);
@@ -108,6 +114,7 @@ export class Recorder {
       actor.poseBlendTime = fa.pose === fb.pose ? lerp(fa.poseBlendTime, fb.poseBlendTime, u) : f.poseBlendTime;
       actor.poseFrom = f.poseFrom;
       actor.active = fa.active;
+      actor.say = f.say;
     });
     m.ball.pos.set(lerp(a.ball.x, b.ball.x, u), lerp(a.ball.y, b.ball.y, u), lerp(a.ball.z, b.ball.z, u));
     m.ball.spin = lerp(a.ball.spin, b.ball.spin, u);
@@ -121,7 +128,10 @@ export class Recorder {
     s.from.fromArray(a.star.from);
     s.to.fromArray(a.star.to);
     return {
-      cam: { rx: lerpAngle(a.cam.rx, b.cam.rx, u), ry: lerpAngle(a.cam.ry, b.cam.ry, u), fov: lerp(a.cam.fov, b.cam.fov, u) },
+      cam: {
+        rx: lerpAngle(a.cam.rx, b.cam.rx, u), ry: lerpAngle(a.cam.ry, b.cam.ry, u), fov: lerp(a.cam.fov, b.cam.fov, u),
+        ...(a.cam.x !== undefined && b.cam.x !== undefined ? { x: lerp(a.cam.x, b.cam.x, u), y: lerp(a.cam.y!, b.cam.y!, u), z: lerp(a.cam.z!, b.cam.z!, u) } : {}),
+      },
       world: {
         excitement: lerp(a.world.excitement, b.world.excitement, u),
         hotX: b.world.hotX,

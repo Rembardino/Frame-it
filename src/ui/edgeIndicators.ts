@@ -12,6 +12,7 @@ const COLOR: Record<Indicator['category'], string> = {
   main: '255,214,64',
   distraction: '255,140,60',
   rare: '235,110,255',
+  secret: '61,220,132', // mai mostrato: i momenti segreti non hanno indicatori
   order: '79,209,255',
 };
 

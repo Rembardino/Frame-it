@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 
-const { AdManager } = await import('data:text/javascript;base64,' + Buffer.from(await readFile(new URL('../mobile/services/adManager.js', import.meta.url), 'utf8')).toString('base64'));
+const { AdManager, bannerPlacementAllowed } = await import('data:text/javascript;base64,' + Buffer.from(await readFile(new URL('../mobile/services/adManager.js', import.meta.url), 'utf8')).toString('base64'));
 const require = createRequire(import.meta.url);
 const { resolveAdsConfig, TEST_APP_ID } = require('../mobile/services/config.cjs');
 assert.equal(resolveAdsConfig().enabled, false);
@@ -13,6 +13,19 @@ const live = resolveAdsConfig({}, { FRAMEIT_ADS_ENABLED: 'true', FRAMEIT_ADS_MOD
 assert.equal(live.enabled, true);
 assert.equal(live.testAds, false);
 assert.equal(live.appId, 'ca-app-pub-111~222');
+
+const appConfig = JSON.parse(await readFile(new URL('../mobile/app.json', import.meta.url), 'utf8'));
+const configured = resolveAdsConfig(appConfig.expo.extra.frameit.ads);
+assert.equal(configured.enabled, true);
+assert.equal(configured.testAds, false);
+assert.equal(configured.appId, 'ca-app-pub-6724714927747840~8863376926');
+assert.equal(configured.bannerId, 'ca-app-pub-6724714927747840/6045641890');
+assert.equal(configured.interstitialId, 'ca-app-pub-6724714927747840/1585406726');
+for (const screen of ['menu', 'tutorial', 'album', 'playing', 'results']) {
+  for (const replay of [false, true]) {
+    assert.equal(bannerPlacementAllowed(screen, replay), screen === 'menu' || (screen === 'playing' && replay));
+  }
+}
 
 function scenario({ enabled = true, consentAllowed = true, gatherFails = false, initFails = false, showFails = false } = {}) {
   const ads = [], pauses = [], states = [], calls = { consent: 0, initialize: 0, cached: 0, warnings: 0 };
@@ -97,4 +110,4 @@ function scenario({ enabled = true, consentAllowed = true, gatherFails = false, 
   s.manager.setScreen('playing'); s.manager.matchEnded(); assert.equal(s.ads.length, 0);
   assert.equal(s.states.at(-1).allowed, false);
 }
-console.log('OK: ads disabled by default, separate live IDs, UMP/cache/revocation, one interstitial per match, offline/no-fill/show errors, background and cleanup');
+console.log('OK: live Frame It IDs, menu/replay banner placement, disabled fallback, UMP/cache/revocation, one interstitial per match, offline/no-fill/show errors, background and cleanup');

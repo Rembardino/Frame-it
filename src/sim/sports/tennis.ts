@@ -9,17 +9,22 @@ export class TennisSimulation implements SportSimulation {
   private points: [number, number] = [0, 0];
   private wait = 1;
   private server: TeamId = 0;
+  /** Secondi dalla fine dell'ultimo punto (-1 = si gioca): esultanza, ritorno a fondo campo, servizio. */
+  private between = 1.2;
   get busy() { return this.ball.flying; }
   constructor(private match: Match) {
     this.ball = new NetBall(match);
     match.actors.forEach((a) => { a.pos.set(a.team === 0 ? -10.5 : 10.5, 0, 0); a.target.copy(a.pos); });
     this.ball.hold(match.actors[0]);
+    match.phase = 'reset';
   }
 
   update(dt: number) {
     if (this.match.isStopped) return;
     const winner = this.ball.update(dt);
     if (winner !== null) this.award(winner);
+    // Mentre un copione ha la palla, comanda lui; la pausa tra i punti riprende dopo.
+    if (this.between >= 0 && !this.match.ballScripted) return this.betweenPoints(dt);
     for (const a of this.match.actors) {
       if (!a.scripted) {
         const incoming = this.ball.targetTeam === a.team ? this.ball.landing : null;
@@ -58,14 +63,41 @@ export class TennisSimulation implements SportSimulation {
     this.match.excitement = finishing ? 0.95 : 0.5;
   }
 
+  private betweenPoints(dt: number) {
+    const B = CONFIG.match;
+    this.between += dt;
+    // Lato destro o sinistro del campo, alternato a ogni punto; si risponde in diagonale.
+    const lane = (this.points[0] + this.points[1]) % 2 === 0 ? 1 : -1;
+    for (const a of this.match.actors) {
+      const side = a.team === 0 ? -1 : 1, serving = a.team === this.server;
+      // Prima esultano (o si disperano) sul posto, poi tornano a fondo campo.
+      if (this.between < B.celebrateSec * 0.5) a.target.copy(a.pos);
+      else a.target.set(side * (serving ? 11.4 : 10.8), 0, serving ? lane * 1.2 : -lane * 2.6);
+      a.speedLimit = B.jogSpeed;
+      a.faceTarget = this.match.actors[1 - a.team];
+    }
+    const ready = this.match.actors.every((a) => a.pos.distanceTo(a.target) < 0.4);
+    if (!ready && this.between > B.resetSec + B.resetCutSec) { this.match.cutToTargets(); this.between = B.resetSec - 0.6; }
+    if (!ready || this.between < B.resetSec) return;
+    this.between = -1;
+    this.match.phase = 'play';
+    const server = this.match.actors[this.server];
+    this.ball.hold(server);
+    this.action('serve', server, this.match.actors[1 - this.server]);
+  }
+
   private award(team: TeamId) {
     this.points[team]++;
+    this.match.sound('point', this.match.actors[team].pos);
     const other = (1 - team) as TeamId;
     if (this.points[team] >= 4 && this.points[team] - this.points[other] >= 2) {
       this.match.score[team]++; this.points = [0, 0]; this.server = (1 - this.server) as TeamId;
     }
-    this.match.setPose(this.match.actors[team], 'celebrate', 1);
-    this.ball.hold(this.match.actors[this.server]); this.wait = 1.5;
+    this.match.setPose(this.match.actors[team], 'celebrate', CONFIG.match.celebrateSec * 0.5);
+    this.match.setPose(this.match.actors[1 - team], 'dejected', CONFIG.match.celebrateSec * 0.5);
+    this.ball.hold(this.match.actors[this.server]);
+    this.between = 0;
+    this.match.phase = 'reset';
   }
 
   scoreText() {

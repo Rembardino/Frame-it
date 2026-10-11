@@ -6,6 +6,7 @@ import { radialTexture } from './stage';
 import { createAthlete, type Athlete } from './athlete';
 import { createBall } from './ball';
 import { actorMotion, stanceOffset } from '../animation/motion';
+import { mouthPose } from '../audio/speech';
 
 interface PlayerView extends Athlete { actor: Actor; root: THREE.Group; shadow: THREE.Mesh }
 
@@ -20,7 +21,7 @@ export class ActorViews {
     const shadowGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     const shadowMat = new THREE.MeshBasicMaterial({ map: radialTexture('0,0,0'), transparent: true, depthWrite: false, opacity: 0.6 });
     for (const actor of [...match.actors, ...match.extras]) {
-      const root = new THREE.Group(); root.scale.setScalar(CONFIG.visuals.playerScale);
+      const root = new THREE.Group(); root.scale.setScalar(actor.role === 'spectator' ? CONFIG.visuals.spectatorScale : CONFIG.visuals.playerScale);
       const athlete = createAthlete(actor); root.add(athlete.body);
       const shadow = new THREE.Mesh(shadowGeo, shadowMat);
       this.group.add(root, shadow); this.views.push({ actor, root, ...athlete, shadow });
@@ -43,13 +44,18 @@ export class ActorViews {
 
   private apply(v: PlayerView) {
     const a = v.actor, p = actorMotion(a, this.match.time, this.match.ball.holder === a);
-    v.root.position.set(a.pos.x, 0, a.pos.z); v.root.rotation.y = -a.heading;
-    v.shadow.position.set(a.pos.x, 0.02, a.pos.z);
+    // y: gli spettatori in tribuna stanno sul loro gradone.
+    v.root.position.set(a.pos.x, a.pos.y, a.pos.z); v.root.rotation.y = -a.heading;
+    v.shadow.position.set(a.pos.x, a.pos.y + 0.02, a.pos.z);
     v.shadow.scale.setScalar(1.15 * CONFIG.visuals.playerScale / (1 + Math.max(0, p.lift) * 0.3));
     // Rotate a falling body at the hips. Other gestures bend only the torso, keeping feet planted.
     v.body.rotation.set(p.tiltSide * p.bodyWeight, 0, p.lean * p.bodyWeight);
     v.torso.rotation.set(p.tiltSide * (1 - p.bodyWeight), p.turn, p.lean * (1 - p.bodyWeight));
     v.head.position.y = 0.74 + p.headUp;
+    // Bocca: segue le sillabe della frase; chi esulta la tiene un po' aperta anche in silenzio.
+    const m = mouthPose(a.say, this.match.time);
+    const open = Math.max(m.open, a.pose === 'celebrate' ? 0.3 : 0);
+    v.mouth.scale.set(1, 1 + open * 3.4, m.wide);
     v.head.rotation.set(0, -p.turn * 0.35, -p.lean * 0.25 * (1 - p.bodyWeight));
     const left = p.legSwing + p.legL, right = -p.legSwing + p.legR;
     v.legL.rotation.set(-p.legSpread + p.strideSide, 0, left);

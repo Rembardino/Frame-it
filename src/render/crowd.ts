@@ -91,7 +91,8 @@ export class Crowd {
     scene.add(this.body, head, hair, this.arms, this.phones);
   }
 
-  update(dt: number, s: CrowdState) {
+  /** gaps = posti occupati dagli spettatori "veri" dei momenti segreti: lì il tifoso finto sparisce. */
+  update(dt: number, s: CrowdState, gaps: THREE.Vector3[] = []) {
     this.time += dt;
     const t = this.time;
     const look = s.lookUp;
@@ -105,7 +106,8 @@ export class Crowd {
       const jump = Math.min(1, s.excitement + local) * f.energy * Math.max(0, Math.sin(t * 9 + f.phase)) * 0.45 * (1 - look);
       this.p.set(f.x, f.y + idle * (1 - look) + jump, f.z);
       this.q.multiplyQuaternions(f.rot, this.lean);
-      this.m.compose(this.p, this.q, this.one);
+      const gap = gaps.some((g) => Math.abs(g.y - f.y) < 0.3 && Math.hypot(g.x - f.x, g.z - f.z) < 0.6);
+      this.m.compose(this.p, this.q, gap ? this.zero : this.one);
       this.body.setMatrixAt(i, this.m);
       if (this.arms.visible) this.arms.setMatrixAt(i, f.pointer ? this.m : this.m.compose(this.p, this.q, this.zero));
     }

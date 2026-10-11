@@ -4,9 +4,9 @@ import type { Actor } from './match';
 
 const desired = new THREE.Vector3();
 const delta = new THREE.Vector3();
-const planted = new Set(['serve', 'receive', 'set', 'spike', 'block', 'shoot', 'jab', 'hook', 'uppercut', 'crouch']);
+const planted = new Set(['serve', 'receive', 'set', 'spike', 'block', 'shoot', 'jab', 'hook', 'uppercut', 'crouch', 'hug', 'kiss', 'sleep', 'kneel']);
 const grounded = (a: Actor) => a.pose === 'fall' || a.pose === 'dive' || a.pose === 'tackle';
-const player = (a: Actor) => !['ref', 'coach', 'fan', 'steward'].includes(a.role);
+const player = (a: Actor) => !['ref', 'coach', 'fan', 'steward', 'spectator'].includes(a.role);
 
 /** Arrive, brake before sharp cuts, and yield before bodies overlap. No random steering. */
 export function steerActor(a: Actor, neighbors: readonly Actor[], dt: number) {
@@ -60,7 +60,8 @@ export function separateActors(actors: readonly Actor[], dt: number) {
   const space = SPORT === 'boxe' ? 0.85 : 0.72 * CONFIG.visuals.playerScale;
   for (let i = 0; i < actors.length; i++) for (let j = i + 1; j < actors.length; j++) {
     const a = actors[i], b = actors[j];
-    if (grounded(a) || grounded(b)) continue;
+    // Gli spettatori stanno stretti (abbracci, baci) e lontani dal campo: niente spinte.
+    if (grounded(a) || grounded(b) || a.role === 'spectator' || b.role === 'spectator') continue;
     let dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
     const distance = Math.hypot(dx, dz);
     if (distance >= space) continue;
@@ -75,7 +76,7 @@ export function separateActors(actors: readonly Actor[], dt: number) {
   }
   for (const a of actors) {
     if (!player(a)) continue;
-    const edgeX = CONFIG.pitch.length / 2 - 0.4, edgeZ = CONFIG.pitch.width / 2 - 0.4;
+    const edgeX = CONFIG.pitch.length / 2 + (SPORT === 'pallavolo' ? 0.1 : -0.4), edgeZ = CONFIG.pitch.width / 2 - 0.4;
     const x = THREE.MathUtils.clamp(a.pos.x, -edgeX, edgeX);
     const z = THREE.MathUtils.clamp(a.pos.z, -edgeZ, edgeZ);
     if (x !== a.pos.x) a.vel.x = 0;

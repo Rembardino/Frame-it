@@ -128,8 +128,10 @@ try {
           maxStep = Math.max(maxStep, taker.pos.distanceTo(before));
         }
         assert(restart.phase === 'play' && restart.ball.holder === taker, 'calcio: kickoff waits forever');
-        assert(maxStep < 0.18 && taker.pos.distanceTo(new THREE.Vector3(0.6, 0, 0)) < 0.75,
-          'calcio: kickoff teleports the forward');
+        assert(restart.actors.every(a => a.pos.distanceTo(restart.kickoffSpot(a, 1)) < 0.75),
+          'calcio: kickoff before both teams are back in position');
+        assert((maxStep < 0.18 || restart.cuts === 1) && taker.pos.distanceTo(new THREE.Vector3(0.6, 0, 0)) < 0.75,
+          'calcio: kickoff teleports the forward without a TV cut');
       }
       if (sport === 'boxe') {
         const ring = new Match(); ring.ballScripted = true;

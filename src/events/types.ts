@@ -7,8 +7,9 @@ import type { EffectName, Pose, Role, ShotOutcome } from '../sim/match';
 import type { ShotSize } from '../scoring/scoring';
 import type { SportAction } from '../sim/sports/types';
 
-/** order = ordine del regista (non sta in libreria: lo crea la Director Voice). */
-export type Category = 'main' | 'distraction' | 'rare' | 'order';
+/** order = ordine del regista (non sta in libreria: lo crea la Director Voice);
+ *  secret = momento segreto fuori dalla partita, mai annunciato (events/secrets.ts). */
+export type Category = 'main' | 'distraction' | 'rare' | 'order' | 'secret';
 export type Speed = 'walk' | 'jog' | 'run' | 'sprint';
 /** attack = squadra che attacca nell'evento (chi ha palla, o scelta a caso), defense = l'altra. */
 export type Side = 'attack' | 'defense';
