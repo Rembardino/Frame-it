@@ -171,12 +171,22 @@ export function subjectCenter(s: Subject): Vec3 {
 export class MomentTracker {
   readonly samples: MomentSample[] = [];
   last: FrameEval | null = null;
+  /** Dove stava il soggetto nell'istante decisivo (centro e raggio): per la foto dei momenti persi. */
+  aim: { t: number; x: number; y: number; z: number; r: number } | null = null;
 
   constructor(readonly moment: Moment) {}
 
   sample(t: number, view: View, input: FrameInput) {
     this.last = evaluateFrame(view, input);
     this.samples.push({ t, view, ev: this.last });
+    if (!this.aim && t >= this.moment.decisive) {
+      const pts = input.subjects.flatMap((s) => s.points).filter((k) => k.kind !== 'hands').map((k) => k.p);
+      if (!pts.length) return;
+      const c = { t, x: 0, y: 0, z: 0, r: 1 };
+      for (const p of pts) { c.x += p.x / pts.length; c.y += p.y / pts.length; c.z += p.z / pts.length; }
+      for (const p of pts) c.r = Math.max(c.r, Math.hypot(p.x - c.x, p.y - c.y, p.z - c.z));
+      this.aim = c;
+    }
   }
 
   result(enabled: Component[]): ScoreResult {

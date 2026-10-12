@@ -79,7 +79,8 @@ function mesh(parts: Part[], castShadow = false) {
 }
 
 /** Spettatori: colori dei vestiti normali e dei costumi interi (suit = anche braccia e gambe del costume). */
-const PLAIN_SHIRTS = [0xe8e2d0, 0x2b2f3a, 0xc23b4a, 0x3d7bd9, 0xf0b429, 0x5a8f5a, 0x8e5bc2];
+// Colori accesi: chi è protagonista di un momento segreto deve staccare dal pubblico.
+const PLAIN_SHIRTS = [0xff3b5c, 0xffd400, 0x00c2ff, 0xff7a00, 0x39e639, 0xff4fd8];
 const LOOKS: Record<Exclude<SpectatorLook, 'plain' | 'mascot'>, { shirt: number; shorts: number; socks: number; suit?: number }> = {
   banana: { shirt: 0xffd83a, shorts: 0xffd83a, socks: 0xffd83a, suit: 0xffd83a },
   dino: { shirt: 0x3fa34d, shorts: 0x3fa34d, socks: 0x3fa34d, suit: 0x3fa34d },

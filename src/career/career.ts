@@ -2,17 +2,30 @@
  * MODALITÀ CARRIERA — soldi, iscritti al canale, offerte di lavoro, negozio dei potenziamenti.
  * Puro (niente DOM, niente CONFIG): lo stato vive in localStorage, config.ts applica i potenziamenti.
  *
- * Due modi di guadagnare:
- *  - Lavoro: un cliente ti paga per riprendere la sua partita. Paga base × qualità (stelle medie).
- *  - In proprio: nessuna paga, ma gli highlights finiscono su FrameTube. Più stelle = più visualizzazioni
- *    = più soldi e più iscritti, e più iscritti = più visualizzazioni la volta dopo.
+ * Il modello, tutto lineare (raddoppi una cosa, raddoppia il risultato):
+ *  - Lavoro: paga = paga base dell'offerta × (minPay + (1 − minPay) × punteggio medio / fullPayScore).
+ *  - Paga base dell'offerta = base × (1 + gradino del cliente × clientStep);
+ *    ogni subsPerClient iscritti si sblocca un cliente più importante (fino all'ultimo della lista).
+ *  - Video su FrameTube (fino a 3 a partita, lavoro o in proprio): visualizzazioni totali =
+ *    (viewsBase + iscritti × viewsPerSub) × punteggio / scoreRef × raro/virale × in proprio × assistita.
+ *    Arrivano a rate uguali nelle videoLife partite di carriera successive (la prima subito).
+ *  - Ogni visualizzazione = moneyPerView €. Più iscritti = video e lavori migliori.
+ *  - Nuovi iscritti di un video = fansPerVideo × la stessa qualità (punteggio, raro/virale...), ma NON dipendono
+ *    dagli iscritti che hai già: così gli iscritti crescono in modo lineare e non esplodono (niente circolo
+ *    iscritti → visualizzazioni → iscritti, che faceva miliardi in 30 partite).
  */
 import type { SportId } from '../config';
 
 export type CareerKind = 'job' | 'own';
 
 export interface Offer { id: string; sport: SportId; client: string; pay: number }
-export interface Video { label: string; sport: SportId; stars: number; views: number; money: number }
+export interface Video {
+  label: string; sport: SportId; stars: number; views: number; money: number;
+  /** Visualizzazioni totali previste e partite passate dalla pubblicazione (i video vecchi non li hanno: non crescono). */
+  potential?: number; age?: number;
+  /** Nuovi iscritti che il video porta in tutta la sua vita. */
+  fans?: number;
+}
 export interface CareerState {
   money: number;
   subs: number;
@@ -32,24 +45,35 @@ export interface PendingMatch { kind: CareerKind; sport: SportId; offerId?: stri
 
 export const ECONOMY = {
   startMoney: 300,
-  /** Paga di un lavoro = base × (minPay + stelle medie × perStar). 3 stelle ≈ paga piena. */
+  /** Paga di un lavoro = base × (minPay + (1 − minPay) × punteggio medio / fullPayScore).
+   *  Punteggio medio 50 (≈ 3 stelle) = paga piena, 0 = un quarto, 100 = 1,75 volte. */
   minPay: 0.25,
-  perStar: 0.25,
-  /** Paga base delle offerte: [min, max], cresce con gli iscritti (reputazione). */
+  fullPayScore: 50,
+  /** Paga base delle offerte: [min, max], poi la moltiplica il gradino del cliente (vedi subsPerClient). */
   jobBase: [250, 450],
-  jobPerSub: 0.4,
   /** In modalità assistita si guadagna meno. */
   assistedFactor: 0.7,
-  /** Visualizzazioni di un video = (base + iscritti × perSub) × peso delle stelle × caso. */
+  /** Visualizzazioni totali di un video = (viewsBase + iscritti × viewsPerSub) × punteggio / scoreRef × moltiplicatori. */
   viewsBase: 200,
-  viewsPerSub: 2,
-  starViews: { 3: 0.4, 4: 1, 5: 2.5 } as Record<number, number>,
+  viewsPerSub: 1,
+  scoreRef: 50,
+  /** Variazione casuale delle visualizzazioni (±10%): due video uguali non fanno mai numeri identici. */
+  noise: 0.1,
+  /** Partite di carriera in cui un video continua a crescere (a quote uguali, la prima subito). */
+  videoLife: 5,
   rareViews: 4,
   /** I momenti segreti (coppie, travestiti, capitomboli...) diventano virali. */
   viralViews: 6,
-  /** Euro per visualizzazione, e nuovi iscritti per visualizzazione. */
-  moneyPerView: 0.2,
-  subsPerView: 0.02,
+  /** Euro per visualizzazione. Tarato con npm run sim:career: giocatore medio ~500 €/partita dopo 10 partite,
+   *  negozio completo in ~30 partite per un giocatore bravo (0.2 dava 4 volte tanto e negozio pieno in 14). */
+  moneyPerView: 0.03,
+  /** Nuovi iscritti portati da un video di qualità 1 (ripresa normale, punteggio scoreRef) in tutta la sua vita. */
+  fansPerVideo: 4,
+  /** In proprio le visualizzazioni valgono di più: è il tuo canale, non il cliente. */
+  ownViews: 1.5,
+  /** Ogni N iscritti si fa avanti un cliente più importante, che paga clientStep in più per gradino. */
+  subsPerClient: 400,
+  clientStep: 0.2,
   /** Stelle minime perché una ripresa diventi un video. */
   minVideoStars: 3,
 };
@@ -74,8 +98,10 @@ export const SHOP: ShopItem[] = [
   { id: 'gear-boxe', name: 'Postazione a bordo ring', desc: 'Boxe: camera più vicina al ring.', cost: [1200], sport: 'boxe' },
 ];
 
-const CLIENTS = ['Polisportiva Aurora', 'Canale 7 Locale', 'Torneo dei Quartieri', 'Circolo Sportivo Riviera',
-  'TeleValle', 'Lega Amatori', 'Sport Week TV', 'Accademia Giovani'];
+/** Dal meno al più importante: i clienti in fondo arrivano solo con la fama (iscritti). */
+const CLIENTS = ['Polisportiva Aurora', 'Accademia Giovani', 'Torneo dei Quartieri', 'Lega Amatori',
+  'Circolo Sportivo Riviera', 'Canale 7 Locale', 'TeleValle', 'Sport Week TV',
+  'Campionato Regionale', 'Rete Sport Nazionale', 'Coppa Internazionale', 'Finale Europea Live'];
 const SPORTS: SportId[] = ['calcio', 'basket', 'tennis', 'pallavolo', 'boxe'];
 
 // ==================================================================== stato
@@ -152,43 +178,88 @@ export function makeOffers(s: CareerState): Offer[] {
   return Array.from({ length: 3 }, (_, i) => {
     const sport = open[Math.floor(Math.random() * open.length)];
     const [lo, hi] = ECONOMY.jobBase;
-    const pay = Math.round((rand(lo, hi) + s.subs * ECONOMY.jobPerSub) / 10) * 10;
-    return { id: `${Date.now().toString(36)}-${i}`, sport, client: CLIENTS[Math.floor(Math.random() * CLIENTS.length)], pay };
+    // I 4 clienti più importanti raggiungibili con gli iscritti attuali.
+    const top = Math.min(CLIENTS.length, 4 + Math.floor(s.subs / ECONOMY.subsPerClient));
+    const tier = Math.max(0, top - 1 - Math.floor(Math.random() * 4));
+    const pay = Math.round((rand(lo, hi) * (1 + tier * ECONOMY.clientStep)) / 10) * 10;
+    return { id: `${Date.now().toString(36)}-${i}`, sport, client: CLIENTS[tier], pay };
   });
 }
 
-/** Una ripresa della partita (azione, distrazione, ordine, evento raro) con le sue stelle. */
-export interface Shot { label: string; stars: number; rare: boolean; viral?: boolean }
+/** Una ripresa della partita (azione, distrazione, ordine, evento raro) con stelle e punteggio 0..100. */
+export interface Shot { label: string; stars: number; score: number; rare: boolean; viral?: boolean }
 
-export interface Report { kind: CareerKind; earned: number; videos: Video[]; newSubs: number }
+export interface Report {
+  kind: CareerKind;
+  /** Paga del cliente (0 in proprio). */
+  pay: number;
+  /** Entrate dal canale in questa partita: video nuovi e vecchi ancora in crescita. */
+  channelMoney: number;
+  channelViews: number;
+  earned: number;
+  /** Video pubblicati in questa partita. */
+  videos: Video[];
+  newSubs: number;
+}
 
-/** Fine partita: paga o pubblica, aggiorna lo stato (salvarlo tocca a chi chiama). */
-export function settle(s: CareerState, p: PendingMatch, shots: Shot[], avgStars: number, assisted: boolean): Report {
-  const factor = assisted ? ECONOMY.assistedFactor : 1;
-  let earned = 0, newSubs = 0;
-  const videos: Video[] = [];
+/** Qualità di un video: 1 = ripresa normale con punteggio scoreRef. Lineare nel punteggio. */
+function videoQuality(shot: Shot, kind: CareerKind, assisted: boolean) {
+  const special = shot.rare ? ECONOMY.rareViews : shot.viral ? ECONOMY.viralViews : 1;
+  return (shot.score / ECONOMY.scoreRef) * special * (kind === 'own' ? ECONOMY.ownViews : 1) * (assisted ? ECONOMY.assistedFactor : 1);
+}
+
+/** Visualizzazioni totali che un video farà nella sua vita. */
+export function videoPotential(subs: number, shot: Shot, kind: CareerKind, assisted: boolean, luck = 1) {
+  return Math.round((ECONOMY.viewsBase + subs * ECONOMY.viewsPerSub) * videoQuality(shot, kind, assisted) * luck);
+}
+
+/** Nuovi iscritti che un video porterà: dipendono solo dalla qualità, non dagli iscritti che hai già. */
+export function videoFans(shot: Shot, kind: CareerKind, assisted: boolean, luck = 1) {
+  return Math.round(ECONOMY.fansPerVideo * videoQuality(shot, kind, assisted) * luck);
+}
+
+/** Una partita in più: il video prende la sua quota di visualizzazioni e iscritti (l'ultima chiude il conto esatto). */
+function grow(v: Video) {
+  if (!v.potential || (v.age ?? 0) >= ECONOMY.videoLife) return { views: 0, money: 0, subs: 0 };
+  v.age = (v.age ?? 0) + 1;
+  const share = (n: number, age: number) => Math.round((n * age) / ECONOMY.videoLife);
+  const views = share(v.potential, v.age) - share(v.potential, v.age - 1);
+  const subs = share(v.fans ?? 0, v.age) - share(v.fans ?? 0, v.age - 1);
+  const money = Math.round(views * ECONOMY.moneyPerView);
+  v.views += views;
+  v.money += money;
+  return { views, money, subs };
+}
+
+/** Fine partita: paga (lavoro), pubblica le clip scelte e fa crescere il canale. Salvare tocca a chi chiama. */
+export function settle(s: CareerState, p: PendingMatch, shots: Shot[], avgScore: number, assisted: boolean): Report {
+  let pay = 0;
   if (p.kind === 'job') {
     const offer = s.offers.find((o) => o.id === p.offerId);
     const base = offer?.pay ?? ECONOMY.jobBase[0];
-    earned = Math.round(base * (ECONOMY.minPay + avgStars * ECONOMY.perStar) * factor);
-  } else {
-    for (const shot of shots) {
-      if (shot.stars < ECONOMY.minVideoStars) continue;
-      const weight = (ECONOMY.starViews[shot.stars] ?? 1) * (shot.rare ? ECONOMY.rareViews : shot.viral ? ECONOMY.viralViews : 1);
-      const views = Math.round((ECONOMY.viewsBase + s.subs * ECONOMY.viewsPerSub) * weight * rand(0.7, 1.3) * factor);
-      const money = Math.round(views * ECONOMY.moneyPerView);
-      videos.push({ label: shot.label, sport: p.sport, stars: shot.stars, views, money });
-      earned += money;
-      newSubs += Math.round(views * ECONOMY.subsPerView);
-      s.views += views;
-    }
-    s.videos = [...videos, ...s.videos].slice(0, 30);
+    const quality = ECONOMY.minPay + (1 - ECONOMY.minPay) * avgScore / ECONOMY.fullPayScore;
+    pay = Math.round(base * quality * (assisted ? ECONOMY.assistedFactor : 1));
   }
+  const videos: Video[] = shots.filter((shot) => shot.stars >= ECONOMY.minVideoStars).map((shot) => {
+    const luck = rand(1 - ECONOMY.noise, 1 + ECONOMY.noise);
+    return { label: shot.label, sport: p.sport, stars: shot.stars, views: 0, money: 0, age: 0,
+      potential: videoPotential(s.subs, shot, p.kind, assisted, luck), fans: videoFans(shot, p.kind, assisted, luck) };
+  });
+  s.videos = [...videos, ...s.videos].slice(0, 30);
+  let channelViews = 0, channelMoney = 0, newSubs = 0;
+  for (const v of s.videos) {
+    const g = grow(v);
+    channelViews += g.views;
+    channelMoney += g.money;
+    newSubs += g.subs;
+  }
+  const earned = pay + channelMoney;
+  s.views += channelViews;
   s.money += earned;
   s.subs += newSubs;
   s.matches++;
   s.offers = makeOffers(s);
-  return { kind: p.kind, earned, videos, newSubs };
+  return { kind: p.kind, pay, channelMoney, channelViews, earned, videos, newSubs };
 }
 
 // ==================================================================== effetto dei potenziamenti

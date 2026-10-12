@@ -117,7 +117,8 @@ export class DirectorVoice {
 
   /** Commento ironico sul voto di un momento (non sempre). */
   onResult(r: DirectorResult) {
-    if (r.category === 'order') return;
+    // I segreti persi restano segreti fino al riepilogo.
+    if (r.category === 'order' || (r.category === 'secret' && !r.result)) return;
     if (this.apologize && r.category === 'main') {
       this.apologize = false;
       this.say(pick(LINES.apology));
@@ -232,7 +233,7 @@ export class DirectorVoice {
     const ok = !!r && r.score >= c.orderSuccess;
     const bonus = ok ? c.orderBonus : 0;
     const { start, decisive, end } = o.tracker.moment;
-    this.finished.push({ id: `order:${o.def.id}`, label: `Ordine: ${o.def.label}`, category: 'order', importance: 0.5, result: r, points: bonus, bonus, window: { start, decisive, end } });
+    this.finished.push({ id: `order:${o.def.id}`, label: `Ordine: ${o.def.label}`, category: 'order', importance: 0.5, result: r, points: bonus, bonus, aim: o.tracker.aim, window: { start, decisive, end } });
     this.say(pick(ok ? LINES.orderOk : LINES.orderFail));
     if (o.wrong) this.apologize = true;
     this.order = null;

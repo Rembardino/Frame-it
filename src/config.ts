@@ -100,8 +100,8 @@ const BASE = {
   visuals: {
     /** Giocatori e palla un po' più grandi del reale, per leggibilità su schermo piccolo. */
     playerScale: 1.12,
-    /** Spettatori dei momenti segreti: a grandezza normale, non ingranditi come i giocatori (stanno tra il pubblico). */
-    spectatorScale: 0.92,
+    /** Spettatori dei momenti segreti: un po' più grandi del pubblico, così si notano (più alto = più evidenti). */
+    spectatorScale: 1.15,
     ballRadius: 0.11,
     ballScale: 2,
     /** Breve raccordo fra due gesti, registrato anche nei replay. */
@@ -235,6 +235,14 @@ const BASE = {
     reactDelay: 0.35,
     /** Moltiplicatore dei punti rispetto a un'azione normale. */
     bonus: 2,
+  },
+
+  highlights: {
+    /** Clip candidate per FrameTube a fine partita di carriera: azioni con almeno minStars (gli eventi rari e virali sempre). */
+    minStars: 3,
+    /** Quante candidate si tengono (le migliori per punti) e quante se ne possono scegliere. */
+    keep: 6,
+    pick: 3,
   },
 
   recorder: {

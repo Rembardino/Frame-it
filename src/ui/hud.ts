@@ -115,9 +115,12 @@ export class Hud {
   }
 
   /** Riepilogo di fine partita. */
-  showSummary(s: MatchSummary, match: Match, record: number, isRecord: boolean) {
+  showSummary(s: MatchSummary, match: Match, record: number, isRecord: boolean, missed: { label: string; img: string | null }[] = []) {
     const teams = CONFIG.teams;
     const best = s.best.map((b) => `<li><span>${t(b.label)}</span><span class="r-stars">${stars(b.stars)}</span><b>${b.score}</b></li>`).join('');
+    // Momenti persi con la foto di cosa succedeva: la prossima volta ci si fa più caso.
+    const lost = missed.length ? `<div class="sum-missed"><small>${t('Ti sei perso')}</small><div class="sum-missed-row">${missed
+      .map((m) => `<figure>${m.img ? `<img src="${m.img}" alt="">` : ''}<figcaption>${t(m.label)}</figcaption></figure>`).join('')}</div></div>` : '';
     const el = $('summary');
     el.innerHTML = `
       <div class="sum">
@@ -130,7 +133,7 @@ export class Hud {
           <div><small>${t('Distrazioni riprese')}</small><b>${s.distractions.caught}/${s.distractions.total}</b></div>
           <div><small>${t('Clip rare')}</small><b>${s.rareClips}</b></div>
         </div>
-        <div class="sum-best"><small>${t('Momenti migliori')}</small><ul>${best || `<li>${t('Nessuno... ahia.')}</li>`}</ul></div>
+        <div class="sum-best"><small>${t('Momenti migliori')}</small><ul>${best || `<li>${t('Nessuno... ahia.')}</li>`}</ul></div>${lost}
         <div class="sum-verdict"><span class="tag">${t('REGIA')}</span> “${t(s.verdict)}”</div>
         <div class="sum-btns"><button id="again">${t('Rigioca')}</button><button id="sum-album" class="ghost">${t('Album')}</button></div>
       </div>`;

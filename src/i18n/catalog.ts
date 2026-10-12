@@ -6,6 +6,9 @@ import { CAREER_ROWS } from './career';
 /** Stable source keys; every supported language has an explicit translation. */
 export const ROWS: [string, string, string, string, string][] = [
   ["Lingua", "Language", "Idioma", "Langue", "Sprache"],
+  ["Scegli fino a {n} clip per FrameTube", "Pick up to {n} clips for FrameTube", "Elige hasta {n} clips para FrameTube", "Choisissez jusqu’à {n} clips pour FrameTube", "Wähle bis zu {n} Clips für FrameTube"],
+  ["Pubblica su FrameTube", "Publish on FrameTube", "Publicar en FrameTube", "Publier sur FrameTube", "Auf FrameTube veröffentlichen"],
+  ["Continua", "Continue", "Continuar", "Continuer", "Weiter"],
   ["Ordine: {label}", "Order: {label}", "Orden: {label}", "Consigne : {label}", "Auftrag: {label}"],
   ["Calcio", "Football", "Fútbol", "Football", "Fußball"],
   ["Basket", "Basketball", "Baloncesto", "Basket-ball", "Basketball"],
@@ -40,6 +43,7 @@ export const ROWS: [string, string, string, string, string][] = [
   ["Distrazioni riprese", "Distractions captured", "Distracciones captadas", "Distractions filmées", "Ablenkungen eingefangen"],
   ["Clip rare", "Rare highlights", "Momentos raros", "Moments rares", "Seltene Highlights"],
   ["Momenti migliori", "Best moments", "Mejores momentos", "Meilleurs moments", "Beste Momente"],
+  ["Ti sei perso", "You missed", "Te perdiste", "Tu as manqué", "Verpasst"],
   ["Nessuno... ahia.", "None... ouch.", "Ninguno... ay.", "Aucun… aïe.", "Keine... autsch."],
   ["Rigioca", "Play again", "Volver a jugar", "Rejouer", "Noch einmal spielen"],
   ["Album", "Album", "Álbum", "Album", "Album"],

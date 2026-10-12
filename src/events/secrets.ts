@@ -254,9 +254,9 @@ export class SecretMoments {
     // La pausa fino al prossimo segreto conta dalla fine di questo, non dal suo inizio.
     this.next = Math.max(this.next, this.match.time + rand(S().every[0], S().every[1]));
     for (const a of s.actors) { a.faceTarget = null; this.leaving.push({ a, until }); }
-    // Mai vista: nessun avviso, il segreto resta segreto.
-    if (!s.seen) return;
-    const result = s.result();
+    // Mai successa (aspettava la camera): niente da dire. Successa ma non vista: persa, svelata solo nel riepilogo.
+    if (s.triggerAt === null) return;
+    const result = s.seen ? s.result() : null;
     const { start, decisive, end } = s.tracker.moment;
     this.finished.push({
       id: s.plan.id,
@@ -264,7 +264,8 @@ export class SecretMoments {
       category: 'secret',
       importance: 1,
       result,
-      points: Math.round(result.score * 10 * S().bonus),
+      points: result ? Math.round(result.score * 10 * S().bonus) : 0,
+      aim: s.tracker.aim,
       window: { start, decisive, end },
     });
   }

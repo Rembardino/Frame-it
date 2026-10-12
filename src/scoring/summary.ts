@@ -9,6 +9,8 @@ export interface MatchSummary {
   points: number;
   /** Stelle medie dei momenti ripresi (azioni, distrazioni, ordini). */
   avgStars: number;
+  /** Punteggio medio (0..100) degli stessi momenti: la paga di carriera cresce in modo lineare con questo. */
+  avgScore: number;
   best: { label: string; stars: number; score: number }[];
   orders: { done: number; total: number };
   distractions: { caught: number; total: number };
@@ -20,6 +22,7 @@ export interface MatchSummary {
 export function summarize(history: DirectorResult[]): MatchSummary {
   const scored = history.filter((r) => r.result);
   const avgStars = scored.length ? scored.reduce((s, r) => s + r.result!.stars, 0) / scored.length : 0;
+  const avgScore = scored.length ? scored.reduce((s, r) => s + r.result!.score, 0) / scored.length : 0;
   const best = scored
     .filter((r) => r.category !== 'order' && r.result!.stars >= 3)
     .sort((a, b) => b.result!.score * b.importance - a.result!.score * a.importance)
@@ -30,6 +33,7 @@ export function summarize(history: DirectorResult[]): MatchSummary {
   return {
     points: history.reduce((s, r) => s + r.points, 0),
     avgStars,
+    avgScore,
     best,
     orders: { done: orders.filter((r) => r.bonus).length, total: orders.length },
     distractions: { caught: distractions.filter((r) => r.result).length, total: distractions.length },

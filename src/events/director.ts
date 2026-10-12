@@ -36,6 +36,8 @@ export interface DirectorResult {
   importance: number;
   /** null = momento perso (non è mai stato inquadrato). */
   result: ScoreResult | null;
+  /** Dove guardare per la foto di un momento perso. */
+  aim?: MomentTracker['aim'];
   /** Punti partita guadagnati (voto × importanza × 10, più eventuali bonus). */
   points: number;
   /** Bonus del regista per un ordine eseguito. */
@@ -507,6 +509,7 @@ export class Director {
       result,
       points,
       multiplier,
+      aim: t.aim,
       window: { start, decisive, end },
     });
   }

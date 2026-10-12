@@ -2,6 +2,7 @@
  * Frame It: Live Sports TV — bootstrap e game loop.
  */
 import './style.css';
+import * as THREE from 'three';
 import { CAREER, CONFIG, SPORT, SPORT_LIST } from './config';
 import { createStage } from './render/stage';
 import { ActorViews } from './render/actors';
@@ -12,7 +13,7 @@ import { Director, type DirectorResult } from './events/director';
 import { SecretMoments } from './events/secrets';
 import { DirectorVoice } from './director/voice';
 import { CameraController } from './camera/cameraController';
-import { Recorder, type CameraFrame, type Frame, type WorldFrame } from './recorder/recorder';
+import { Recorder, type CameraFrame, type Clip, type Frame, type WorldFrame } from './recorder/recorder';
 import { ReplayPlayer } from './recorder/replay';
 import { Hud } from './ui/hud';
 import { DebugOverlay } from './ui/debugOverlay';
@@ -23,6 +24,7 @@ import { loadCareer, saveCareer, setPending, settle, type PendingMatch } from '.
 import { Drone } from './camera/drone';
 import { AudioEngine } from './audio/audio';
 import { addToAlbum, showAlbum } from './ui/album';
+import { mountHighlights } from './ui/highlights';
 import { actorSubject, ballSubject, frameInput } from './scoring/moment';
 import { summarize } from './scoring/summary';
 import type { Component } from './scoring/scoring';
@@ -154,6 +156,39 @@ let lastReplay = -Infinity;
 let pendingReplay: DirectorResult | null = null;
 let liveSnapshot: Frame | null = null;
 
+// ---------------------------------------------------------------- highlights per FrameTube
+
+/** Momenti belli in attesa che la clip sia registrata per intero, e le clip pronte (le migliori per punti). */
+let waitingHighlights: DirectorResult[] = [];
+const highlights: { r: DirectorResult; clip: Clip }[] = [];
+function wantsHighlight(r: DirectorResult) {
+  if (!r.result || r.category === 'order') return false;
+  if (r.category === 'rare' || r.category === 'secret') return r.result.stars >= CONFIG.rare.captureStars;
+  return r.result.stars >= CONFIG.highlights.minStars;
+}
+/** Chiamato a ogni passo: la clip si prende quando i secondi dopo l'istante decisivo sono registrati. */
+function collectHighlights(force = false) {
+  const R = CONFIG.replay;
+  waitingHighlights = waitingHighlights.filter((r) => {
+    if (!force && match.time < r.window.decisive + R.after) return true;
+    const clip = recorder.clip(r.label, r.window.decisive, r.window.decisive - R.before, r.window.decisive + R.after);
+    if (clip.frames.length > 1) highlights.push({ r, clip });
+    highlights.sort((a, b) => b.r.points - a.r.points).splice(CONFIG.highlights.keep);
+    return false;
+  });
+}
+/** Miniature delle clip candidate (fotogramma decisivo). */
+function highlightThumbs() {
+  collectHighlights(true);
+  const live = recorder.capture(camNow(), worldNow());
+  const list = highlights.map(({ r, clip }) => {
+    renderFrame(clip.frames.reduce((p, q) => (Math.abs(q.t - r.window.decisive) < Math.abs(p.t - r.window.decisive) ? q : p)));
+    return { label: r.label, stars: r.result!.stars, img: snapshot() };
+  });
+  renderFrame(live);
+  return list;
+}
+
 function wantsReplay(r: DirectorResult) {
   const R = CONFIG.replay;
   if (!R.enabled || !r.result || ended || r.category === 'order') return false;
@@ -231,14 +266,46 @@ $('replay').addEventListener('pointerdown', () => {
 
 // ---------------------------------------------------------------- voti, totali, fine partita
 
+/** Foto di un momento perso: il fotogramma registrato dell'istante decisivo, con la camera puntata sul soggetto. */
+function missedPhoto(r: DirectorResult) {
+  const aim = r.aim;
+  const frames = aim ? recorder.clip('', aim.t, aim.t - 0.5, aim.t + 0.5).frames : [];
+  if (!aim || !frames.length) return null;
+  const f = frames.reduce((p, q) => (Math.abs(q.t - aim.t) < Math.abs(p.t - aim.t) ? q : p));
+  const live = recorder.capture(camNow(), worldNow());
+  const show = (fr: Frame, aimed: boolean) => {
+    const { cam: c, world } = recorder.apply(fr, fr, 0);
+    setCamera(c);
+    if (aimed) {
+      const camera = stage.camera;
+      camera.lookAt(aim.x, aim.y, aim.z);
+      const dist = camera.position.distanceTo(new THREE.Vector3(aim.x, aim.y, aim.z));
+      camera.fov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan((aim.r * 1.8) / dist)), 6, 50);
+      camera.updateProjectionMatrix();
+    }
+    views.update(0);
+    crowd.update(0, crowdState(world), secrets.gaps);
+    sky.update();
+  };
+  show(f, true);
+  stage.renderer.render(stage.scene, stage.camera);
+  const img = snapshot();
+  show(live, false);
+  return img;
+}
+
 const history: DirectorResult[] = [];
+const missed: { label: string; img: string | null }[] = [];
 function onResult(r: DirectorResult) {
   history.push(r);
-  hud.showResult(r);
+  // Momento perso: niente scheda durante la partita, lo si rivede (con la foto) nel riepilogo.
+  if (r.result) hud.showResult(r);
+  else missed.push({ label: r.label, img: missedPhoto(r) });
   voice.onResult(r);
   const s = summarize(history);
   hud.setTotals(s.points, s.avgStars);
   if (wantsReplay(r)) pendingReplay = r;
+  if (wantsHighlight(r)) waitingHighlights.push(r);
 }
 
 /** Record salvato sul dispositivo (localStorage può non esserci: navigazione privata, iframe...). */
@@ -271,8 +338,8 @@ function checkEnd() {
   setTimeout(() => {
     const s = summarize(history);
     const { record, isRecord } = saveRecord(s.points);
-    hud.showSummary(s, match, record, isRecord);
-    if (CAREER) showCareerResult(s.avgStars);
+    hud.showSummary(s, match, record, isRecord, missed);
+    if (CAREER) showCareerResult(s.avgScore);
     postNative({ type: 'match-ended' });
     postNative({ type: 'screen', screen: 'results' });
   }, 4500);
@@ -280,19 +347,23 @@ function checkEnd() {
 
 // ---------------------------------------------------------------- carriera
 
-/** Fine partita di carriera: paga o pubblica i video, e mostra il risultato nel riepilogo. */
-function showCareerResult(avgStars: number) {
-  const state = loadCareer();
-  const shots = history.filter((r) => r.result && r.category !== 'order')
-    .map((r) => ({ label: r.label, stars: r.result!.stars, rare: r.category === 'rare', viral: r.category === 'secret' }));
-  const report = settle(state, CAREER!, shots, avgStars, assisted);
-  saveCareer(state);
+/** Fine partita di carriera: si scelgono le clip per FrameTube, poi paga, video pubblicati e risultato. */
+function showCareerResult(avgScore: number) {
   const box = document.querySelector('#summary .sum-btns')!;
-  box.insertAdjacentHTML('beforebegin', careerReport(report, state));
-  box.innerHTML = `<button id="to-career">${t('Torna alla carriera')}</button>`;
-  $('to-career').addEventListener('click', () => {
-    try { localStorage.setItem('frameit.career.open', '1'); } catch { /* si torna al menu */ }
-    restartGame();
+  box.classList.add('hidden'); // prima si pubblica, poi si esce
+  mountHighlights(highlightThumbs(), (chosen) => {
+    const state = loadCareer();
+    const shots = chosen.map((i) => highlights[i].r)
+      .map((r) => ({ label: r.label, stars: r.result!.stars, score: r.result!.score, rare: r.category === 'rare', viral: r.category === 'secret' }));
+    const report = settle(state, CAREER!, shots, avgScore, assisted);
+    saveCareer(state);
+    box.insertAdjacentHTML('beforebegin', careerReport(report, state));
+    box.innerHTML = `<button id="to-career">${t('Torna alla carriera')}</button>`;
+    box.classList.remove('hidden');
+    $('to-career').addEventListener('click', () => {
+      try { localStorage.setItem('frameit.career.open', '1'); } catch { /* si torna al menu */ }
+      restartGame();
+    });
   });
 }
 
@@ -435,7 +506,7 @@ stage.renderer.setAnimationLoop((now) => {
     for (let i = 0; i < steps; i++) {
       match.update(step); director.update(step, view); voice.update(step, view); secrets.update(view);
       for (const r of [...director.finished.splice(0), ...voice.finished.splice(0), ...secrets.finished.splice(0)]) onResult(r);
-      checkEnd(); recorder.tick(step, camNow(), worldNow());
+      checkEnd(); recorder.tick(step, camNow(), worldNow()); collectHighlights();
     }
   }
 
@@ -464,7 +535,8 @@ stage.renderer.setAnimationLoop((now) => {
   debugOverlay?.draw(dt, match.time, view, director.focusTracker() ?? voice.order?.tracker ?? null, ambientInput(), enabled);
   stage.renderer.render(stage.scene, stage.camera);
 
-  if (pendingReplay) {
+  // Il replay aspetta la fine dell'esultanza: prima si festeggia, poi si rivede.
+  if (pendingReplay && match.phase !== 'goal') {
     startReplay(pendingReplay);
     pendingReplay = null;
   }

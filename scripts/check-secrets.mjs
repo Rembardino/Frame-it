@@ -22,7 +22,9 @@ for (const sport of ['calcio', 'tennis', 'boxe']) {
       // 1) Senza guardarla: nessun voto, nessun avviso, e gli spettatori se ne vanno.
       let m = new Match(), s = new SecretMoments(m, rows, plan.id);
       for (let t = 0; t < 60 && (t < 6 || s.active.length); t += dt) { m.update(dt); s.update(away); if (t > 6) s.stop(); }
-      assert.equal(s.finished.length, 0, `${sport}/${plan.id}: unseen secret was announced`);
+      // Persa: niente voto né punti (la si rivede solo nel riepilogo); se aspettava la camera, non è mai successa.
+      assert(s.finished.every((r) => !r.result && !r.points), `${sport}/${plan.id}: unseen secret was scored`);
+      assert.equal(s.finished.length, plan.reactive ? 0 : 1, `${sport}/${plan.id}: unseen secret not reported as missed`);
       s.update(away);
       assert(!m.extras.some((e) => e.role === 'spectator' && e.active), `${sport}/${plan.id}: spectators stay after leaving`);
 

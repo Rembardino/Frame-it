@@ -4,7 +4,7 @@
  */
 import { SPORT_LIST } from '../config';
 import {
-  SHOP, buy, canBuy, level, loadCareer, saveCareer, unlocked,
+  ECONOMY, SHOP, buy, canBuy, level, loadCareer, saveCareer, unlocked,
   type CareerState, type PendingMatch, type Report,
 } from '../career/career';
 import { numberText, t } from '../i18n';
@@ -64,7 +64,7 @@ export class CareerHub {
       <div class="cr-card"><b>${t(sp.name)}</b><span>FrameTube</span>
       <button class="secondary" data-own="${sp.id}">${t('Gioca')}</button></div>`).join('');
     return `
-      <h3>${t('Richieste di lavoro')}</h3><p class="cr-note">${t('Il cliente paga in base alla qualità: con 3 stelle medie prendi la paga piena.')}</p>
+      <h3>${t('Richieste di lavoro')}</h3><p class="cr-note">${t('Il cliente paga in base alla qualità: con 3 stelle medie prendi la paga piena, di più se fai meglio.')}</p>
       <div class="cr-cards">${offers}</div>
       <h3>${t('In proprio')}</h3><p class="cr-note">${t('Nessuna paga: i tuoi highlights vanno su FrameTube. Più stelle = più visualizzazioni, soldi e iscritti.')}</p>
       <div class="cr-cards">${own}</div>
@@ -84,24 +84,28 @@ export class CareerHub {
   }
 
   private channel(s: CareerState) {
-    if (!s.videos.length) return `<p class="cr-note">${t('Nessun video ancora. Gioca in proprio per pubblicare i tuoi highlights.')}</p>`;
-    return s.videos.map((v) => `<div class="cr-row"><div><b>${t(v.label)}</b> <span class="r-stars">${stars(v.stars)}</span>
-      <p>${sportName(v.sport)}</p></div><span>${numberText(v.views)} ${t('visualizzazioni')} · ${euro(v.money)}</span></div>`).join('');
+    if (!s.videos.length) return `<p class="cr-note">${t('Nessun video ancora. A fine partita scegli i tuoi highlights da pubblicare.')}</p>`;
+    return s.videos.map((v) => {
+      // Video ancora in crescita: quante visualizzazioni prenderà alla prossima partita.
+      const left = v.potential && (v.age ?? 0) < ECONOMY.videoLife ? v.potential - v.views : 0;
+      const next = left ? `<small class="cr-grow">${t('+{n} alla prossima partita', { n: numberText(Math.min(left, Math.round(v.potential! / ECONOMY.videoLife))) })}</small>` : '';
+      return `<div class="cr-row"><div><b>${t(v.label)}</b> <span class="r-stars">${stars(v.stars)}</span>
+      <p>${sportName(v.sport)}</p></div><span>${numberText(v.views)} ${t('visualizzazioni')} · ${euro(v.money)} ${next}</span></div>`;
+    }).join('');
   }
 }
 
 /** Riquadro "carriera" da aggiungere al riepilogo di fine partita. */
 export function careerReport(r: Report, s: CareerState) {
-  const videos = r.kind === 'own'
-    ? r.videos.length
-      ? `<ul>${r.videos.map((v) => `<li><span>${t(v.label)}</span><span class="r-stars">${stars(v.stars)}</span><b>${numberText(v.views)}</b></li>`).join('')}</ul>`
-      : `<p>${t('Nessuna ripresa abbastanza buona da pubblicare (servono almeno 3 stelle).')}</p>`
+  const videos = r.videos.length
+    ? `<ul>${r.videos.map((v) => `<li><span>${t(v.label)}</span><span class="r-stars">${stars(v.stars)}</span><b>${numberText(v.potential ?? v.views)}</b></li>`).join('')}</ul>`
     : '';
   return `
     <div class="sum-grid cr-sum">
-      <div><small>${t(r.kind === 'job' ? 'Pagamento del cliente' : 'Guadagno')}</small><b>${euro(r.earned)}</b></div>
-      ${r.kind === 'own' ? `<div><small>${t('Video pubblicati')}</small><b>${r.videos.length}</b></div><div><small>${t('Nuovi iscritti')}</small><b>+${numberText(r.newSubs)}</b></div>` : ''}
+      ${r.kind === 'job' ? `<div><small>${t('Pagamento del cliente')}</small><b>${euro(r.pay)}</b></div>` : ''}
+      <div><small>${t('Entrate FrameTube')}</small><b>${euro(r.channelMoney)}</b><em>${numberText(r.channelViews)} ${t('visualizzazioni')}</em></div>
+      <div><small>${t('Nuovi iscritti')}</small><b>+${numberText(r.newSubs)}</b></div>
       <div><small>${t('Soldi')}</small><b>${euro(s.money)}</b></div>
     </div>
-    ${videos ? `<div class="sum-best"><small>FrameTube</small>${videos}</div>` : ''}`;
+    ${videos ? `<div class="sum-best"><small>${t('Nuovi video · visualizzazioni previste')}</small>${videos}</div>` : ''}`;
 }
