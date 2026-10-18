@@ -15,12 +15,13 @@ import { DirectorVoice } from './director/voice';
 import { CameraController } from './camera/cameraController';
 import { Recorder, type CameraFrame, type Clip, type Frame, type WorldFrame } from './recorder/recorder';
 import { ReplayPlayer } from './recorder/replay';
+import { loadClip, saveClips, REPLAY_REQUEST } from './recorder/archive';
 import { Hud } from './ui/hud';
 import { DebugOverlay } from './ui/debugOverlay';
 import { EdgeIndicators } from './ui/edgeIndicators';
 import { AssistFrame } from './ui/assistFrame';
 import { CareerHub, careerReport } from './ui/careerHub';
-import { loadCareer, saveCareer, setPending, settle, type PendingMatch } from './career/career';
+import { loadCareer, saveCareer, setPending, settle, type PendingMatch, type Video } from './career/career';
 import { Drone } from './camera/drone';
 import { AudioEngine } from './audio/audio';
 import { addToAlbum, showAlbum } from './ui/album';
@@ -71,6 +72,7 @@ const sky = new SkyEffects(stage.scene, match);
 const cam = new CameraController(stage.camera, stage.renderer.domElement);
 cam.bindZoomButton($('zin'), -1);
 cam.bindZoomButton($('zout'), 1);
+$('zreset').addEventListener('click', () => cam.resetZoom());
 cam.setEnabled(false);
 const gyro = new GyroscopeController(cam);
 const drone = new Drone(cam, stage.camera, stage.scene);
@@ -141,7 +143,7 @@ const crowdState = (w: WorldFrame): CrowdState => ({ excitement: w.excitement, h
 const camNow = (): CameraFrame => ({
   rx: stage.camera.rotation.x, ry: stage.camera.rotation.y, fov: stage.camera.fov,
   // La posizione serve solo a chi ha il drone (nel replay la camera torna dov'era in volo).
-  ...(drone.owned ? { x: stage.camera.position.x, y: stage.camera.position.y, z: stage.camera.position.z } : {}),
+  x: stage.camera.position.x, y: stage.camera.position.y, z: stage.camera.position.z,
 });
 function setCamera(c: CameraFrame) {
   stage.camera.rotation.set(c.rx, c.ry, 0);
@@ -155,6 +157,8 @@ function setCamera(c: CameraFrame) {
 let lastReplay = -Infinity;
 let pendingReplay: DirectorResult | null = null;
 let liveSnapshot: Frame | null = null;
+let archivedReplay = false;
+let liveSeeds: number[] = [];
 
 // ---------------------------------------------------------------- highlights per FrameTube
 
@@ -257,6 +261,14 @@ function endReplay() {
   syncCamera();
   document.body.classList.remove('replaying');
   $('replay').classList.add('hidden');
+  if (archivedReplay) {
+    archivedReplay = false;
+    [...match.actors, ...match.extras].forEach((actor, i) => { actor.seed = liveSeeds[i]; });
+    views.update(0);
+    startScreen.classList.remove('hidden');
+    careerHub.openChannel();
+    postNative({ type: 'screen', screen: 'menu' });
+  }
 }
 $('replay').addEventListener('pointerdown', () => {
   if (!replay.active) return;
@@ -351,12 +363,20 @@ function checkEnd() {
 function showCareerResult(avgScore: number) {
   const box = document.querySelector('#summary .sum-btns')!;
   box.classList.add('hidden'); // prima si pubblica, poi si esce
-  mountHighlights(highlightThumbs(), (chosen) => {
+  mountHighlights(highlightThumbs(), async (chosen) => {
     const state = loadCareer();
-    const shots = chosen.map((i) => highlights[i].r)
-      .map((r) => ({ label: r.label, stars: r.result!.stars, score: r.result!.score, rare: r.category === 'rare', viral: r.category === 'secret' }));
+    const selected = chosen.map((i) => highlights[i]);
+    const shots = selected.map(({ r }) => ({ label: r.label, stars: r.result!.stars, score: r.result!.score, rare: r.category === 'rare', viral: r.category === 'secret', clipId: crypto.randomUUID() }));
     const report = settle(state, CAREER!, shots, avgScore, assisted);
+    let storageFailed = false;
+    try {
+      await saveClips(selected.map(({ clip }, i) => ({ id: shots[i].clipId, recording: { clip, seeds: [...match.actors, ...match.extras].map(a => a.seed) } })), state.videos.flatMap(v => v.clipId ? [v.clipId] : []));
+    } catch {
+      storageFailed = true;
+      for (const video of report.videos) delete video.clipId;
+    }
     saveCareer(state);
+    if (storageFailed) box.insertAdjacentHTML('beforebegin', `<p role="status">${t('Clip non salvate: spazio non disponibile.')}</p>`);
     box.insertAdjacentHTML('beforebegin', careerReport(report, state));
     box.innerHTML = `<button id="to-career">${t('Torna alla carriera')}</button>`;
     box.classList.remove('hidden');
@@ -376,7 +396,33 @@ function playCareer(p: PendingMatch) {
   if (q.toString() === location.search.slice(1)) location.reload();
   else location.search = q.toString();
 }
-const careerHub = new CareerHub(playCareer, () => assisted);
+async function watchVideo(video: Video) {
+  if (!video.clipId) throw new Error('No recording');
+  if (video.sport !== SPORT) {
+    localStorage.setItem(REPLAY_REQUEST, video.clipId);
+    if (nativeMessage('select-sport', video.sport)) return;
+    const query = new URLSearchParams(location.search);
+    query.set('sport', video.sport);
+    query.delete('autostart');
+    location.search = query.toString();
+    return;
+  }
+  const recording = await loadClip(video.clipId);
+  if (!recording || recording.clip.frames.length < 2 || recording.clip.frames[0].actors.length !== match.actors.length + match.extras.length) throw new Error('Invalid recording');
+  liveSnapshot = recorder.capture(camNow(), worldNow());
+  liveSeeds = [...match.actors, ...match.extras].map(a => a.seed);
+  [...match.actors, ...match.extras].forEach((actor, i) => { actor.seed = recording.seeds[i]; });
+  archivedReplay = true;
+  replay.start(recording.clip);
+  cam.setEnabled(false);
+  syncCamera();
+  $('career').classList.add('hidden');
+  startScreen.classList.add('hidden');
+  document.body.classList.add('replaying');
+  $('replay').classList.remove('hidden');
+  postNative({ type: 'replay-active', active: true });
+}
+const careerHub = new CareerHub(playCareer, () => assisted, watchVideo);
 $('career-btn').addEventListener('pointerup', (e) => { e.stopPropagation(); careerHub.open(); });
 // La richiesta vale per questo caricamento soltanto: la prossima volta si torna alla modalità libera.
 if (CAREER) setPending(null);
@@ -460,7 +506,13 @@ document.addEventListener('visibilitychange', () => {
   cam.setEnabled(cameraCanMove());
   syncCamera();
 });
-if (params.has('autostart') || CAREER) start();
+let requestedReplay: string | null = null;
+try { requestedReplay = localStorage.getItem(REPLAY_REQUEST); localStorage.removeItem(REPLAY_REQUEST); } catch { /* storage unavailable */ }
+if (requestedReplay) {
+  const video = loadCareer().videos.find(v => v.clipId === requestedReplay);
+  if (video) void watchVideo(video).catch(() => careerHub.openChannel());
+  else careerHub.openChannel();
+} else if (params.has('autostart') || CAREER) start();
 stage.renderer.setAnimationLoop((now) => {
   if (appPaused || userPaused || document.hidden) { last = now; return; }
   // Il timestamp del primo RAF può precedere performance.now() registrato durante l'avvio.
@@ -468,6 +520,7 @@ stage.renderer.setAnimationLoop((now) => {
   last = now;
 
   if (practice.active) {
+    gyro.update(dt);
     cam.update(dt);
     practice.update(dt);
     return;
@@ -493,6 +546,7 @@ stage.renderer.setAnimationLoop((now) => {
   }
 
   if (running && !ended) drone.update(dt);
+  gyro.update(dt);
   cam.update(dt);
   const view = cam.view();
   if (drone.owned) {

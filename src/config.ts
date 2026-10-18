@@ -63,6 +63,10 @@ const BASE = {
     /** Micro-oscillazione da camera a spalla (gradi). 0 = disattivata. */
     shakeAmplitude: 0.05,
     shakeSpeed: 0.7,
+    /** Giroscopio: guadagno, tremolio ignorato (gradi del telefono) e filtro in secondi. */
+    gyroSensitivity: 0.45,
+    gyroDeadZone: 0.35,
+    gyroFollowTime: 0.14,
     /** Testa motorizzata (carriera): quanto in fretta la camera va da sola sulla palla quando non la tocchi (1/s). 0 = spenta. */
     autoTrack: 0,
     /** Drone (carriera): secondi di volo a partita (0 = non ce l'hai), velocità massima (m/s) e prontezza (1/s). */

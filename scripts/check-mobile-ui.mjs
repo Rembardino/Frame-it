@@ -82,6 +82,14 @@ try {
     await page.mouse.up();
     console.log('Zoom out button works');
 
+    await page.locator('#zreset').click();
+    assert.equal(await page.evaluate(async () => {
+      const { CONFIG } = await import('/src/config.ts');
+      const { cam, stage } = window.frameit;
+      return Math.abs(cam.fov - CONFIG.camera.fovMax) < 1e-9 && Math.abs(stage.camera.fov - CONFIG.camera.fovMax) < 1e-9 && Math.abs(cam.magnification - 1) < 1e-9;
+    }), true, 'One tap must immediately restore the widest zoom');
+    console.log('Zoom reset button restores the widest framing');
+
     // A sensor acknowledgement activates controls; the first sample calibrates without a jump.
     await page.locator('#gyro-toggle').click();
     assert(await page.evaluate(() => window.nativeMessages.some(message => message.type === 'gyroscope' && message.enabled)));
@@ -90,7 +98,7 @@ try {
     const initialPose = await page.evaluate(() => ({ yaw: window.frameit.cam.yaw, pitch: window.frameit.cam.pitch }));
     await orientation(page, 0);
     await orientation(page, 12);
-    await page.waitForFunction(initial => Math.abs(window.frameit.cam.yaw - initial.yaw) + Math.abs(window.frameit.cam.pitch - initial.pitch) > 5, initialPose);
+    await page.waitForFunction(initial => Math.abs(window.frameit.cam.yaw - initial.yaw) + Math.abs(window.frameit.cam.pitch - initial.pitch) > 1, initialPose);
     console.log('Gyroscope movement works');
     await page.locator('#gyro-center').click();
     await orientation(page, 90);

@@ -5,7 +5,7 @@
 import { SPORT_LIST } from '../config';
 import {
   ECONOMY, SHOP, buy, canBuy, level, loadCareer, saveCareer, unlocked,
-  type CareerState, type PendingMatch, type Report,
+  type CareerState, type PendingMatch, type Report, type Video,
 } from '../career/career';
 import { numberText, t } from '../i18n';
 
@@ -17,11 +17,16 @@ const stars = (n: number) => '★'.repeat(n);
 export class CareerHub {
   private tab: 'jobs' | 'shop' | 'channel' = 'jobs';
 
-  constructor(private onPlay: (p: PendingMatch) => void, private assisted: () => boolean) {}
+  constructor(private onPlay: (p: PendingMatch) => void, private assisted: () => boolean, private onReplay: (v: Video) => Promise<void>) {}
 
   open() {
     $('career').classList.remove('hidden');
     this.render();
+  }
+
+  openChannel() {
+    this.tab = 'channel';
+    this.open();
   }
 
   private render() {
@@ -39,6 +44,12 @@ export class CareerHub {
         <div class="cr-body">${body}</div>
       </div>`;
     $('cr-back').addEventListener('click', () => $('career').classList.add('hidden'));
+    $('career').querySelectorAll<HTMLButtonElement>('[data-replay]').forEach((b) => b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { await this.onReplay(s.videos[Number(b.dataset.replay)]); }
+      catch { b.textContent = t('Clip non disponibile'); }
+      finally { b.disabled = false; }
+    }));
     $('career').querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => b.addEventListener('click', () => {
       this.tab = b.dataset.tab as typeof this.tab;
       this.render();
@@ -85,12 +96,13 @@ export class CareerHub {
 
   private channel(s: CareerState) {
     if (!s.videos.length) return `<p class="cr-note">${t('Nessun video ancora. A fine partita scegli i tuoi highlights da pubblicare.')}</p>`;
-    return s.videos.map((v) => {
+    return s.videos.map((v, i) => {
       // Video ancora in crescita: quante visualizzazioni prenderà alla prossima partita.
       const left = v.potential && (v.age ?? 0) < ECONOMY.videoLife ? v.potential - v.views : 0;
       const next = left ? `<small class="cr-grow">${t('+{n} alla prossima partita', { n: numberText(Math.min(left, Math.round(v.potential! / ECONOMY.videoLife))) })}</small>` : '';
       return `<div class="cr-row"><div><b>${t(v.label)}</b> <span class="r-stars">${stars(v.stars)}</span>
-      <p>${sportName(v.sport)}</p></div><span>${numberText(v.views)} ${t('visualizzazioni')} · ${euro(v.money)} ${next}</span></div>`;
+      <p>${sportName(v.sport)}</p></div><span>${numberText(v.views)} ${t('visualizzazioni')} · ${euro(v.money)} ${next}</span>
+      ${v.clipId ? `<button class="secondary" data-replay="${i}">${t('Rivedi clip')}</button>` : `<small>${t('Clip non disponibile')}</small>`}</div>`;
     }).join('');
   }
 }

@@ -2,6 +2,7 @@ import { Euler, Quaternion, Vector3 } from 'three';
 import type { CameraController } from './cameraController';
 import { postNative } from '../platform/navigation';
 import { t } from '../i18n';
+import { CONFIG } from '../config';
 
 export interface OrientationSample { alpha: number; beta: number; gamma: number; screen: number }
 const DEG = Math.PI / 180;
@@ -20,6 +21,9 @@ export class GyroscopeController {
   private pending = false;
   private reference: Quaternion | null = null;
   private previous: { yaw: number; pitch: number } | null = null;
+  private input = { yaw: 0, pitch: 0 };
+  private target = { yaw: 0, pitch: 0 };
+  private filtered = { yaw: 0, pitch: 0 };
   private screenAngle: number | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private feedbackTimer: ReturnType<typeof setTimeout> | undefined;
@@ -48,6 +52,7 @@ export class GyroscopeController {
   setActive(active: boolean) {
     if (active === this.active) return;
     this.active = active;
+    this.camera.sensorControlled = this.enabled && active;
     this.center();
     postNative({ type: 'camera-active', active });
   }
@@ -55,6 +60,22 @@ export class GyroscopeController {
   center() {
     this.reference = null;
     this.previous = null;
+    this.input = { yaw: 0, pitch: 0 };
+    this.target = { yaw: 0, pitch: 0 };
+    this.filtered = { yaw: 0, pitch: 0 };
+  }
+
+  /** Smooth at render rate so native 30 Hz samples cannot step the camera around. */
+  update(dt: number) {
+    if (!this.enabled || !this.active || !this.camera.inputsEnabled || dt <= 0) return;
+    const c = CONFIG.camera;
+    const k = 1 - Math.exp(-dt / c.gyroFollowTime);
+    const yaw = (this.target.yaw - this.filtered.yaw) * k;
+    const pitch = (this.target.pitch - this.filtered.pitch) * k;
+    this.filtered.yaw += yaw;
+    this.filtered.pitch += pitch;
+    const zoom = Math.max(0.15, Math.min(1, this.camera.fov / c.startFov));
+    this.camera.moveBy(yaw * c.gyroSensitivity * zoom, pitch * c.gyroSensitivity * zoom);
   }
 
   private async toggle() {
@@ -86,6 +107,7 @@ export class GyroscopeController {
     clearTimeout(this.timer);
     this.pending = false;
     this.enabled = enabled;
+    this.camera.sensorControlled = enabled && this.active;
     this.center();
     this.status.textContent = t(enabled ? 'Ruota il telefono per inquadrare. Ricentra quando cambi posizione.'
       : reason === 'denied' ? 'Permesso negato. Puoi continuare a trascinare per inquadrare.'
@@ -125,7 +147,15 @@ export class GyroscopeController {
       const dy = ((yaw - this.previous.yaw + 540) % 360) - 180;
       const dp = pitch - this.previous.pitch;
       // Rebase on sensor discontinuities rather than jumping across the field.
-      if (Math.abs(dy) < 35 && Math.abs(dp) < 35) this.camera.moveBy(dy, dp);
+      if (Math.abs(dy) < 35 && Math.abs(dp) < 35) {
+        this.input.yaw += dy;
+        this.input.pitch += dp;
+        // A moving dead band suppresses hand tremor without losing slow, deliberate turns.
+        for (const axis of ['yaw', 'pitch'] as const) {
+          const delta = this.input[axis] - this.target[axis];
+          this.target[axis] += Math.sign(delta) * Math.max(0, Math.abs(delta) - CONFIG.camera.gyroDeadZone);
+        }
+      }
     }
     this.previous = { yaw, pitch };
   }

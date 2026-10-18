@@ -20,6 +20,7 @@ export type CareerKind = 'job' | 'own';
 
 export interface Offer { id: string; sport: SportId; client: string; pay: number }
 export interface Video {
+  clipId?: string;
   label: string; sport: SportId; stars: number; views: number; money: number;
   /** Visualizzazioni totali previste e partite passate dalla pubblicazione (i video vecchi non li hanno: non crescono). */
   potential?: number; age?: number;
@@ -187,7 +188,7 @@ export function makeOffers(s: CareerState): Offer[] {
 }
 
 /** Una ripresa della partita (azione, distrazione, ordine, evento raro) con stelle e punteggio 0..100. */
-export interface Shot { label: string; stars: number; score: number; rare: boolean; viral?: boolean }
+export interface Shot { label: string; stars: number; score: number; rare: boolean; viral?: boolean; clipId?: string }
 
 export interface Report {
   kind: CareerKind;
@@ -242,7 +243,7 @@ export function settle(s: CareerState, p: PendingMatch, shots: Shot[], avgScore:
   }
   const videos: Video[] = shots.filter((shot) => shot.stars >= ECONOMY.minVideoStars).map((shot) => {
     const luck = rand(1 - ECONOMY.noise, 1 + ECONOMY.noise);
-    return { label: shot.label, sport: p.sport, stars: shot.stars, views: 0, money: 0, age: 0,
+    return { label: shot.label, sport: p.sport, stars: shot.stars, views: 0, money: 0, age: 0, clipId: shot.clipId,
       potential: videoPotential(s.subs, shot, p.kind, assisted, luck), fans: videoFans(shot, p.kind, assisted, luck) };
   });
   s.videos = [...videos, ...s.videos].slice(0, 30);

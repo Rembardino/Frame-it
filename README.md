@@ -18,8 +18,11 @@ La lingua iniziale è l'inglese. Il menu Language permette di scegliere English,
 - Trascinamento, frecce o WASD: inquadratura.
 - E o +: zoom avanti. Q o −: zoom indietro. Anche rotella del mouse.
 - Su telefono: trascina, pizzica o tieni premuti i pulsanti +/−.
+- Pulsante `1×`: torna subito all'inquadratura più larga possibile dello sport.
 - Giroscopio opzionale: attivalo nel menu o in partita, poi ruota il telefono per inquadrare. `Ricentra` ricalibra la posizione; trascinamento e zoom restano disponibili. Su browser servono HTTPS e sensori/permessi compatibili.
 - Tocca il replay per saltarlo e tornare alla diretta.
+
+Le nuove clip pubblicate in Carriera → FrameTube si possono rivedere con `Rivedi clip`, anche dopo aver riaperto il gioco. Le registrazioni sono conservate sul dispositivo; i vecchi video salvati solo con le statistiche non hanno una clip recuperabile. Il giroscopio filtra i piccoli tremolii e riduce la sensibilità con lo zoom stretto.
 
 Al primo avvio della partita compare un tutorial in cinque passaggi, seguito da tre esercizi pratici dello sport scelto. Guarda una breve azione reale con la camera guida, poi ricrea l'inquadratura sul momento fermo: miniatura del modello da 100/100, guide sovrapposte, consigli e voto in tempo reale aiutano a regolare camera e zoom. Mantieni 100/100 per un istante per passare all'esercizio successivo. Puoi rivedere l'esempio, togliere le guide o saltare un esercizio. Il menu `Allenamento camera` apre direttamente la pratica; `Tutorial` ripete anche la spiegazione. Nessun esercizio fa avanzare la partita o assegna punti al record. Dettagli ed esempi: [docs/camera-practice.md](docs/camera-practice.md).
 
@@ -53,6 +56,8 @@ npm run check:practice
 npm run check:i18n
 npm run check:native
 npm run check:mobile
+npm run check:gyro
+npm run check:clips
 npm run build
 ```
 

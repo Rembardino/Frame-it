@@ -25,6 +25,7 @@ export const ROWS: [string, string, string, string, string][] = [
   ["Allontana: Q o meno", "Zoom out: Q or minus", "Alejar: Q o menos", "Zoom arrière : Q ou moins", "Herauszoomen: Q oder Minus"],
   ["Avvicina (E o +)", "Zoom in (E or +)", "Acercar (E o +)", "Zoom avant (E ou +)", "Heranzoomen (E oder +)"],
   ["Allontana (Q o −)", "Zoom out (Q or −)", "Alejar (Q o −)", "Zoom arrière (Q ou −)", "Herauszoomen (Q oder −)"],
+  ["Allontana al massimo", "Zoom all the way out", "Alejar al máximo", "Dézoomer au maximum", "Ganz herauszoomen"],
   ["Tocca per saltare", "Tap to skip", "Toca para saltar", "Touchez pour passer", "Tippen zum Überspringen"],
   ["Ruota il telefono in orizzontale", "Rotate your phone to landscape", "Gira el teléfono en horizontal", "Tournez le téléphone à l’horizontale", "Drehe dein Handy ins Querformat"],
   ["FINE", "END", "FIN", "FIN", "ENDE"],

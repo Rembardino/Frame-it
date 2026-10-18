@@ -26,6 +26,8 @@ export class CameraController {
   autoTarget: (() => THREE.Vector3 | null) | null = null;
   /** Drone in volo: si gira a 360°, si guarda quasi in verticale, e W/A/S/D muovono il drone invece della camera. */
   free = false;
+  /** Sensor aiming uses its own stabilization instead of handheld shake and automatic tracking. */
+  sensorControlled = false;
 
   private tYaw = this.yaw;
   private tPitch = this.pitch;
@@ -73,6 +75,18 @@ export class CameraController {
     btn.addEventListener('pointerup', stop);
     btn.addEventListener('pointercancel', stop);
     btn.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  /** Torna subito all'inquadratura più larga dello sport, mantenendo la direzione della camera. */
+  resetZoom() {
+    if (!this.enabled) return;
+    this.zoomHold = 0;
+    this.pinchDist = 0;
+    this.zoomButtons.forEach(btn => btn.classList.remove('on'));
+    this.tFov = this.fov = C.fovMax;
+    this.camera.fov = this.fov;
+    this.camera.updateProjectionMatrix();
+    this.hasInteracted = true;
   }
 
   /** Sospende gli input durante il replay e scarta eventuali pressioni rimaste attive. */
@@ -132,7 +146,7 @@ export class CameraController {
       this.vYaw *= f;
       this.vPitch *= f;
     }
-    const p = C.autoTrack > 0 && !this.free && this.enabled && !this.pointers.size && !this.keys.size && !this.zoomHold ? this.autoTarget?.() : null;
+    const p = C.autoTrack > 0 && !this.sensorControlled && !this.free && this.enabled && !this.pointers.size && !this.keys.size && !this.zoomHold ? this.autoTarget?.() : null;
     if (p) {
       const a = this.anglesTo(p), k = 1 - Math.exp(-dt * C.autoTrack);
       this.tYaw += (a.yaw - this.tYaw) * k;
@@ -149,8 +163,9 @@ export class CameraController {
 
     // Micro-oscillazione da camera a spalla (somma di sinusoidi = movimento organico).
     const t = this.time * C.shakeSpeed;
-    const sx = C.shakeAmplitude * (Math.sin(t * 2.1) + 0.5 * Math.sin(t * 5.3 + 1.7));
-    const sy = C.shakeAmplitude * (Math.sin(t * 1.7 + 0.4) + 0.5 * Math.sin(t * 4.1 + 2.9));
+    const amplitude = this.sensorControlled ? 0 : C.shakeAmplitude;
+    const sx = amplitude * (Math.sin(t * 2.1) + 0.5 * Math.sin(t * 5.3 + 1.7));
+    const sy = amplitude * (Math.sin(t * 1.7 + 0.4) + 0.5 * Math.sin(t * 4.1 + 2.9));
 
     this.camera.rotation.set((this.pitch + sy) * DEG, -(this.yaw + sx) * DEG, 0);
     this.camera.fov = this.fov;

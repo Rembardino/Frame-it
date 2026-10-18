@@ -1,5 +1,8 @@
 /** Modalità Carriera: menu, negozio, canale, riepilogo. Colonne: it, en, es, fr, de. */
 export const CAREER_ROWS: [string, string, string, string, string][] = [
+  ['Rivedi clip', 'Watch clip', 'Ver clip', 'Revoir le clip', 'Clip ansehen'],
+  ['Clip non disponibile', 'Clip unavailable', 'Clip no disponible', 'Clip indisponible', 'Clip nicht verfügbar'],
+  ['Clip non salvate: spazio non disponibile.', 'Clips could not be saved: storage unavailable.', 'No se pudieron guardar los clips: almacenamiento no disponible.', 'Clips non enregistrés : stockage indisponible.', 'Clips konnten nicht gespeichert werden: Speicher nicht verfügbar.'],
   ['Carriera', 'Career', 'Carrera', 'Carrière', 'Karriere'],
   ['CARRIERA', 'CAREER', 'CARRERA', 'CARRIÈRE', 'KARRIERE'],
   ['Lavori', 'Jobs', 'Trabajos', 'Missions', 'Aufträge'],
