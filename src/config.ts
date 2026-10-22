@@ -268,6 +268,8 @@ const BASE = {
     speed: 0.6,
     slowSpeed: 0.3,
     slowWindow: 0.5,
+    /** Velocità della scritta che scorre nella fascia in basso del replay (lettere al secondo). */
+    tickerSpeed: 9,
   },
 
   audio: {

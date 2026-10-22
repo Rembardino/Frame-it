@@ -20,7 +20,7 @@ La lingua iniziale è l'inglese. Il menu Language permette di scegliere English,
 - Su telefono: trascina, pizzica o tieni premuti i pulsanti +/−.
 - Pulsante `1×`: torna subito all'inquadratura più larga possibile dello sport.
 - Giroscopio opzionale: attivalo nel menu o in partita, poi ruota il telefono per inquadrare. `Ricentra` ricalibra la posizione; trascinamento e zoom restano disponibili. Su browser servono HTTPS e sensori/permessi compatibili.
-- Tocca il replay per saltarlo e tornare alla diretta.
+- Tocca il replay per saltarlo e tornare alla diretta. La fascia in basso, con la scritta che scorre, non salta il replay: tiene i tocchi lontani dal banner pubblicitario che nell'app sta subito sotto.
 
 Le nuove clip pubblicate in Carriera → FrameTube si possono rivedere con `Rivedi clip`, anche dopo aver riaperto il gioco. Le registrazioni sono conservate sul dispositivo; i vecchi video salvati solo con le statistiche non hanno una clip recuperabile. Il giroscopio filtra i piccoli tremolii e riduce la sensibilità con lo zoom stretto.
 

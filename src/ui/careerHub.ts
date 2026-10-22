@@ -38,7 +38,7 @@ export class CareerHub {
         <div class="cr-head">
           <button id="cr-back" class="text-button">← ${t('Torna al menu')}</button>
           <b>${t('CARRIERA')}</b>
-          <span class="cr-wallet"><b>${euro(s.money)}</b> · ${numberText(s.subs)} ${t('iscritti')} · ${numberText(s.views)} ${t('visualizzazioni')}</span>
+          <span class="cr-wallet"><b>${euro(s.money)}</b><span>${numberText(s.subs)} ${t('iscritti')}</span><span>${numberText(s.views)} ${t('visualizzazioni')}</span></span>
         </div>
         <div class="cr-tabs sports">${tab('jobs', t('Lavori'))}${tab('shop', t('Negozio'))}${tab('channel', 'FrameTube')}</div>
         <div class="cr-body">${body}</div>
@@ -69,10 +69,10 @@ export class CareerHub {
 
   private jobs(s: CareerState) {
     const offers = s.offers.map((o) => `
-      <div class="cr-card"><b>${sportName(o.sport)}</b><span>${o.client}</span><em>${t('Paga base')} ${euro(o.pay)}</em>
+      <div class="cr-card"><b data-sport="${o.sport}">${sportName(o.sport)}</b><span>${o.client}</span><em>${t('Paga base')} ${euro(o.pay)}</em>
       <button class="primary" data-offer="${o.id}">${t('Accetta')}</button></div>`).join('');
     const own = SPORT_LIST.filter((sp) => unlocked(s, sp.id)).map((sp) => `
-      <div class="cr-card"><b>${t(sp.name)}</b><span>FrameTube</span>
+      <div class="cr-card"><b data-sport="${sp.id}">${t(sp.name)}</b><span>FrameTube</span>
       <button class="secondary" data-own="${sp.id}">${t('Gioca')}</button></div>`).join('');
     return `
       <h3>${t('Richieste di lavoro')}</h3><p class="cr-note">${t('Il cliente paga in base alla qualità: con 3 stelle medie prendi la paga piena, di più se fai meglio.')}</p>

@@ -17,7 +17,7 @@ export function mountHighlights(list: Highlight[], publish: (chosen: number[]) =
       <div class="sum-missed-row">${list.map((h, i) => `
         <figure data-i="${i}" class="${chosen.has(i) ? 'on' : ''}"><img src="${h.img}" alt="">
           <figcaption>${t(h.label)} ${'★'.repeat(h.stars)}</figcaption></figure>`).join('')}</div>
-      <button id="hl-publish">${t(list.length ? 'Pubblica su FrameTube' : 'Continua')}</button></div>`);
+      <button id="hl-publish" class="primary">${t(list.length ? 'Pubblica su FrameTube' : 'Continua')}</button></div>`);
   const hl = document.querySelector('.sum-hl')!;
   hl.querySelectorAll<HTMLElement>('figure').forEach((fig) => fig.addEventListener('click', () => {
     const i = Number(fig.dataset.i);

@@ -34,7 +34,7 @@ import { bindNativeServices } from './platform/services';
 import { GyroscopeController } from './camera/gyroscope';
 import { Tutorial, tutorialSeen } from './ui/tutorial';
 import { CameraPractice } from './ui/cameraPractice';
-import { LANGUAGE, LANGUAGES, isLanguage, localizePage, saveLanguage, t } from './i18n';
+import { LANGUAGE, LANGUAGES, isLanguage, localizePage, numberText, saveLanguage, t } from './i18n';
 
 const params = new URLSearchParams(location.search);
 const debug = CONFIG.debug.enabled || params.has('debug');
@@ -223,8 +223,24 @@ function renderFrame(f: Frame) {
   stage.renderer.render(stage.scene, stage.camera);
 }
 
+/** Scritta che scorre nella fascia in basso del replay, come nelle dirette TV (il banner resta fermo sotto). */
+function setTicker(parts: string[]) {
+  const text = [...parts, 'FRAME IT · LIVE SPORTS TV'].join('   •   ');
+  const span = document.createElement('span');
+  span.textContent = text;
+  const ticker = $('rp-ticker');
+  ticker.replaceChildren(span, span.cloneNode(true));
+  ticker.style.animationDuration = `${Math.max(6, text.length / CONFIG.replay.tickerSpeed)}s`;
+}
+
 function startReplay(r: DirectorResult) {
   const R = CONFIG.replay;
+  const [home, away] = CONFIG.teams;
+  setTicker([
+    `${home.short} ${match.sportSimulation?.scoreText() ?? `${match.score[0]} - ${match.score[1]}`} ${away.short}`,
+    `${t(r.label)} ${'★'.repeat(r.result?.stars ?? 0)} ${r.result?.score ?? ''}`,
+    ...(r.points ? [`+${numberText(r.points)} PT`] : []),
+  ]);
   const w = r.window;
   const clip = recorder.clip(r.label, w.decisive, w.decisive - R.before, Math.min(w.decisive + R.after, match.time));
   if (clip.frames.length < 2) return;
@@ -270,8 +286,9 @@ function endReplay() {
     postNative({ type: 'screen', screen: 'menu' });
   }
 }
-$('replay').addEventListener('pointerdown', () => {
-  if (!replay.active) return;
+$('replay').addEventListener('pointerdown', (e) => {
+  // La fascia in basso non salta il replay: tiene i tocchi lontani dal banner pubblicitario.
+  if (!replay.active || (e.target as Element).closest('.rp-bar.bottom')) return;
   replay.skip();
   endReplay();
 });
@@ -378,7 +395,7 @@ function showCareerResult(avgScore: number) {
     saveCareer(state);
     if (storageFailed) box.insertAdjacentHTML('beforebegin', `<p role="status">${t('Clip non salvate: spazio non disponibile.')}</p>`);
     box.insertAdjacentHTML('beforebegin', careerReport(report, state));
-    box.innerHTML = `<button id="to-career">${t('Torna alla carriera')}</button>`;
+    box.innerHTML = `<button id="to-career" class="primary career-cta">${t('Torna alla carriera')}</button>`;
     box.classList.remove('hidden');
     $('to-career').addEventListener('click', () => {
       try { localStorage.setItem('frameit.career.open', '1'); } catch { /* si torna al menu */ }
@@ -413,6 +430,7 @@ async function watchVideo(video: Video) {
   liveSeeds = [...match.actors, ...match.extras].map(a => a.seed);
   [...match.actors, ...match.extras].forEach((actor, i) => { actor.seed = recording.seeds[i]; });
   archivedReplay = true;
+  setTicker([`${t(video.label)} ${'★'.repeat(video.stars)}`, 'FrameTube']);
   replay.start(recording.clip);
   cam.setEnabled(false);
   syncCamera();
@@ -467,6 +485,7 @@ for (const s of SPORT_LIST) {
   const b = document.createElement('button');
   b.textContent = t(s.name);
   b.className = s.id === SPORT ? 'on' : '';
+  b.dataset.sport = s.id;
   b.addEventListener('pointerup', (e) => {
     e.stopPropagation(); // non far partire la partita
     if (s.id === SPORT) return requestStart();
