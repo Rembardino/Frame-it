@@ -3,7 +3,7 @@
     "name": "Frame It: Live Sports TV",
     "slug": "frame-it",
     "owner": "rembardino",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "landscape",
     "platforms": [
       "android"
@@ -26,7 +26,7 @@
     "extra": {
       "frameit": {
         "ads": {
-          "enabled": false,
+          "enabled": true,
           "testAds": false,
           "appId": "ca-app-pub-6724714927747840~8863376926",
           "bannerId": "ca-app-pub-6724714927747840/6045641890",

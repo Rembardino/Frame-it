@@ -16,12 +16,11 @@ assert.equal(live.appId, 'ca-app-pub-111~222');
 
 const appConfig = JSON.parse(await readFile(new URL('../mobile/app.json', import.meta.url), 'utf8'));
 const configured = resolveAdsConfig(appConfig.expo.extra.frameit.ads);
-// Test chiusi: annunci spenti in app.json finché non si va in produzione (gli ID restano pronti).
-assert.equal(configured.enabled, false);
-const stored = appConfig.expo.extra.frameit.ads;
-assert.equal(stored.appId, 'ca-app-pub-6724714927747840~8863376926');
-assert.equal(stored.bannerId, 'ca-app-pub-6724714927747840/6045641890');
-assert.equal(stored.interstitialId, 'ca-app-pub-6724714927747840/1585406726');
+assert.equal(configured.enabled, true);
+assert.equal(configured.testAds, false);
+assert.equal(configured.appId, 'ca-app-pub-6724714927747840~8863376926');
+assert.equal(configured.bannerId, 'ca-app-pub-6724714927747840/6045641890');
+assert.equal(configured.interstitialId, 'ca-app-pub-6724714927747840/1585406726');
 for (const screen of ['menu', 'tutorial', 'album', 'playing', 'results']) {
   for (const replay of [false, true]) {
     assert.equal(bannerPlacementAllowed(screen, replay), screen === 'menu' || (screen === 'playing' && replay));
