@@ -20,16 +20,16 @@ export const LESSONS: Record<SportId, LessonSpec[]> = {
   boxe: [
     { event: 'x-jab', at: 1.72, tip: 'Tieni entrambi i pugili e i guantoni: il contatto deve vedersi.' },
     { event: 'x-hook', at: 1.72, tip: 'Non stringere su un solo pugile: mostra anche la reazione al gancio.' },
-    { event: 'x-knockdown', at: 2.75, tip: 'Allarga sul knockdown: includi chi cade, l’avversario e l’arbitro.' },
+    { event: 'x-knockdown', at: 3.3, tip: 'Allarga sul knockdown: includi chi cade, l’avversario e l’arbitro.' },
   ],
   tennis: [
     { event: 't-ace', at: 1.8, tip: 'Lascia spazio sopra la racchetta e non perdere la palla al servizio.' },
     { event: 't-incrociato', at: 2.52, tip: 'Nello scambio tieni i due giocatori e la traiettoria della palla.' },
-    { event: 't-volée', at: 4, tip: 'Segui l’avvicinamento a rete mantenendo palla e avversario.' },
+    { event: 't-volée', at: 4, tip: 'Segui l’avvicinamento a rete: stretto su chi colpisce e sulla palla.' },
   ],
   pallavolo: [
     { event: 'v-ace', at: 2.24, tip: 'Inquadra servizio e palla lasciando spazio sopra le mani.' },
-    { event: 'v-spike', at: 4.86, tip: 'Allarga sulla schiacciata: palla alta, attaccante e muro dentro.' },
+    { event: 'v-spike', at: 4.86, tip: 'Stringi sulla schiacciata: palla alta, attaccante e muro dentro.' },
     { event: 'v-block', at: 4.86, tip: 'Mostra entrambi i lati della rete e le mani al momento del muro.' },
   ],
 };

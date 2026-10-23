@@ -38,7 +38,8 @@ export class BoxingSimulation implements SportSimulation {
       // Fuori distanza, già a terra o schivato abbassandosi: colpo a vuoto.
       if (hit.actor.pos.distanceTo(hit.opponent.pos) > 1.85 || hit.opponent.pose === 'fall' || hit.opponent.pose === 'crouch') continue;
       this.match.setPose(hit.opponent, hit.kind === 'knockdown' ? 'fall' : 'recoil', hit.kind === 'knockdown' ? 2.5 : 0.55, hit.actor);
-      this.match.score[hit.actor.team] += hit.kind === 'knockdown' ? 2 : 1;
+      // Contano solo i colpi all'avversario, non quelli a chi invade il ring.
+      if (this.match.actors.includes(hit.opponent)) this.match.score[hit.actor.team] += hit.kind === 'knockdown' ? 2 : 1;
       this.match.sound(hit.kind === 'knockdown' ? 'knockdown' : 'punch', hit.opponent.pos, hit.kind === 'jab' ? 0.6 : 1);
       this.match.excitement = hit.kind === 'knockdown' ? 1 : 0.7;
       if (hit.kind === 'knockdown') this.cheer = { actor: hit.actor, in: 0.5 };

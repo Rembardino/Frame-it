@@ -78,6 +78,8 @@ export const CONTENT_ROWS: [string, string, string, string, string][] = [
   ["Inquadra l'allenatore!", "Frame the coach!", "¡Encuadra al entrenador!", "Cadre l'entraîneur !", "Nimm den Trainer ins Bild!"],
   ["Inquadra l’arbitro!", "Frame the referee!", "¡Encuadra al árbitro!", "Cadre l'arbitre !", "Nimm den Schiedsrichter ins Bild!"],
   ["Invasione di campo", "Pitch invasion", "Invasión de campo", "Intrusion sur le terrain", "Platzsturm"],
+  ["Invasione sul ring!", "Ring invasion!", "¡Invasión del ring!", "Intrusion sur le ring !", "Ringstürmer!"],
+  ["Qualcuno sale sul ring!", "Someone's climbing into the ring!", "¡Alguien se sube al ring!", "Quelqu'un monte sur le ring !", "Da steigt jemand in den Ring!"],
   ["Jab e diretto", "Jab and cross", "Jab y directo", "Jab et direct", "Jab und Gerade"],
   ["Knockdown! Si rialza", "Knockdown! Back on their feet", "¡Caída! Se levanta", "Knockdown ! Il se relève", "Niederschlag! Wieder auf den Beinen"],
   ["L'arbitro, voglio l'arbitro!", "The referee, I want the referee!", "¡El árbitro, quiero al árbitro!", "L'arbitre, je veux l'arbitre !", "Der Schiedsrichter, ich will den Schiedsrichter!"],

@@ -58,6 +58,7 @@ npm run check:native
 npm run check:mobile
 npm run check:gyro
 npm run check:clips
+npm run check:difficulty
 npm run build
 ```
 

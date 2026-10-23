@@ -151,8 +151,11 @@ export function idealView(pos: Vec3, aspect: number, input: FrameInput): { view:
   const close = input.size === 'close';
   let minYaw = Infinity, maxYaw = -Infinity, minPitch = Infinity, maxPitch = -Infinity;
   for (const s of input.subjects) {
-    for (const k of shapePoints(s)) {
+    const headY = s.points.find((k) => k.kind === 'head')?.p.y ?? Infinity;
+    for (const k of s.points) {
       if (close && k.kind === 'feet') continue; // nel primo piano i piedi possono uscire
+      // Le mani non contano, tranne quelle alzate in un primo piano (muro, servizio): fanno parte del gesto.
+      if (k.kind === 'hands' && !(close && k.p.y > headY)) continue;
       const a = angles(pos, k.p);
       minYaw = Math.min(minYaw, a.yaw); maxYaw = Math.max(maxYaw, a.yaw);
       minPitch = Math.min(minPitch, a.pitch); maxPitch = Math.max(maxPitch, a.pitch);
@@ -285,7 +288,7 @@ export function scoreMoment(samples: MomentSample[], decisiveT: number, enabled:
   }
 
   // Medie pesate di copertura, taglia, composizione.
-  let W = 0, cov = 0, size = 0, comp = 0, zoom = 0, leadBad = 0, dCov = 0, dN = 0;
+  let W = 0, cov = 0, size = 0, comp = 0, zoom = 0, leadBad = 0, dCov = 0, dZoom = 0, dN = 0;
   const cut = Object.fromEntries(KINDS.map((k) => [k, 0])) as Record<KeypointKind, number>;
   const subj = new Map<string, { kind: SubjectFrame['kind']; sum: number; w: number }>();
   for (const s of samples) {
@@ -304,7 +307,7 @@ export function scoreMoment(samples: MomentSample[], decisiveT: number, enabled:
       e.w += w;
       subj.set(x.label, e);
     }
-    if (decisive) { dCov += s.ev.coverage; dN++; }
+    if (decisive) { dCov += s.ev.coverage; dZoom += s.ev.zoomRatio; dN++; }
   }
   cov /= W; size /= W; comp /= W; zoom /= W; leadBad /= W;
   for (const k of KINDS) cut[k] /= W;
@@ -358,7 +361,9 @@ export function scoreMoment(samples: MomentSample[], decisiveT: number, enabled:
   for (const k of enabled) { wTot += c.weights[k]; total += c.weights[k] * components[k]; }
   let score = wTot > 0 ? total / wTot : 0;
   const decisiveMissed = dN === 0 || dCov / dN < c.decisiveMissCoverage;
-  if (decisiveMissed) score = Math.min(score, c.stars[2] - 1); // massimo 2 stelle
+  // Troppo largo proprio nell'istante decisivo: come mancarlo (regola dei campi piccoli, vedi config).
+  const tooWide = !decisiveMissed && c.decisiveTooWide > 0 && enabled.includes('size') && dZoom / dN >= Math.log(c.decisiveTooWide);
+  if (decisiveMissed || tooWide) score = Math.min(score, c.stars[2] - 1); // massimo 2 stelle
   score = Math.round(score);
 
   // Motivazioni: le perdite più grosse (solo voci attive), poi i punti di forza.
@@ -367,6 +372,7 @@ export function scoreMoment(samples: MomentSample[], decisiveT: number, enabled:
   const good: string[] = [];
   const lossOf = (k: Component, v: number) => c.weights[k] * (1 - v) * 100;
   if (decisiveMissed) bad.push({ text: 'Momento decisivo mancato (max 2 stelle)', loss: 1000 });
+  if (tooWide) bad.push({ text: 'Troppo largo nel momento decisivo (max 2 stelle)', loss: 1000 });
   if (on('coverage')) {
     for (const [label, e] of subj) {
       const v = e.sum / e.w;

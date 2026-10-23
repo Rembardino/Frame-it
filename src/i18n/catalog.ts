@@ -59,6 +59,7 @@ export const ROWS: [string, string, string, string, string][] = [
   ["Tempismo", "Timing", "Sincronización", "Timing", "Timing"],
   ["Momento non ripreso", "Moment not captured", "Momento no captado", "Moment non filmé", "Moment nicht eingefangen"],
   ["Momento decisivo mancato (max 2 stelle)", "Decisive moment missed (max 2 stars)", "Momento decisivo perdido (máx. 2 estrellas)", "Moment décisif manqué (2 étoiles max.)", "Entscheidender Moment verpasst (max. 2 Sterne)"],
+  ["Troppo largo nel momento decisivo (max 2 stelle)", "Too wide at the decisive moment (max 2 stars)", "Demasiado abierto en el momento decisivo (máx. 2 estrellas)", "Trop large au moment décisif (2 étoiles max.)", "Im entscheidenden Moment zu weit (max. 2 Sterne)"],
   ["{subject} fuori inquadratura", "{subject} out of frame", "{subject} fuera de encuadre", "{subject} hors cadre", "{subject} außerhalb des Bildes"],
   ["Palla tagliata", "Ball cut off", "Balón cortado", "Balle coupée", "Ball abgeschnitten"],
   ["Testa tagliata", "Head cut off", "Cabeza cortada", "Tête coupée", "Kopf abgeschnitten"],

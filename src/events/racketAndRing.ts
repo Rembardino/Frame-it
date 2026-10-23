@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import type { EventDef, RolePick, ShotPhase, Step } from './types';
 import type { SportAction } from '../sim/sports/types';
 
@@ -7,7 +8,11 @@ const rivals: Record<string, RolePick> = {
 };
 
 function tennis(id: string, label: string, hint: string, actions: [number, string, SportAction][], decisive: number): EventDef {
-  const shots: ShotPhase[] = actions.map(([t, who]) => ({ from: Math.max(0, t - 0.55), size: 'medium', subjects: [who, 'ball', [who === 'a' ? 'b' : 'a', 0.5]] }));
+  // Il regista vuole chi colpisce e la palla, non tutto il campo: dopo ogni colpo si segue la palla
+  // verso chi risponde e si stringe su di lui quando colpisce.
+  const shots: ShotPhase[] = actions.map(([t, who], i) => ({
+    from: i ? actions[i - 1][0] + 0.15 : Math.max(0, t - 0.55), size: 'medium', subjects: [who, 'ball'],
+  }));
   return {
     id, label, hint, category: 'main', weight: 1, importance: 1, ownsBall: true,
     roles: { a: { ...rivals.a, label: 'Tennista' }, b: { ...rivals.b, label: 'Avversario' } },
@@ -32,12 +37,18 @@ TENNIS[3].steps.splice(2, 0, { t: 2.5, do: 'move', who: 'a', to: { pitch: [-2.2,
 
 function boxing(id: string, label: string, hint: string, actions: [number, string, SportAction][]): EventDef {
   const decisive = actions[actions.length - 1][0];
+  const { boxingCloseUpBefore, boxingCloseUpAfter } = CONFIG.director;
   return {
     id, label, hint, category: 'main', weight: 1, importance: 1, ownsBall: true,
     roles: { a: { ...rivals.a, label: 'Pugile' }, b: { ...rivals.b, label: 'Avversario' } },
     steps: actions.map(([t, who, action]) => ({ t, do: 'sport', action, who, target: who === 'a' ? 'b' : 'a' })),
     cues: [{ t: 0.2, signal: 'crowdRise', who: 'a' }], decisive, duration: decisive + 3,
-    shots: [{ from: 0, size: 'medium', subjects: ['a', 'b'] }],
+    // Come in TV: larghi sul ring, stretti sullo scambio di colpi, poi di nuovo larghi.
+    shots: [
+      { from: 0, size: 'medium', subjects: ['a', 'b'] },
+      { from: Math.max(0, actions[0][0] - boxingCloseUpBefore), size: 'close', subjects: ['a', 'b'] },
+      { from: decisive + boxingCloseUpAfter, size: 'medium', subjects: ['a', 'b'] },
+    ],
   };
 }
 
@@ -51,7 +62,44 @@ export const BOXING: EventDef[] = [
 BOXING[2].steps.splice(1, 0, { t: 1.9, do: 'pose', who: 'a', pose: 'crouch', dur: 0.4, face: 'b' });
 BOXING[4].roles.ref = { label: 'Arbitro', pick: 'referee' };
 BOXING[4].steps.push({ t: 2.4, do: 'pose', who: 'ref', pose: 'card', dur: 2.5 });
-BOXING[4].shots.push({ from: 2.3, size: 'wide', subjects: ['b', 'a', 'ref'] });
+// Dopo il knockdown si allarga sull'arbitro che conta.
+BOXING[4].shots[2] = { ...BOXING[4].shots[2], size: 'wide', subjects: ['b', 'a', 'ref'] };
+
+/** Un tifoso sale sul ring a fare lo spaccone: i pugili smettono di combattere e lo stendono insieme. */
+export const BOXING_INVASION: EventDef = {
+  id: 'x-invasione', label: 'Invasione sul ring!', hint: 'Qualcuno sale sul ring!',
+  category: 'distraction', weight: 1, importance: 0.8, exclusive: true, once: true, fixedSide: true, ownsBall: true,
+  roles: {
+    fan: { label: 'Tifoso', pick: 'extra', kind: 'fan', at: { pitch: [1, -5.5] } },
+    a: { ...rivals.a, label: 'Pugile' },
+    b: { ...rivals.b, label: 'Pugile' },
+    referee: { label: 'Arbitro', pick: 'referee' },
+  },
+  steps: [
+    { t: 0, do: 'move', who: 'fan', to: { pitch: [0.3, -1.6] }, speed: 'sprint' },
+    { t: 0.5, do: 'pose', who: 'referee', pose: 'protest', dur: 1.5, face: 'fan' },
+    { t: 1.4, do: 'pose', who: 'fan', pose: 'wave', dur: 1.4 },
+    { t: 1.6, do: 'follow', who: 'a', target: 'fan', off: [-0.85, 0.3], speed: 'run' },
+    { t: 1.6, do: 'follow', who: 'b', target: 'fan', off: [0.85, 0.3], speed: 'run' },
+    { t: 1.6, do: 'pose', who: 'a', pose: 'guard', dur: 4.7, face: 'fan' },
+    { t: 1.6, do: 'pose', who: 'b', pose: 'guard', dur: 4.7, face: 'fan' },
+    { t: 2.6, do: 'sport', action: 'jab', who: 'a', target: 'fan' },
+    { t: 3.0, do: 'sport', action: 'hook', who: 'b', target: 'fan' },
+    { t: 3.5, do: 'sport', action: 'knockdown', who: 'a', target: 'fan' },
+    { t: 6.3, do: 'release', who: ['a', 'b'] },
+    { t: 6.3, do: 'move', who: 'fan', to: { pitch: [1, -5.5] }, speed: 'jog' },
+  ],
+  cues: [{ t: 0, signal: 'crowdRise', who: 'fan' }],
+  decisive: 3.7, duration: 8.5,
+  shots: [
+    { from: 0, size: 'wide', subjects: ['fan'] },
+    { from: 1.6, size: 'medium', subjects: ['fan', 'a', 'b'] },
+    // Come negli scambi: stretti sui colpi.
+    { from: 2.6 - CONFIG.director.boxingCloseUpBefore, size: 'close', subjects: ['fan', 'a', 'b'] },
+    { from: 3.7 + CONFIG.director.boxingCloseUpAfter, size: 'medium', subjects: ['fan', 'a', 'b'] },
+    { from: 6.3, size: 'medium', subjects: ['fan'] },
+  ],
+};
 
 function volleyball(id: string, label: string, hint: string, last: SportAction, fast = false): EventDef {
   const roles: Record<string, RolePick> = {
@@ -71,11 +119,12 @@ function volleyball(id: string, label: string, hint: string, last: SportAction, 
     id, label, hint, category: 'main', weight: 1, importance: 1, ownsBall: true, roles, steps,
     cues: [{ t: 0.1, signal: 'crowdRise', who: fast ? 'receiver' : 'hitter' }],
     decisive: fast ? 2 : 4.6, duration: fast ? 4 : 6.6,
-    shots: fast ? [{ from: 0, size: 'medium', subjects: ['receiver', 'ball'] }]
+    // Il colpo decisivo (servizio, schiacciata, muro) si stringe a rete come in TV.
+    shots: fast ? [{ from: 0, size: 'medium', subjects: ['receiver', 'ball'] }, { from: 1.3, size: 'close', subjects: ['receiver', 'ball'] }]
       : [{ from: 0, size: 'wide', subjects: ['defender', 'receiver', 'ball'] },
         { from: 1.5, size: 'medium', subjects: ['receiver', 'setter', 'ball'] },
         { from: 2.8, size: 'medium', subjects: ['setter', 'hitter', 'ball'] },
-        { from: 4, size: 'medium', subjects: ['hitter', 'defender', 'ball'] }],
+        { from: 4, size: 'close', subjects: ['hitter', 'defender', 'ball'] }],
   };
 }
 

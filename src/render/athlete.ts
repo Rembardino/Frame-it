@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG, SPORT } from '../config';
 import type { Actor, SpectatorLook } from '../sim/match';
+import { radialTexture } from './stage';
 
 export interface Athlete {
   body: THREE.Group; torso: THREE.Group; head: THREE.Group;
@@ -11,6 +12,8 @@ export interface Athlete {
   wristL: THREE.Group; wristR: THREE.Group;
   /** Bocca: si apre in altezza quando il personaggio parla o urla. */
   mouth: THREE.Mesh;
+  /** Scatola dell'anello (solo spettatori): compare nella proposta di matrimonio, col suo luccichio. */
+  ring?: THREE.Group; sparkle?: THREE.Sprite;
 }
 const SKIN = [0xe8b58d, 0xba8059, 0x805139, 0xd59b74, 0x593b2e];
 const HAIR = [0x241c19, 0x4a3022, 0x171a23, 0x9b6b38];
@@ -212,11 +215,33 @@ export function createAthlete(actor: Actor): Athlete {
   };
   const leftLeg = leg(1), rightLeg = leg(-1), leftArm = arm(1), rightArm = arm(-1);
   if (SPORT === 'tennis' && player) rightArm.wrist.add(racket(team.shirt));
+  const ring = look === 'plain' ? ringBox() : undefined;
+  if (ring) rightArm.wrist.add(ring.group);
   // The body pivots at the pelvis, while the chest has its own hinge above it.
   body.children.forEach(child => { child.position.y -= 0.94; }); body.position.y = 0.94;
   return { body, torso, head, legL: leftLeg.root, legR: rightLeg.root, kneeL: leftLeg.knee,
     kneeR: rightLeg.knee, armL: leftArm.root, armR: rightArm.root, elbowL: leftArm.elbow, elbowR: rightArm.elbow,
-    wristL: leftArm.wrist, wristR: rightArm.wrist, mouth };
+    wristL: leftArm.wrist, wristR: rightArm.wrist, mouth, ring: ring?.group, sparkle: ring?.sparkle };
+}
+
+/** Scatola aperta con l'anello, sul palmo. Fuori scala e con un luccichio: dalla camera è lontana decine di metri. */
+function ringBox() {
+  const group = new THREE.Group();
+  // Il "sopra" della scatola è il dorso della mano rivolto in alto quando il braccio è teso in avanti.
+  group.position.set(0.035, -0.07, 0); group.rotation.z = -Math.PI / 2; group.scale.setScalar(1.4); group.visible = false;
+  const gold = new THREE.TorusGeometry(0.034, 0.011, 6, 18);
+  group.add(mesh([
+    slab(0xb3123a, [0, 0.03, 0], [0.09, 0.06, 0.09]),
+    slab(0xb3123a, [-0.05, 0.085, 0], [0.014, 0.08, 0.09]),
+    slab(0xf6f0e6, [0, 0.062, 0], [0.07, 0.008, 0.07]),
+    { geometry: gold, color: 0xffc928, at: [0, 0.095, 0], size: [1, 1, 1] },
+    oval(0xe8fbff, [0, 0.135, 0], [0.02, 0.02, 0.02]),
+  ]));
+  gold.dispose();
+  const sparkle = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture('255,246,200'), blending: THREE.AdditiveBlending, depthWrite: false }));
+  sparkle.position.set(0, 0.135, 0);
+  group.add(sparkle);
+  return { group, sparkle };
 }
 
 function jerseyNumber(number: number) {

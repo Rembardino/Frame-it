@@ -65,5 +65,9 @@ export class ActorViews {
     v.armL.rotation.set(-p.raiseL, 0, p.armL); v.armR.rotation.set(p.raiseR, 0, p.armR);
     v.elbowL.rotation.z = p.elbowL; v.elbowR.rotation.z = p.elbowR;
     v.wristL.rotation.set(0, p.wristL, p.wristFlexL); v.wristR.rotation.set(0, p.wristR, p.wristFlexR);
+    if (v.ring) {
+      v.ring.visible = a.pose === 'kneel';
+      v.sparkle!.scale.setScalar(0.32 + 0.12 * Math.sin(this.match.time * 9));
+    }
   }
 }

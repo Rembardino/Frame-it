@@ -5,7 +5,7 @@
  */
 import { SPORT } from '../config';
 import { BASKET } from './basket';
-import { BOXING, TENNIS, VOLLEYBALL, sideEvents } from './racketAndRing';
+import { BOXING, BOXING_INVASION, TENNIS, VOLLEYBALL, sideEvents } from './racketAndRing';
 import type { EventDef, RolePick } from './types';
 
 const OUTFIELD = ['def', 'mid', 'fwd'] as const;
@@ -300,5 +300,5 @@ const CALCIO: EventDef[] = [
 /** La libreria dello sport in gioco. */
 export const LIBRARY: EventDef[] = SPORT === 'basket' ? BASKET
   : SPORT === 'tennis' ? [...TENNIS, ...sideEvents('t')]
-  : SPORT === 'boxe' ? [...BOXING, ...sideEvents('x')]
+  : SPORT === 'boxe' ? [...BOXING, BOXING_INVASION, ...sideEvents('x')]
   : SPORT === 'pallavolo' ? [...VOLLEYBALL, ...sideEvents('v')] : CALCIO;

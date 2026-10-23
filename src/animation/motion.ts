@@ -158,9 +158,10 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
     case 'dejected': p.lean = -0.22; p.armL *= 0.3; p.armR *= 0.3; break;
     // ---- spettatori dei momenti segreti
     case 'hug':
-      // Da dietro, braccia avvolte davanti (come nella foto della coppia in tribuna), dondolando piano.
-      p.armL = p.armR = 1.4; p.elbowL = p.elbowR = 1.35; p.raiseL = p.raiseR = 1.35;
-      p.lean = -0.12; p.tiltSide = wiggle(1.1) * 0.05; p.turn = wiggle(0.8) * 0.06; break;
+      // Da dietro e un po' di lato, braccia attorno alla vita di lei, dondolando piano.
+      // raise ~π/2 gira il piano del gomito in orizzontale: gli avambracci si chiudono verso l'interno.
+      p.armL = p.armR = 0.85; p.raiseL = p.raiseR = 1.35; p.elbowL = p.elbowR = 1.45;
+      p.lean = -0.14; p.tiltSide = 0.08 + wiggle(1.1) * 0.04; p.turn = wiggle(0.8) * 0.05; break;
     case 'hide': {
       // Si abbassa di colpo, mani sul viso.
       const k = ease(pt * 5);
@@ -168,9 +169,14 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
       p.lean = -0.55 * k; p.legL = p.legR = 0.4 * k; p.kneeL = p.kneeR = -0.85 * k; p.lift -= 0.18 * k;
       p.turn += wiggle(9) * 0.03; break;
     }
-    case 'kiss':
-      p.armL = p.armR = 0.85; p.elbowL = p.elbowR = 0.95; p.raiseL = p.raiseR = -0.25;
-      p.lean = -0.3 * ease(pt * 3); p.lift = 0.03; break;
+    case 'kiss': {
+      // Uno con le braccia sulle spalle dell'altro, l'altro attorno alla vita (poseDir: +1 / -1);
+      // si sporgono quanto basta perché le teste si tocchino, inclinate da lati opposti.
+      const k = ease(pt * 3), up = a.poseDir >= 0;
+      // raise ~π/2 gira il piano del gomito in orizzontale: gli avambracci si chiudono dietro collo o schiena.
+      p.armL = p.armR = up ? 1.45 : 0.8; p.raiseL = p.raiseR = up ? 1.5 : 1.35; p.elbowL = p.elbowR = up ? 1.3 : 1.45;
+      p.lean = -0.16 * k; p.tiltSide = (up ? 0.12 : -0.12) * k; p.lift = 0.02; break;
+    }
     case 'dance':
       p.armL = 2.3 + Math.sin(time * 7 + a.id) * 0.5; p.armR = 2.3 + Math.sin(time * 7 + a.id + Math.PI) * 0.5;
       p.elbowL = p.elbowR = 0.5; p.raiseL = p.raiseR = 0.3;

@@ -20,7 +20,8 @@
     "check:clips": "node scripts/check-clip-replay.mjs",
     "sim:career": "node scripts/sim-career.mjs",
     "check:audio": "node scripts/check-audio.mjs",
-    "check:secrets": "node scripts/check-secrets.mjs"
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "check:difficulty": "node scripts/check-difficulty.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"

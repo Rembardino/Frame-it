@@ -26,7 +26,8 @@ function screenHeight(ev: FrameEval) {
 /** Corridoio fra la linea laterale lontana e i cartelloni pubblicitari. */
 const WALKWAY_Z = -(W / 2 + 2.3);
 
-type Cast = { seat: 'stand' | 'walkway'; look?: 'plain' | 'costume' | 'mascot'; count: 1 | 2; couple?: 'behind' | 'side' };
+/** gap = distanza (m) fra i due di una coppia affiancata: i busti sono larghi ~0,55 m. */
+type Cast = { seat: 'stand' | 'walkway'; look?: 'plain' | 'costume' | 'mascot'; count: 1 | 2; couple?: 'behind' | 'side'; gap?: number };
 interface Plan {
   id: string;
   label: string;
@@ -51,6 +52,18 @@ const backOff = (a: Actor, dist: number) => {
   a.target.set(a.pos.x - Math.cos(a.heading) * dist, a.pos.y, a.pos.z - Math.sin(a.heading) * dist);
   a.speedLimit = CONFIG.match.walkSpeed;
 };
+/** I due si avvicinano fino a gap metri (per il bacio dopo la proposta). */
+const closeIn = (a: Actor, b: Actor, gap: number) => {
+  const mid = a.pos.clone().add(b.pos).multiplyScalar(0.5), dir = b.pos.clone().sub(a.pos).setY(0).normalize();
+  a.target.copy(mid).addScaledVector(dir, -gap / 2);
+  b.target.copy(mid).addScaledVector(dir, gap / 2);
+  a.speedLimit = b.speedLimit = CONFIG.match.walkSpeed * 0.6;
+};
+/** Bacio: uno abbraccia le spalle, l'altro la vita (vedi la posa 'kiss'). */
+const kiss = (m: Match, a: Actor, b: Actor, dur: number) => {
+  pose(m, a, 'kiss', dur, b); pose(m, b, 'kiss', dur, a);
+  a.poseDir = 1; b.poseDir = -1;
+};
 /** Camminata lungo il corridoio, nel verso dir. */
 const stroll = (a: Actor, dir: number, dist: number) => {
   a.target.set(a.pos.x + dir * dist, 0, a.pos.z);
@@ -67,11 +80,11 @@ export const PLANS: Plan[] = [
   },
   {
     id: 's-kiss', label: 'Bacio in diretta!', size: 'medium', reactive: true, wait: 35, decisive: 1.4, duration: 4.4,
-    cast: { seat: 'stand', count: 2, couple: 'side' },
+    cast: { seat: 'stand', count: 2, couple: 'side', gap: 0.6 },
     // Vogliono farsi riprendere: appena inquadrati salutano e si baciano.
     steps: [
       [0, ([a, b], m) => { pose(m, a, 'wave', 1); pose(m, b, 'wave', 1); }],
-      [1, ([a, b], m) => { pose(m, a, 'kiss', 2.8, b); pose(m, b, 'kiss', 2.8, a); }],
+      [1, ([a, b], m) => kiss(m, a, b, 2.8)],
     ],
   },
   {
@@ -81,12 +94,14 @@ export const PLANS: Plan[] = [
   },
   {
     id: 's-proposal', label: 'Proposta di matrimonio!', size: 'medium', reactive: false, decisive: 3.7, duration: 9,
-    cast: { seat: 'walkway', count: 2, couple: 'side' },
+    // Lontani quanto basta per il braccio teso con l'anello; poi si avvicinano per il bacio.
+    cast: { seat: 'walkway', count: 2, couple: 'side', gap: 1.05 },
     steps: [
       [0, ([a, b]) => { a.faceTarget = b; b.faceTarget = a; }],
-      [2, ([a, b], m) => pose(m, a, 'kneel', 4.4, b)],
+      [2, ([a, b], m) => pose(m, a, 'kneel', 3.9, b)],
       [3.6, ([a, b], m) => pose(m, b, 'celebrate', 1.8, a)],
-      [6.5, ([a, b], m) => { pose(m, a, 'kiss', 2.3, b); pose(m, b, 'kiss', 2.3, a); }],
+      [5.9, ([a, b]) => closeIn(a, b, 0.6)],
+      [6.5, ([a, b], m) => kiss(m, a, b, 2.3)],
     ],
   },
   {
@@ -236,9 +251,11 @@ export class SecretMoments {
       forward = new THREE.Vector3(0, 0, 1);
       along = new THREE.Vector3(1, 0, 0);
     }
+    // Lui dietro e un po' di lato, così dalla camera si vedono tutte e due le teste.
+    const gap = c.gap ?? 0.6;
     const spots = c.count === 1 ? [at]
-      : c.couple === 'behind' ? [at, at.clone().addScaledVector(forward, -0.3)]
-      : [at.clone().addScaledVector(along, -0.24), at.clone().addScaledVector(along, 0.24)];
+      : c.couple === 'behind' ? [at, at.clone().addScaledVector(forward, -0.34).addScaledVector(along, 0.22)]
+      : [at.clone().addScaledVector(along, -gap / 2), at.clone().addScaledVector(along, gap / 2)];
     const out: Actor[] = [];
     for (const spot of spots) {
       const a = m.spawnExtra('spectator', spot, (x) => want(x) && !out.includes(x));

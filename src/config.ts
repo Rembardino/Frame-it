@@ -158,6 +158,9 @@ const BASE = {
     decisiveWindow: 0.25,
     /** Copertura minima nell'istante decisivo: sotto = "mancato", massimo 2 stelle. */
     decisiveMissCoverage: 0.35,
+    /** Inquadratura N volte più larga dell'ideale nell'istante decisivo: massimo 2 stelle (0 = regola spenta).
+     *  Serve nei campi piccoli (boxe, tennis), dove da fermi si vede tutto e la Copertura è piena gratis. */
+    decisiveTooWide: 0,
     /** Copertura da cui la camera è "sul posto" (per il Tempismo). */
     onTargetCoverage: 0.75,
     /** Anticipo (s) che vale il massimo del Tempismo, e ritardo (s) che lo azzera. */
@@ -192,6 +195,10 @@ const BASE = {
     goalChance: 0.3,
     /** Se un'azione resta bloccata per tanti secondi (es. palla persa), l'evento viene annullato. */
     abortAfter: 4,
+    /** Boxe: il regista vuole il primo piano dei due pugili da N secondi prima del primo colpo
+     *  fino a N secondi dopo l'ultimo, poi si torna larghi. Più anticipo = più tempo per stringere. */
+    boxingCloseUpBefore: 0.6,
+    boxingCloseUpAfter: 0.8,
   },
 
   voice: {
@@ -353,6 +360,7 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
     over: {
       pitch: { length: 6.1, width: 6.1, goalName: 'Ring' },
       camera: { position: { x: 0, y: 3, z: 8.5 }, startPitch: -10, startFov: 45, fovMax: 65 },
+      scoring: { decisiveTooWide: 2 },
       match: { clockMinutes: 9, runSpeed: 2.8, sprintSpeed: 3.5, walkSpeed: 1, accel: 10 },
       visuals: { playerScale: 1.05 },
       teams: [
@@ -368,6 +376,7 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
     over: {
       pitch: { length: 23.77, width: 10.97, goalName: 'Rete' },
       camera: { position: { x: 1.8, y: 5, z: 18 }, startYaw: -5.7, startPitch: -12, startFov: 46, fovMax: 64 },
+      scoring: { decisiveTooWide: 2 },
       match: { clockMinutes: 30, runSpeed: 6, sprintSpeed: 7, accel: 18 },
       visuals: { ballRadius: 0.034, ballScale: 3.5 },
       teams: [
@@ -383,6 +392,7 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
     over: {
       pitch: { length: 18, width: 9, goalName: 'Rete' },
       camera: { position: { x: 1.5, y: 4.5, z: 14 }, startYaw: -6.1, startPitch: -8, startFov: 46, fovMax: 66 },
+      scoring: { decisiveTooWide: 2 },
       match: { clockMinutes: 25, runSpeed: 4.5, sprintSpeed: 6, accel: 18 },
       visuals: { playerScale: 1.1, ballRadius: 0.105, ballScale: 1.8 },
       teams: [
