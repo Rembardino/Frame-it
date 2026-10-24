@@ -32,6 +32,8 @@ export const LESSONS: Record<SportId, LessonSpec[]> = {
     { event: 'v-spike', at: 4.86, tip: 'Stringi sulla schiacciata: palla alta, attaccante e muro dentro.' },
     { event: 'v-block', at: 4.86, tip: 'Mostra entrambi i lati della rete e le mani al momento del muro.' },
   ],
+  // Il golf si riprende col drone: niente lezioni a camera fissa (allenamento e tutorial non si aprono).
+  golf: [], ciclismo: [], vela: [],
 };
 
 export interface LessonFrame { frame: Frame; input: FrameInput }

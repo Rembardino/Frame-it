@@ -2,6 +2,8 @@ import { CONTENT_ROWS } from './content';
 import { FEATURE_ROWS } from './features';
 import { PRACTICE_ROWS } from './practice';
 import { CAREER_ROWS } from './career';
+import { GOLF_ROWS } from './golf';
+import { DRONE_ROWS } from './drone';
 
 /** Stable source keys; every supported language has an explicit translation. */
 export const ROWS: [string, string, string, string, string][] = [
@@ -115,4 +117,6 @@ export const ROWS: [string, string, string, string, string][] = [
   ...FEATURE_ROWS,
   ...PRACTICE_ROWS,
   ...CAREER_ROWS,
+  ...GOLF_ROWS,
+  ...DRONE_ROWS,
 ];

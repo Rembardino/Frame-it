@@ -4,6 +4,7 @@
  */
 import { CONFIG, SPORT } from '../config';
 import type { Actor, Ball, Match } from '../sim/match';
+import { BODY, type Animal } from '../sim/fauna';
 import {
   evaluateFrame, scoreMoment,
   type Component, type FrameEval, type FrameInput, type Keypoint, type MomentSample,
@@ -42,8 +43,10 @@ export function actorSubject(a: Actor, label: string, weight = 1): Subject {
       // Mani ai lati del corpo (perpendicolari alla direzione in cui guarda).
       const rx = -fz * 0.4 * s;
       const rz = fx * 0.4 * s;
-      let head = { x, y: 1.78 * s, z };
-      let body = { x, y: 1.2 * s, z };
+      // In bici si sta piegati: la testa è più in basso.
+      const rider = SPORT === 'ciclismo' && a.role !== 'fan' && a.role !== 'steward' && a.role !== 'spectator' && a.pose !== 'fall';
+      let head = { x, y: (rider ? 1.45 : 1.78) * s, z };
+      let body = { x, y: (rider ? 1.0 : 1.2) * s, z };
       if (a.pose === 'dive') {
         head = { x, y: 0.7 * s, z: z + a.poseDir * 1.1 * s };
         body = { x, y: 0.6 * s, z: z + a.poseDir * 0.6 * s };
@@ -95,6 +98,81 @@ export function ballSubject(b: Ball, weight = 1.2): Subject {
       return b.holder ? b.holder.vel : b.vel;
     },
   };
+}
+
+const ANIMAL: Record<Animal['species'], string> = {
+  deer: 'Cervo', fox: 'Volpe', rabbit: 'Lepre', duck: 'Anatra', birds: 'Uccelli', cow: 'Mucca', dog: 'Cane',
+  dolphin: 'Delfino', gull: 'Gabbiano', eagle: 'Aquila', whale: 'Balena',
+};
+
+/** Animali di un evento: testa, corpo e zampe di chi cammina; il corpo intero di chi vola o nuota. */
+export function animalSubject(match: Match, a: Animal, weight = 1): Subject {
+  const b = BODY[a.species], v = { x: 0, y: 0, z: 0 };
+  return {
+    label: ANIMAL[a.species],
+    kind: 'player',
+    weight,
+    vel() {
+      const p = match.fauna.at(a, 0, match.time).pos, q = match.fauna.at(a, 0, match.time + 0.1).pos;
+      v.x = (q.x - p.x) * 10; v.z = (q.z - p.z) * 10;
+      return v;
+    },
+    points() {
+      const out: Keypoint[] = [];
+      for (let i = 0; i < a.n; i++) {
+        const { pos, heading } = match.fauna.at(a, i, match.time);
+        const fx = Math.cos(heading) * b.len * 0.5, fz = Math.sin(heading) * b.len * 0.5;
+        if (b.fly || b.swim) out.push({ p: { x: pos.x + fx, y: pos.y + b.h * 0.5, z: pos.z + fz }, kind: 'area' }, { p: { x: pos.x - fx, y: pos.y, z: pos.z - fz }, kind: 'area' });
+        else out.push({ p: { x: pos.x + fx, y: pos.y + b.h, z: pos.z + fz }, kind: 'head' }, { p: { x: pos.x, y: pos.y + b.h * 0.6, z: pos.z }, kind: 'body' }, { p: { x: pos.x, y: pos.y, z: pos.z }, kind: 'feet' });
+      }
+      return out;
+    },
+  };
+}
+
+/** Il gruppo dei ciclisti (chi non è caduto) o tutti gli equipaggi della regata: un soggetto solo. */
+export function groupSubject(match: Match, label: string, weight = 1, list?: () => Actor[]): Subject {
+  const v = { x: 0, y: 0, z: 0 }, s = CONFIG.visuals.playerScale;
+  const members = list ?? (() => match.actors.filter((a) => a.pose !== 'fall'));
+  return {
+    label,
+    kind: 'player',
+    weight,
+    vel() {
+      const list = members();
+      v.x = list.reduce((t, a) => t + a.vel.x, 0) / Math.max(1, list.length);
+      v.z = list.reduce((t, a) => t + a.vel.z, 0) / Math.max(1, list.length);
+      return v;
+    },
+    points: () => members().flatMap((a): Keypoint[] => [
+      { p: { x: a.pos.x, y: a.pos.y + 1.45 * s, z: a.pos.z }, kind: 'head' },
+      { p: { x: a.pos.x, y: a.pos.y, z: a.pos.z }, kind: 'feet' },
+    ]),
+  };
+}
+
+/** Golf: la palla con r metri di margine attorno (in volo va inquadrata anche un po' di cielo davanti). */
+export function flightSubject(b: Ball, r: number, weight = 1.2): Subject {
+  const offsets = [[r, 0, 0], [-r, 0, 0], [0, r, 0], [0, -r, 0], [0, 0, r], [0, 0, -r]];
+  return {
+    label: 'Palla',
+    kind: 'ball',
+    weight,
+    vel: () => b.vel,
+    points: () => [{ p: b.pos, kind: 'ball' }, ...offsets.map(([x, y, z]): Keypoint =>
+      ({ p: { x: b.pos.x + x, y: Math.max(0, b.pos.y + y), z: b.pos.z + z }, kind: 'area' }))],
+  };
+}
+
+/** Golf: la bandiera (base, cima dell'asta e punta della bandierina). */
+export function pinSubject(pin: Vec3, weight = 0.6): Subject {
+  const pts: Keypoint[] = [
+    { p: { x: pin.x, y: 0, z: pin.z }, kind: 'goal' },
+    { p: { x: pin.x, y: 2.4, z: pin.z }, kind: 'goal' },
+    { p: { x: pin.x + 0.6, y: 2.2, z: pin.z }, kind: 'goal' },
+  ];
+  const still = { x: 0, y: 0, z: 0 };
+  return { label: CONFIG.pitch.goalName, kind: 'goal', weight, points: () => pts, vel: () => still };
 }
 
 /** Porta: i 4 angoli dello specchio. side = +1 porta a x positivo, -1 a x negativo. */

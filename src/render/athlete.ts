@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG, SPORT } from '../config';
 import type { Actor, SpectatorLook } from '../sim/match';
 import { radialTexture } from './stage';
+import { t } from '../i18n';
 
 export interface Athlete {
   body: THREE.Group; torso: THREE.Group; head: THREE.Group;
@@ -14,6 +15,8 @@ export interface Athlete {
   mouth: THREE.Mesh;
   /** Scatola dell'anello (solo spettatori): compare nella proposta di matrimonio, col suo luccichio. */
   ring?: THREE.Group; sparkle?: THREE.Sprite;
+  /** Ciclisti: la bici (va sul gruppo radice, non sul corpo) e le pedivelle che girano. */
+  bike?: { group: THREE.Group; crank: THREE.Object3D };
 }
 const SKIN = [0xe8b58d, 0xba8059, 0x805139, 0xd59b74, 0x593b2e];
 const HAIR = [0x241c19, 0x4a3022, 0x171a23, 0x9b6b38];
@@ -127,6 +130,8 @@ export function createAthlete(actor: Actor): Athlete {
   const costume = look && look !== 'plain' && look !== 'mascot' ? LOOKS[look] : null;
   const player = !extra && actor.role !== 'ref', boxer = SPORT === 'boxe' && player;
   const sleeveless = player && (SPORT === 'basket' || SPORT === 'pallavolo' || boxer);
+  const golfer = SPORT === 'golf' && player;
+  const rider = SPORT === 'ciclismo' && player, sailor = SPORT === 'vela' && player;
   const kit = actor.role === 'ref' ? CONFIG.visuals.referee : actor.role === 'steward' ? CONFIG.visuals.steward
     : actor.role === 'fan' ? CONFIG.visuals.fan : actor.role === 'coach' ? { shirt: team.socks, shorts: 0x252d3c, socks: 0x252d3c }
     : look === 'mascot' ? { shirt: team.shirt, shorts: team.shirt, socks: team.shirt }
@@ -136,6 +141,8 @@ export function createAthlete(actor: Actor): Athlete {
   const skin = SKIN[actor.id % SKIN.length], hair = HAIR[actor.id % HAIR.length];
   /** Braccia e gambe: pelle, o il tessuto del costume intero. */
   const limbSkin = look === 'mascot' ? team.shirt : costume?.suit ?? skin;
+  /** I golfisti hanno i pantaloni lunghi. */
+  const legSkin = golfer ? kit.shorts : limbSkin;
   const accent = actor.team === 0 ? 0xf3f6ff : 0xffddb0;
   const body = new THREE.Group(), torso = new THREE.Group(); torso.position.y = 1.04; body.add(torso);
   body.add(mesh([
@@ -152,7 +159,8 @@ export function createAthlete(actor: Actor): Athlete {
     trunk.push(slab(accent, [0.139, 0.37, 0.088], [0.005, 0.043, 0.031]));
   }
   torso.add(mesh(trunk, true));
-  if (player && !boxer) torso.add(jerseyNumber(actor.id % 99 + 1));
+  if (player && !boxer && !golfer) torso.add(jerseyNumber(actor.id % 99 + 1));
+  if (SPORT === 'golf' && actor.role === 'coach') torso.add(golfBag(team.shirt));
 
   const head = new THREE.Group(); head.position.y = 0.74;
   const face: Part[] = [shaped(skull, skin, [0, 0, 0]), shaped(hairCap, hair, [-0.008, 0, 0]),
@@ -168,6 +176,10 @@ export function createAthlete(actor: Actor): Athlete {
   if (actor.id % 3 === 0) face.push({ geometry: hairCap, color: hair, at: [-0.012, 0.012, 0], size: [1, 1.1, 1] });
   if (SPORT === 'tennis' && player) face.push(band(0xf5f2e9, [0, 0.049, 0], [0.121, 0.022, 0.114]));
   if (SPORT === 'pallavolo' && player && actor.id % 2 === 0) face.push(section(hair, [-0.135, 0.015, 0], [0.029, 0.18, 0.035]));
+  if (golfer) face.push({ geometry: hairCap, color: team.shorts, at: [-0.004, 0.022, 0], size: [1.07, 1, 1.07] }, slab(team.shorts, [0.13, 0.072, 0], [0.1, 0.012, 0.15]));
+  // Casco: affusolato con gli occhiali scuri per i ciclisti, tondo per i velisti.
+  if (rider) face.push({ geometry: hairCap, color: team.shirt, at: [-0.03, 0.03, 0], size: [1.25, 1.05, 1.12] }, band(0x15181d, [0.105, 0.025, 0], [0.04, 0.022, 0.11]));
+  if (sailor) face.push({ geometry: hairCap, color: 0xf4f4f2, at: [-0.005, 0.025, 0], size: [1.14, 1.1, 1.14] });
   face.push(...accessories(look, team.shirt));
   head.add(mesh(face)); torso.add(head);
   const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
@@ -177,7 +189,7 @@ export function createAthlete(actor: Actor): Athlete {
   const leg = (side: number) => {
     const root = new THREE.Group(); root.position.set(0, 0.92, side * 0.102);
     root.add(mesh([
-      section(limbSkin, [0, -0.215, 0], [0.074, 0.43, 0.077]),
+      section(legSkin, [0, -0.215, 0], [0.074, 0.43, 0.077]),
       section(kit.shorts, [0, -0.06, 0], [0.083, boxer ? 0.26 : 0.22, 0.088]),
       slab(accent, [0, -0.068, side * 0.078], [0.035, 0.15, 0.004]),
     ], true));
@@ -185,8 +197,8 @@ export function createAthlete(actor: Actor): Athlete {
     const highSock = SPORT === 'calcio' || boxer || extra || actor.role === 'ref';
     const shoe = player ? (actor.team === 0 ? 0xf4efdb : 0x20273a) : 0x20273a;
     const lower: Part[] = [
-      oval(limbSkin, [0, 0, 0], [0.05, 0.052, 0.058]),
-      section(limbSkin, [0, -0.2, 0], [0.056, 0.4, 0.06]),
+      oval(legSkin, [0, 0, 0], [0.05, 0.052, 0.058]),
+      section(legSkin, [0, -0.2, 0], [0.056, 0.4, 0.06]),
       section(kit.socks, [0, highSock ? -0.245 : -0.35, 0], [0.048, highSock ? 0.29 : 0.08, 0.055]),
       shaped(shoeShape, shoe, [0.054, -0.41, 0]),
       { geometry: shoeShape, color: 0xdce2ea, at: [0.054, -0.449, 0], size: [1.02, 0.25, 1.04] },
@@ -215,13 +227,16 @@ export function createAthlete(actor: Actor): Athlete {
   };
   const leftLeg = leg(1), rightLeg = leg(-1), leftArm = arm(1), rightArm = arm(-1);
   if (SPORT === 'tennis' && player) rightArm.wrist.add(racket(team.shirt));
+  if (golfer) rightArm.wrist.add(golfClub());
+  if (SPORT === 'golf' && actor.role === 'ref') rightArm.wrist.add(quietSign());
+  const bike = rider ? bicycle(team.shirt) : undefined;
   const ring = look === 'plain' ? ringBox() : undefined;
   if (ring) rightArm.wrist.add(ring.group);
   // The body pivots at the pelvis, while the chest has its own hinge above it.
   body.children.forEach(child => { child.position.y -= 0.94; }); body.position.y = 0.94;
   return { body, torso, head, legL: leftLeg.root, legR: rightLeg.root, kneeL: leftLeg.knee,
     kneeR: rightLeg.knee, armL: leftArm.root, armR: rightArm.root, elbowL: leftArm.elbow, elbowR: rightArm.elbow,
-    wristL: leftArm.wrist, wristR: rightArm.wrist, mouth, ring: ring?.group, sparkle: ring?.sparkle };
+    wristL: leftArm.wrist, wristR: rightArm.wrist, mouth, ring: ring?.group, sparkle: ring?.sparkle, bike };
 }
 
 /** Scatola aperta con l'anello, sul palmo. Fuori scala e con un luccichio: dalla camera è lontana decine di metri. */
@@ -271,3 +286,76 @@ function racket(color: number) {
   group.add(new THREE.LineSegments(strings, new THREE.LineBasicMaterial({ color: 0xd4dedb, transparent: true, opacity: 0.75 })));
   return group;
 }
+
+/** Ferro da golf: impugnatura, asta e testa. La testa (a −0,98) è il punto che colpisce la palla. */
+function golfClub() {
+  return mesh([band(0x1b1d22, [0, -0.07, 0], [0.017, 0.15, 0.017]), band(0xc9ced6, [0, -0.56, 0], [0.008, 0.84, 0.008]),
+    slab(0x9aa3ad, [0.035, -0.975, 0], [0.095, 0.035, 0.03])]);
+}
+
+/** Sacca da golf sulla schiena del caddie, con le teste dei bastoni che spuntano. */
+function golfBag(color: number) {
+  const parts: Part[] = [band(color, [0, 0, 0], [0.12, 0.8, 0.12]), band(0x1d1f24, [0, 0.42, 0], [0.125, 0.05, 0.125]),
+    band(0x1d1f24, [0, -0.38, 0], [0.125, 0.06, 0.125])];
+  [[-0.05, 0.03], [0.05, -0.02], [0, 0.06], [0.03, 0.05], [-0.03, -0.05]].forEach(([x, z], i) => {
+    parts.push(band(0xb8bec6, [x, 0.5 + i * 0.02, z], [0.01, 0.2, 0.01]), slab(i % 2 ? 0x2b2f36 : 0x8a9099, [x + 0.02, 0.61 + i * 0.02, z], [0.055, 0.03, 0.035]));
+  });
+  const bag = mesh(parts, true);
+  bag.position.set(-0.19, 0.24, 0.04); bag.rotation.z = -0.3;
+  return bag;
+}
+
+/** Il cartello del marshal: quando lo alza, silenzio per il colpo. */
+function quietSign() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#f7f2e4'; ctx.fillRect(0, 0, 256, 128);
+  ctx.strokeStyle = '#245a3a'; ctx.lineWidth = 10; ctx.strokeRect(5, 5, 246, 118);
+  ctx.fillStyle = '#245a3a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 44px Arial';
+  ctx.fillText(t('SILENZIO'), 128, 66, 230);
+  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+  const group = new THREE.Group();
+  group.add(mesh([band(0x6b4a2b, [0, -0.2, 0], [0.012, 0.36, 0.012])]));
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.2).rotateY(Math.PI / 2), new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }));
+  sign.position.y = -0.46;
+  group.add(sign);
+  return group;
+}
+
+/** Bici da corsa: telaio del colore della squadra, sella all'altezza del bacino del corridore. */
+function bicycle(color: number) {
+  const tube = (a: [number, number, number], b: [number, number, number], r: number) => {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A);
+    const g = new THREE.CylinderGeometry(r, r, d.length(), 6).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+    return g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+  };
+  const bb: [number, number, number] = [0.16, 0.3, 0], seat: [number, number, number] = [0.02, 0.84, 0], head: [number, number, number] = [0.58, 0.82, 0];
+  const rear: [number, number, number] = [-0.36, 0.34, 0], front: [number, number, number] = [0.64, 0.34, 0];
+  const group = new THREE.Group();
+  // Ruote senza raggi visibili (raggi veri a 60 fps sembrerebbero girare all'indietro): copertone, cerchio e mozzo
+  // sono simmetrici, quindi stanno nel telaio e non serve farli girare. Il disco velato = raggi "mossi" come in TV.
+  const wheel = (at: [number, number, number]): Part[] => [{ geometry: tire, color: 0x15181d, at, size: [1, 1, 1] },
+    { geometry: rim, color: 0x9aa3ad, at, size: [1, 1, 1] }, { geometry: hub, color: 0xb8bec6, at, size: [1, 1, 1] }];
+  group.add(mesh([
+    shaped(tube(bb, seat, 0.02), color, [0, 0, 0]), shaped(tube(seat, head, 0.018), color, [0, 0, 0]), shaped(tube(bb, head, 0.022), color, [0, 0, 0]),
+    shaped(tube(bb, rear, 0.012), color, [0, 0, 0]), shaped(tube(seat, rear, 0.012), color, [0, 0, 0]), shaped(tube(head, front, 0.014), 0x2b2f36, [0, 0, 0]),
+    shaped(tube(head, [0.68, 0.92, 0], 0.014), 0x2b2f36, [0, 0, 0]), shaped(tube([0.68, 0.92, -0.21], [0.68, 0.92, 0.21], 0.014), 0x2b2f36, [0, 0, 0]),
+    slab(0x15181d, [0, 0.885, 0], [0.24, 0.03, 0.09]), band(0x9aa3ad, [0.16, 0.3, 0], [0.06, 0.03, 0.06]),
+    ...wheel(rear), ...wheel(front),
+  ], true));
+  group.add(new THREE.Mesh(spokeDiscs, spokeBlur));
+  // Pedivelle e pedali: girano con le gambe (fase come in animation/motion.ts ride()).
+  const crank = new THREE.Group();
+  crank.position.set(...bb);
+  crank.add(mesh([
+    slab(0x2b2f36, [0.085, 0, 0.09], [0.19, 0.024, 0.014]), slab(0x15181d, [0.17, 0, 0.125], [0.085, 0.016, 0.06]),
+    slab(0x2b2f36, [-0.085, 0, -0.09], [0.19, 0.024, 0.014]), slab(0x15181d, [-0.17, 0, -0.125], [0.085, 0.016, 0.06]),
+    { geometry: chainring, color: 0x9aa3ad, at: [0, 0, -0.07], size: [1, 1, 1] },
+  ]));
+  group.add(crank);
+  return { group, crank };
+}
+const tire = new THREE.TorusGeometry(0.33, 0.021, 6, 28), rim = new THREE.TorusGeometry(0.3, 0.012, 4, 28);
+const hub = new THREE.CylinderGeometry(0.03, 0.03, 0.07, 8).rotateX(Math.PI / 2), chainring = new THREE.TorusGeometry(0.095, 0.012, 4, 16);
+const spokeDiscs = mergeGeometries([new THREE.CircleGeometry(0.3, 20).translate(-0.36, 0.34, 0), new THREE.CircleGeometry(0.3, 20).translate(0.64, 0.34, 0)])!;
+const spokeBlur = new THREE.MeshBasicMaterial({ color: 0xd5dbe2, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false });

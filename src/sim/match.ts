@@ -11,11 +11,15 @@
  * La squadra 0 attacca verso +x, la squadra 1 verso -x.
  */
 import * as THREE from 'three';
-import { CONFIG, SPORT } from '../config';
+import { CONFIG, DRONE_ONLY, SPORT } from '../config';
 import { TennisSimulation } from './sports/tennis';
 import { VolleyballSimulation } from './sports/volleyball';
 import { BoxingSimulation } from './sports/boxing';
+import { GolfSimulation } from './sports/golf';
+import { CyclingSimulation } from './sports/cycling';
+import { SailingSimulation } from './sports/sailing';
 import type { SportSimulation } from './sports/types';
+import { Fauna } from './fauna';
 import { actorMotion, type MotionPose } from '../animation/motion';
 import { steerActor, separateActors } from './locomotion';
 import type { Speech } from '../audio/speech';
@@ -33,7 +37,11 @@ export type Pose =
   | 'shoot' | 'throw' | 'racket' | 'backhand' | 'serve' | 'receive' | 'set' | 'spike' | 'block'
   | 'guard' | 'jab' | 'hook' | 'uppercut' | 'recoil'
   /** Spettatori dei momenti segreti. */
-  | 'hug' | 'hide' | 'kiss' | 'dance' | 'sleep' | 'kneel';
+  | 'hug' | 'hide' | 'kiss' | 'dance' | 'sleep' | 'kneel'
+  /** Golf: in posizione sulla palla, swing pieno, prova dello swing, putt. */
+  | 'address' | 'swing' | 'practice' | 'putt'
+  /** Ciclismo: in piedi sui pedali. Vela: alle manovelle. */
+  | 'sprint' | 'grind';
 export type MatchPhase = 'play' | 'goal' | 'reset' | 'dead';
 export type ShotOutcome = 'goal' | 'save' | 'wide';
 
@@ -43,7 +51,8 @@ export type EffectName = 'shootingStar';
 /** Suoni della partita (generati dall'audio, nessun file). */
 export type SoundName =
   | 'kick' | 'shot' | 'net' | 'save' | 'ooh' | 'goal' | 'whistle' | 'whistleEnd' | 'bounce' | 'swish' | 'rim'
-  | 'racket' | 'volley' | 'punch' | 'knockdown' | 'bell' | 'point';
+  | 'racket' | 'volley' | 'punch' | 'knockdown' | 'bell' | 'point'
+  | 'drive' | 'iron' | 'putt' | 'cup' | 'land' | 'splash' | 'sand' | 'tree';
 /** Segnali per l'audio: un suono in un punto del campo, o una frase urlata da un personaggio. Chi li legge li svuota. */
 export type Cue = { type: 'sound'; sound: SoundName; at: THREE.Vector3; power: number } | { type: 'say'; actor: Actor; line: Shout };
 
@@ -124,6 +133,9 @@ const GW = CONFIG.pitch.goalWidth / 2;
 const M = CONFIG.match;
 const P = CONFIG.pitch;
 const BASKET = SPORT === 'basket';
+const GOLF = SPORT === 'golf';
+/** Golf: durante questi gesti il golfista resta girato verso la palla, anche se la palla vola via. */
+const STROKE: Pose[] = ['address', 'swing', 'practice', 'putt'];
 export const BALL_RADIUS = CONFIG.visuals.ballRadius * CONFIG.visuals.ballScale;
 /** Basket: x del ferro attaccato da chi attacca verso d. */
 const hoopX = (d: number) => d * (L / 2 - P.hoopFromBaseline);
@@ -133,8 +145,11 @@ const PARKING = new THREE.Vector3(0, 0, -80);
 const LOCKED: Pose[] = ['dive', 'fall', 'tackle'];
 
 /** Calcio a 7: 1-3-2-1. Metri su un campo 60x40, scalati sulla dimensione reale. */
-const FORMATION: { role: Role; x: number; z: number }[] = SPORT === 'tennis' || SPORT === 'boxe'
+const FORMATION: { role: Role; x: number; z: number }[] = SPORT === 'tennis' || SPORT === 'boxe' || GOLF
   ? [{ role: 'fwd', x: 0, z: 0 }]
+  // Ciclismo: capitano (velocista), due uomini di fiducia, gregari. Vela: due barche, timoniere e tailer.
+  : SPORT === 'ciclismo' ? Array.from({ length: CONFIG.cycling.ridersPerTeam }, (_, i): { role: Role; x: number; z: number } => ({ role: i ? i < 3 ? 'mid' : 'def' : 'fwd', x: 0, z: 0 }))
+  : SPORT === 'vela' ? [{ role: 'fwd', x: 0, z: 0 }, { role: 'mid', x: 0, z: 0 }, { role: 'fwd', x: 0, z: 0 }, { role: 'mid', x: 0, z: 0 }]
   : SPORT === 'pallavolo'
   ? [{ role: 'fwd', x: 0, z: 0 }, { role: 'mid', x: 0, z: 0 }, { role: 'fwd', x: 0, z: 0 },
     { role: 'def', x: 0, z: 0 }, { role: 'def', x: 0, z: 0 }, { role: 'def', x: 0, z: 0 }]
@@ -232,6 +247,8 @@ export class Match {
   readonly cues: Cue[] = [];
   /** La palla la gestisce un evento: niente decisioni automatiche, contrasti, intercetti. */
   ballScripted = false;
+  /** Animali degli eventi (cervi, stormi, delfini...): li disegna render/fauna.ts. */
+  readonly fauna = new Fauna();
   /** Cielo: stella cadente. from/to sono decisi quando l'evento parte, così il pubblico sa già dove guardare. */
   readonly sky = { star: { planned: false, active: false, t: 0, dur: 1.3, from: new THREE.Vector3(), to: new THREE.Vector3() } };
 
@@ -288,9 +305,12 @@ export class Match {
     }
     this.sportSimulation = SPORT === 'tennis' ? new TennisSimulation(this)
       : SPORT === 'pallavolo' ? new VolleyballSimulation(this)
-      : SPORT === 'boxe' ? new BoxingSimulation(this) : null;
+      : SPORT === 'boxe' ? new BoxingSimulation(this)
+      : GOLF ? new GolfSimulation(this)
+      : SPORT === 'ciclismo' ? new CyclingSimulation(this)
+      : SPORT === 'vela' ? new SailingSimulation(this) : null;
     if (!this.sportSimulation) this.kickoff(0);
-    else {
+    else if (!DRONE_ONLY) {
       this.referee.pos.set(0, 0, -(W / 2 + 1));
       this.referee.target.copy(this.referee.pos);
     }
@@ -309,7 +329,7 @@ export class Match {
 
     if (this.sportSimulation) {
       this.sportSimulation.update(dt);
-      this.updateCoaches();
+      if (!DRONE_ONLY) this.updateCoaches(); // golf: gli allenatori fanno i caddie; ciclismo e vela: in disparte
       const star = this.sky.star;
       if (star.active && (star.t += dt) >= star.dur) star.active = false;
       this.moveActors(dt);
@@ -423,7 +443,7 @@ export class Match {
 
   /** Chi parla quando assume una posa, e cosa dice. */
   private shoutFor(a: Actor, pose: Pose): Shout | null {
-    if (a.role === 'ref') return pose === 'card' ? (SPORT === 'boxe' ? 'count' : this.over ? null : 'card') : pose === 'protest' ? 'steward' : null;
+    if (a.role === 'ref') return pose === 'card' ? (SPORT === 'boxe' ? 'count' : GOLF ? 'quiet' : this.over ? null : 'card') : pose === 'protest' ? 'steward' : null;
     if (a.role === 'steward') return pose === 'tackle' ? 'steward' : null;
     if (a.role === 'fan') return pose === 'wave' ? 'fan' : pose === 'fall' ? 'ouch' : null;
     if (a.role === 'spectator') {
@@ -440,14 +460,14 @@ export class Match {
   /** Fischio: gioco fermo finché un evento non chiama restartPlay(). */
   stopPlay() {
     if (this.phase !== 'play') return;
-    if (this.over) this.sound('whistleEnd', this.referee.pos);
+    if (this.over) this.sound(DRONE_ONLY ? 'point' : 'whistleEnd', this.referee.pos);
     else {
       this.sound('whistle', this.referee.pos);
       // "Fallo!", tranne quando si ferma il gioco per un invasore.
       if (!this.extras.some((e) => e.role === 'fan' && e.active)) this.say(this.referee, 'foul');
     }
     const b = this.ball;
-    b.pos.y = BALL_RADIUS;
+    if (!DRONE_ONLY) b.pos.y = BALL_RADIUS; // golf: la palla può essere in buca; ciclismo e vela: non c'è
     b.state = 'dead';
     b.holder = null;
     b.flight = null;
@@ -974,6 +994,8 @@ export class Match {
 
   private moveActors(dt: number) {
     const all = this.everyone;
+    // Ciclisti ed equipaggi li muove la loro simulazione: qui passano solo le pose.
+    const driven = (a: Actor) => !!this.sportSimulation?.drives?.(a);
     for (const a of all) {
       a.poseBlendTime = Math.min(CONFIG.visuals.poseBlendSec, a.poseBlendTime + dt);
       a.poseTime += dt;
@@ -981,6 +1003,7 @@ export class Match {
         this.setPose(a, SPORT === 'boxe' && a.role === 'fwd' ? 'guard' : 'normal', Infinity,
           SPORT === 'boxe' && a.role === 'fwd' ? this.actors.find(opponent => opponent.team !== a.team)! : null);
       }
+      if (driven(a)) continue;
       if (a.pose === 'dive') {
         if (a.poseTime > 0) a.pos.z += clamp(a.target.z - a.pos.z, -7 * dt, 7 * dt);
         a.vel.set(0, 0, 0);
@@ -1003,12 +1026,12 @@ export class Match {
         : netPlayer && ownsBall && !a.faceTarget ? (a.team === 0 ? 0 : Math.PI)
         : Math.atan2(look.z - a.pos.z, look.x - a.pos.x);
       const turn = wrapAngle(want - a.heading) * (1 - Math.exp(-dt * 9));
-      a.heading += clamp(turn, -6 * dt, 6 * dt);
+      if (!(GOLF && STROKE.includes(a.pose))) a.heading += clamp(turn, -6 * dt, 6 * dt);
       // Shorter steps for shuffles and ring footwork, longer strides at a sprint.
       const cadence = SPORT === 'boxe' ? 5 : 2.6 - clamp(sp / M.sprintSpeed, 0, 1) * 0.55;
       a.runPhase += sp * dt * cadence;
     }
-    separateActors(all, dt);
+    separateActors(all.filter((a) => !driven(a)), dt);
   }
 
   /** Attiva un extra (tifoso, steward, spettatore) in una posizione; pick sceglie fra quelli liberi. */

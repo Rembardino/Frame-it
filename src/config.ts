@@ -73,6 +73,18 @@ const BASE = {
     droneBattery: 0,
     droneSpeed: 7,
     droneResponse: 0.9,
+    /** Telecomando del drone: rotazione con la leva sinistra (gradi/s per ogni grado di FOV: a FOV 42 ≈ 55°/s, zoomato più lenta),
+     *  zona morta al centro delle leve (0..1) ed expo (0 = lineare, 1 = molto fine vicino al centro). */
+    droneYawSpeed: 1.3,
+    droneDeadZone: 0.08,
+    droneExpo: 0.45,
+    /** Velocità del drone (pulsante sopra la leva sinistra): moltiplicatori di velocità e rotazione,
+     *  prontezza (1/s: bassa = parte e si ferma morbido). CINE per le riprese, SPORT per spostarsi in fretta. */
+    droneModes: {
+      cine: { speed: 0.35, turn: 0.5, response: 1.5 },
+      normal: { speed: 1, turn: 1, response: 3 },
+      sport: { speed: 1.7, turn: 1.4, response: 4.5 },
+    },
   },
 
   match: {
@@ -295,6 +307,59 @@ const BASE = {
     maxVoices: 3,
   },
 
+  golf: {
+    /** Buche a partita: si parte da una buca a caso del percorso (6 buche) e si gioca le successive. */
+    holesPerRound: 3,
+    /** Palla ferma: secondi prima dello stacco TV (golfisti già sulla palla), poi secondi prima del colpo. */
+    restSec: 2.5,
+    readySec: 3,
+    /** Secondo del copione in cui parte lo swing (prima: routine e marshal col cartello) e quello del putt. */
+    swingAt: 2.6,
+    puttAt: 2.1,
+    /** Dall'inizio dello swing (o del putt) all'impatto con la palla. */
+    impact: 0.85,
+    puttImpact: 0.5,
+    /** Secondi di volo, altezza massima (m) e secondi dall'atterraggio a palla ferma, per tipo di colpo. */
+    carry: { drive: 6.2, tee3: 5.4, wood: 6, approach: 5, chip: 1.6, bunker: 1.9, putt: 0 },
+    apex: { drive: 32, tee3: 27, wood: 28, approach: 24, chip: 3.5, bunker: 6, putt: 0 },
+    roll: { drive: 3, tee3: 2.2, wood: 2.6, approach: 2.2, chip: 2.2, bunker: 1.8, putt: 0 },
+    /** Secondi di rotolamento del putt, per esito (imbucato corto/medio/lungo, a un passo, sul bordo). */
+    putt: { puttShort: 1.6, putt: 2.6, puttLong: 3.6, puttLag: 3.2, puttLip: 2.8 } as Record<string, number>,
+    /** Scia luminosa della palla (come in TV): secondi di vita dopo l'atterraggio e spessore in pixel. */
+    tracerSec: 4,
+    tracerWidth: 3,
+  },
+
+  cycling: {
+    /** Corridori (per squadra) e velocità del gruppo (m/s): il gruppo regola il passo per arrivare al traguardo verso la fine. */
+    ridersPerTeam: 7,
+    packSpeed: [9, 15],
+    /** Secondo della diretta in cui il gruppo vuole arrivare al traguardo. */
+    arriveSec: 165,
+    /** Nel paese c'è uno strappo: il gruppo rallenta (frazione della velocità). */
+    villageSlow: 0.62,
+    /** Scatto: metri/secondo in più e vantaggio massimo (m). Volata: secondi dal via allo striscione. */
+    attackBoost: 4,
+    attackGap: 40,
+    sprintSec: 14,
+    /** Peso dei corridori: accelerazione e frenata (m/s²); nella volata si accelera di più. */
+    accel: 1.8,
+    brake: 3,
+    sprintAccel: 3,
+    /** Curve: accelerazione laterale massima (m/s²). Più bassa = si frena di più prima dei tornanti. */
+    bendGrip: 6,
+  },
+
+  sailing: {
+    /** Velocità (m/s) di bolina, di poppa e al lasco finale; sopra liftSpeed la barca si alza sui foil. */
+    upwind: 12,
+    downwind: 19,
+    reach: 17,
+    liftSpeed: 9,
+    /** Una virata dura tackSec secondi (la barca rallenta e cambia mura). */
+    tackSec: 3.2,
+  },
+
   indicators: {
     /** Indicatori ai bordi per l'attività fuori inquadratura: opacità massima e raggio (px). */
     maxAlpha: 0.6,
@@ -318,7 +383,7 @@ const BASE = {
 
 // ==================================================================== SPORT
 
-export type SportId = 'calcio' | 'basket' | 'boxe' | 'tennis' | 'pallavolo';
+export type SportId = 'calcio' | 'basket' | 'boxe' | 'tennis' | 'pallavolo' | 'golf' | 'ciclismo' | 'vela';
 type Base = typeof BASE;
 type Overrides = { [K in keyof Base]?: Base[K] extends unknown[] ? Base[K] : Partial<Base[K]> };
 
@@ -403,12 +468,90 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
       crowd: { rowsFar: 6, rowsEnd: 4 },
     },
   },
+  golf: {
+    name: 'Golf',
+    over: {
+      /** Il percorso: 6 buche su 900x600 m (le buche stanno in sim/sports/golfCourse.ts). Si riprende solo col drone. */
+      pitch: { length: 900, width: 600, goalName: 'Bandiera' },
+      /** droneSpeed qui è in m/s veri (negli altri sport si scala col campo). */
+      camera: { startFov: 42, fovMin: 2, fovMax: 62, droneSpeed: 42, shakeAmplitude: 0.03 },
+      /** Allargare troppo dall'alto non basta: nell'istante decisivo serve almeno un terzo dello zoom giusto. */
+      scoring: { decisiveTooWide: 3 },
+      match: { durationSec: 300, walkSpeed: 1.4, jogSpeed: 2.6, runSpeed: 5.5, sprintSpeed: 7 },
+      visuals: {
+        playerScale: 1.12, ballRadius: 0.0214, ballScale: 3,
+        /** Il marshal (giacca verde, pantaloni chiari) col cartello del silenzio. */
+        referee: { shirt: 0x245a3a, shorts: 0xd9cfb4, socks: 0x2a2a2a },
+      },
+      /** Una coppia a colpi alternati. socks = pettorina del caddie. */
+      teams: [
+        { name: 'MARCO', short: 'MAR', shirt: 0x1f3f7a, shorts: 0xe8e2d2, socks: 0xf4f4f4, keeper: 0x1f3f7a },
+        { name: 'GIULIA', short: 'GIU', shirt: 0xe0557d, shorts: 0x3b4252, socks: 0xf4f4f4, keeper: 0xe0557d },
+      ],
+      /** Ogni colpo è un'azione: parte appena il golfista è sulla palla. Le distrazioni succedono lontano, vicino al green. */
+      director: {
+        firstMainAt: 2, mainEvery: [0.5, 1], firstDistractionAt: 30, distractionEvery: [26, 40],
+        dilemmaChance: 0.25, dilemmaBy: 2, goalBudget: 999,
+      },
+      /** Replay più lunghi: si rivede tutto il volo con la scia. */
+      replay: { before: 4.5, after: 2.2, cooldown: 30 },
+      /** Buca in uno: arriva sul primo par 3 dopo l'ora estratta (?rare la forza). */
+      rare: { chancePerMatch: 0.35, window: [0, 0.7] },
+      audio: { crowd: 0.035 },
+    },
+  },
+  ciclismo: {
+    name: 'Ciclismo',
+    over: {
+      /** Gli ultimi 2 km di una tappa in campagna (strada in sim/sports/cyclingRoute.ts). Solo drone. */
+      pitch: { length: 1800, width: 1100, goalName: 'Traguardo' },
+      camera: { startFov: 42, fovMin: 2, fovMax: 62, droneSpeed: 42, shakeAmplitude: 0.03 },
+      scoring: { decisiveTooWide: 3 },
+      /** Velocità del gruppo in CONFIG.cycling; sprintSpeed = il tifoso che corre accanto ai corridori. */
+      match: { durationSec: 300, walkSpeed: 1.4, jogSpeed: 3, runSpeed: 6.5, sprintSpeed: 9 },
+      visuals: { playerScale: 1.08 },
+      director: {
+        firstMainAt: 3, mainEvery: [8, 12], firstDistractionAt: 16, distractionEvery: [16, 26],
+        dilemmaChance: 0.3, dilemmaBy: 2, goalBudget: 999,
+      },
+      replay: { before: 3, after: 2 },
+      rare: { chancePerMatch: 0.4, window: [0.2, 0.7] },
+      audio: { crowd: 0.05 },
+    },
+  },
+  vela: {
+    name: 'Vela',
+    over: {
+      /** Regata di catamarani volanti: partenza, bolina, poppa, arrivo (campo in sim/sports/sailing.ts). Solo drone. */
+      pitch: { length: 2000, width: 1400, goalName: 'Boa' },
+      camera: { startFov: 42, fovMin: 2, fovMax: 62, droneSpeed: 42, shakeAmplitude: 0.03 },
+      scoring: { decisiveTooWide: 3 },
+      match: { durationSec: 300 },
+      visuals: { playerScale: 1.05 },
+      /** Due team con due barche ciascuno (due velisti per barca). */
+      teams: [
+        { name: 'GRECALE', short: 'GRE', shirt: 0xd8393f, shorts: 0x22262e, socks: 0xf2f2f2, keeper: 0xd8393f },
+        { name: 'MAESTRALE', short: 'MAE', shirt: 0x15a6b8, shorts: 0x22262e, socks: 0xf2f2f2, keeper: 0x15a6b8 },
+      ],
+      director: {
+        firstMainAt: 3.5, mainEvery: [8, 12], firstDistractionAt: 18, distractionEvery: [18, 28],
+        dilemmaChance: 0.3, dilemmaBy: 2, goalBudget: 999,
+      },
+      replay: { before: 3.5, after: 2 },
+      rare: { chancePerMatch: 0.4, window: [0.2, 0.7] },
+      audio: { crowd: 0.03 },
+    },
+  },
 };
+
+/** Sport che si riprendono solo col drone (mondi enormi, all'aperto). */
+export const DRONE_SPORTS: SportId[] = ['golf', 'ciclismo', 'vela'];
 
 const param = new URLSearchParams(globalThis.location?.search ?? '').get('sport');
 /** Sport della partita: ?sport=basket nell'URL (la schermata iniziale lo imposta). */
 export const SPORT: SportId = param && param in SPORTS ? (param as SportId) : 'calcio';
 export const SPORT_LIST = Object.entries(SPORTS).map(([id, s]) => ({ id: id as SportId, name: s.name }));
+export const DRONE_ONLY = DRONE_SPORTS.includes(SPORT);
 
 const over = SPORTS[SPORT].over as Record<string, unknown>;
 for (const [k, v] of Object.entries(over)) {

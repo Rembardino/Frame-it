@@ -32,6 +32,9 @@ export function createBall() {
       const panel = angle / (Math.PI / 3);
       rgb = Math.abs(panel - Math.round(panel)) < 0.025 ? [225, 228, 216]
         : Math.floor(panel) % 3 === 0 ? [38, 92, 192] : Math.floor(panel) % 3 === 1 ? [248, 204, 46] : [246, 245, 234];
+    } else if (SPORT === 'golf') {
+      // Bianca con le fossette.
+      rgb = Math.sin(u * 30) * Math.sin(v * 30) > 0.55 ? [214, 217, 220] : [250, 250, 247];
     } else {
       let nearest = frames[0], best = -1;
       for (const frame of frames) {

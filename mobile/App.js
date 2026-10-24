@@ -10,7 +10,7 @@ import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { bannerUnitId, useNativeServices } from './services/useNativeServices';
 
 const BASE_URL = 'https://frameit.local/';
-const SPORTS = ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo'];
+const SPORTS = ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo', 'golf', 'ciclismo', 'vela'];
 const LANGUAGES = ['en', 'it', 'es', 'fr', 'de'];
 
 function Game() {

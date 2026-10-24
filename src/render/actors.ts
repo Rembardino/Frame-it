@@ -23,6 +23,7 @@ export class ActorViews {
     for (const actor of [...match.actors, ...match.extras]) {
       const root = new THREE.Group(); root.scale.setScalar(actor.role === 'spectator' ? CONFIG.visuals.spectatorScale : CONFIG.visuals.playerScale);
       const athlete = createAthlete(actor); root.add(athlete.body);
+      if (athlete.bike) { root.add(athlete.bike.group); root.rotation.order = 'YXZ'; }
       const shadow = new THREE.Mesh(shadowGeo, shadowMat);
       this.group.add(root, shadow); this.views.push({ actor, root, ...athlete, shadow });
     }
@@ -39,6 +40,8 @@ export class ActorViews {
     const b = this.match.ball;
     this.ball.position.copy(b.pos); this.ball.rotation.set(0, 0, -b.spin);
     this.ballShadow.position.set(b.pos.x, 0.015, b.pos.z);
+    // Palla in buca o in acqua: niente ombra.
+    this.ballShadow.visible = SPORT !== 'boxe' && b.pos.y > 0;
     this.ballShadow.scale.setScalar((BALL_RADIUS * 4) / (1 + b.pos.y * 0.4));
   }
 
@@ -46,6 +49,14 @@ export class ActorViews {
     const a = v.actor, p = actorMotion(a, this.match.time, this.match.ball.holder === a);
     // y: gli spettatori in tribuna stanno sul loro gradone.
     v.root.position.set(a.pos.x, a.pos.y, a.pos.z); v.root.rotation.y = -a.heading;
+    if (v.bike) {
+      // Piega in curva (poseDir), bici sul fianco se cade, che dondola nello scatto; ruote che girano.
+      const down = a.pose === 'fall';
+      v.root.rotation.x = down ? 0 : a.poseDir;
+      v.bike.group.rotation.x = down ? a.poseDir : Math.sin(a.runPhase) * (a.pose === 'sprint' ? 0.14 : 0.015);
+      v.bike.group.position.y = down ? 0.15 : 0;
+      v.bike.crank.rotation.z = -a.runPhase;
+    }
     v.shadow.position.set(a.pos.x, a.pos.y + 0.02, a.pos.z);
     v.shadow.scale.setScalar(1.15 * CONFIG.visuals.playerScale / (1 + Math.max(0, p.lift) * 0.3));
     // Rotate a falling body at the hips. Other gestures bend only the torso, keeping feet planted.
@@ -61,7 +72,8 @@ export class ActorViews {
     v.legL.rotation.set(-p.legSpread + p.strideSide, 0, left);
     v.legR.rotation.set(p.legSpread - p.strideSide, 0, right);
     v.kneeL.rotation.z = p.kneeL; v.kneeR.rotation.z = p.kneeR;
-    v.body.position.y = 0.94 + p.lift + stanceOffset(p);
+    // In bici i piedi stanno sui pedali, non a terra.
+    v.body.position.y = 0.94 + p.lift + (v.bike && a.pose !== 'fall' ? 0 : stanceOffset(p));
     v.armL.rotation.set(-p.raiseL, 0, p.armL); v.armR.rotation.set(p.raiseR, 0, p.armR);
     v.elbowL.rotation.z = p.elbowL; v.elbowR.rotation.z = p.elbowR;
     v.wristL.rotation.set(0, p.wristL, p.wristFlexL); v.wristR.rotation.set(0, p.wristR, p.wristFlexR);

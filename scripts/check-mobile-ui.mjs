@@ -52,7 +52,7 @@ try {
         assert.equal(await page.locator('.shot-demo').count(), 3);
         await page.screenshot({ path: fileURLToPath(new URL('framing-phone.png', artifacts)) });
       }
-      if (step === 2) assert.equal(await page.locator('.tutorial-copy p').count(), 5);
+      if (step === 2) assert.equal(await page.locator('.tutorial-copy p').count(), 7);
       assert.equal(await page.evaluate(() => window.frameit.match.time), 0);
     }
     assert.equal(await page.locator('#tutorial-next').textContent(), 'Prova le inquadrature');

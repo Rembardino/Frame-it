@@ -50,7 +50,7 @@ export const CAREER_ROWS: [string, string, string, string, string][] = [
   ['Stabilizzatore', 'Stabilizer', 'Estabilizador', 'Stabilisateur', 'Stabilisator'],
   ['Niente tremolio e movimenti più fluidi nel voto.', 'Less shake, and smoother moves in your rating.', 'Menos temblor y movimientos más fluidos en la nota.', 'Moins de tremblement et des mouvements plus fluides dans la note.', 'Weniger Wackeln und flüssigere Bewegungen in der Bewertung.'],
   ['Drone', 'Drone', 'Dron', 'Drone', 'Drohne'],
-  ['Vola sopra l’azione quando vuoi. Ha una batteria a partita.', 'Fly above the action whenever you like. One battery per match.', 'Vuela sobre la acción cuando quieras. Una batería por partido.', 'Survolez l’action quand vous voulez. Une batterie par match.', 'Flieg über das Geschehen, wann du willst. Ein Akku pro Spiel.'],
+  ['Vola sopra l’azione quando vuoi. Ha una batteria a partita. Sblocca il golf!', 'Fly above the action whenever you like. One battery per match. Unlocks golf!', 'Vuela sobre la acción cuando quieras. Una batería por partido. ¡Desbloquea el golf!', 'Survolez l’action quand vous voulez. Une batterie par match. Débloque le golf !', 'Flieg über das Geschehen, wann du willst. Ein Akku pro Spiel. Schaltet Golf frei!'],
   ['Batteria drone', 'Drone battery', 'Batería del dron', 'Batterie du drone', 'Drohnenakku'],
   ['+15 secondi di volo a partita per livello.', '+15 seconds of flight per match per level.', '+15 segundos de vuelo por partido y nivel.', '+15 secondes de vol par match et par niveau.', '+15 Sekunden Flugzeit pro Spiel und Stufe.'],
   ['Grandangolo da stadio', 'Stadium wide lens', 'Gran angular de estadio', 'Grand-angle de stade', 'Stadion-Weitwinkel'],

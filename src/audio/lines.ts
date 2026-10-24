@@ -6,7 +6,9 @@ import type { Language } from '../i18n';
 
 export type Shout =
   | 'call' | 'protest' | 'argue' | 'shove' | 'ouch' | 'goal' | 'basket' | 'celebrate' | 'dejected'
-  | 'coach' | 'card' | 'foul' | 'count' | 'fan' | 'steward' | 'hide' | 'yes';
+  | 'coach' | 'card' | 'foul' | 'count' | 'fan' | 'steward' | 'hide' | 'yes'
+  /** Golf: il marshal prima del colpo, il compagno quando la palla va verso alberi o acqua. */
+  | 'quiet' | 'fore';
 
 export const SHOUTS: Record<Shout, Record<Language, string[]>> = {
   call: {
@@ -127,5 +129,19 @@ export const SHOUTS: Record<Shout, Record<Language, string[]>> = {
     es: ['¡Alto!', '¡Fuera del campo!'],
     fr: ['Arrête-toi !', 'Hors du terrain !'],
     de: ['Stehen bleiben!', 'Runter vom Platz!'],
+  },
+  quiet: {
+    it: ['Silenzio, prego!'],
+    en: ['Quiet, please!'],
+    es: ['¡Silencio, por favor!'],
+    fr: ['Silence, s’il vous plaît !'],
+    de: ['Ruhe, bitte!'],
+  },
+  fore: {
+    it: ['Fore!', 'Palla!'],
+    en: ['Fore!'],
+    es: ['¡Fore!', '¡Bola!'],
+    fr: ['Fore !', 'Balle !'],
+    de: ['Fore!'],
   },
 };

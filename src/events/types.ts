@@ -3,9 +3,10 @@
  * i segnali premonitori (cues), l'istante decisivo e l'inquadratura ideale.
  * Aggiungere un evento = aggiungere un oggetto in library.ts, senza toccare il codice.
  */
-import type { EffectName, Pose, Role, ShotOutcome } from '../sim/match';
+import type { EffectName, Match, Pose, Role, ShotOutcome } from '../sim/match';
 import type { ShotSize } from '../scoring/scoring';
 import type { SportAction } from '../sim/sports/types';
+import type { Species } from '../sim/fauna';
 
 /** order = ordine del regista (non sta in libreria: lo crea la Director Voice);
  *  secret = momento segreto fuori dalla partita, mai annunciato (events/secrets.ts). */
@@ -32,7 +33,8 @@ export type RolePick = { label: string } & (
 export type Point =
   | { goal: [number, number] }                 // [metri dalla porta attaccata verso il centro, laterale]
   | { near: string; off?: [number, number] }   // [avanti verso la porta attaccata, laterale] da un attore
-  | { pitch: [number, number] };               // [x verso la porta attaccata (0 = centrocampo), laterale]
+  | { pitch: [number, number] }                // [x verso la porta attaccata (0 = centrocampo), laterale]
+  | { spot: string; off?: [number, number] };  // golf: 'stand', 'pin', 'bunker' della buca in gioco, [verso il green, laterale]
 
 /** Azioni a tempo (t = secondi dall'inizio). Passaggio e tiro aspettano che l'attore abbia la palla. */
 export type Step = { t: number } & (
@@ -46,6 +48,8 @@ export type Step = { t: number } & (
   | { do: 'release'; who?: string[] }                      // restituisce gli attori al gioco automatico (tutti se omesso)
   | { do: 'effect'; effect: EffectName }                   // effetto speciale (stella cadente...), preparato a inizio evento
   | { do: 'sport'; action: SportAction; who: string; target?: string }
+  /** Animali (n = quanti, per stormi e branchi) su un percorso tipico dello sport (sim/fauna.ts). Nelle inquadrature: 'animal'. */
+  | { do: 'animal'; species: Species; route: string; n?: number }
 );
 
 /**
@@ -64,7 +68,8 @@ export interface Cue {
 export interface ShotPhase {
   from: number;
   size: ShotSize;
-  /** Ruoli, 'ball', 'goal' (la porta attaccata) o 'star' (la stella cadente). [nome, peso] per cambiarne il peso. */
+  /** Ruoli, 'ball', 'goal' (la porta attaccata), 'star' (la stella cadente); golf 'flight', 'roll', 'pin';
+   *  'animal' (gli animali dell'evento), 'pack' (il gruppo dei ciclisti), 'boats' (le barche). [nome, peso] per cambiarne il peso. */
   subjects: (string | [string, number])[];
   /** Soggetto principale (taglia, composizione). Default: il primo. */
   lead?: string;
@@ -84,6 +89,8 @@ export interface EventDef {
   importance: number;
   /** Parte da solo quando succede qualcosa (es. dopo un gol). */
   trigger?: 'goal';
+  /** Si può scegliere solo quando è vera (golf: il tipo di colpo, la distanza dalla buca, l'acqua vicina...). */
+  when?: (m: Match) => boolean;
   /** Distanza (m) dalla porta attaccata entro cui deve trovarsi chi ha palla. */
   holderGoalDist?: [number, number];
   /** La palla è dell'evento (azioni d'attacco): niente decisioni automatiche. */

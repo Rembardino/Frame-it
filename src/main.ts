@@ -3,7 +3,7 @@
  */
 import './style.css';
 import * as THREE from 'three';
-import { CAREER, CONFIG, SPORT, SPORT_LIST } from './config';
+import { CAREER, CONFIG, DRONE_ONLY, SPORT, SPORT_LIST } from './config';
 import { createStage } from './render/stage';
 import { ActorViews } from './render/actors';
 import { Crowd, type CrowdState } from './render/crowd';
@@ -22,6 +22,7 @@ import { EdgeIndicators } from './ui/edgeIndicators';
 import { AssistFrame } from './ui/assistFrame';
 import { CareerHub, careerReport } from './ui/careerHub';
 import { loadCareer, saveCareer, setPending, settle, type PendingMatch, type Video } from './career/career';
+import type { GolfSimulation } from './sim/sports/golf';
 import { Drone } from './camera/drone';
 import { AudioEngine } from './audio/audio';
 import { addToAlbum, showAlbum } from './ui/album';
@@ -70,12 +71,24 @@ const views = new ActorViews(stage.scene, match);
 const crowd = new Crowd(stage.scene, stage.seatRows);
 const sky = new SkyEffects(stage.scene, match);
 const cam = new CameraController(stage.camera, stage.renderer.domElement);
+// Golf, ciclismo e vela: si riprende solo col drone, che parte già in volo.
+const golf = SPORT === 'golf' ? match.sportSimulation as GolfSimulation : null;
+if (DRONE_ONLY) {
+  const { pos, look } = match.sportSimulation!.droneStart!();
+  stage.camera.position.copy(pos);
+  cam.free = true;
+  const a = cam.anglesTo(look);
+  cam.setView({ yaw: a.yaw, pitch: a.pitch, fov: CONFIG.camera.startFov });
+  $('hint').innerHTML = `<span class="hint-pointer">${t('W/A/S/D vola · Spazio/Shift quota · Trascina per guardare · Rotella zoom')}</span>`
+    + '<span class="hint-touch"></span>'; // dipende da Mode 1 / Mode 2: lo scrive il drone (sotto)
+}
 cam.bindZoomButton($('zin'), -1);
 cam.bindZoomButton($('zout'), 1);
 $('zreset').addEventListener('click', () => cam.resetZoom());
 cam.setEnabled(false);
 const gyro = new GyroscopeController(cam);
 const drone = new Drone(cam, stage.camera, stage.scene);
+if (DRONE_ONLY) $('hint').querySelector('.hint-touch')!.textContent = drone.touchHint;
 const audio = new AudioEngine();
 // I browser fanno partire l'audio solo dopo un tocco del giocatore.
 addEventListener('pointerdown', () => audio.unlock(), { passive: true });
@@ -220,6 +233,7 @@ function renderFrame(f: Frame) {
   views.update(0);
   crowd.update(0, crowdState(world), secrets.gaps);
   sky.update();
+  stage.update?.(match);
   stage.renderer.render(stage.scene, stage.camera);
 }
 
@@ -361,6 +375,7 @@ function checkEnd() {
   syncCamera();
   $('zoomctl').classList.add('hidden');
   $('gyro-controls').classList.add('hidden');
+  $('dronepad').classList.add('hidden');
   match.endMatch();
   voice.end();
   // Lascia finire i voti in corso e la battuta del regista, poi il riepilogo.
@@ -463,7 +478,8 @@ function start() {
   running = true;
   cam.setEnabled(true);
   $('gyro-controls').classList.remove('hidden');
-  $('drone-btn').classList.toggle('hidden', !drone.owned);
+  $('drone-btn').classList.toggle('hidden', !drone.owned || DRONE_ONLY);
+  if (DRONE_ONLY) drone.toggle(); // decolla subito
   syncCamera();
   postNative({ type: 'screen', screen: 'playing' });
   voice.start();
@@ -474,13 +490,16 @@ function start() {
 }
 function requestStart() {
   if (running) return;
-  if (tutorialSeen()) start();
+  if (tutorialSeen() || DRONE_ONLY) start();
   else tutorial.open(start, true);
 }
 $('start-btn').addEventListener('click', requestStart);
 $('tutorial-btn').addEventListener('click', () => tutorial.open());
 $('practice-btn').addEventListener('click', () => practice.open(() => {}));
 // Scelta dello sport: ricarica la pagina con ?sport=... (ogni sport ha campo, regole ed eventi suoi).
+// Tutorial e allenamento sono a camera fissa: negli sport col drone non servono.
+// (In modalità libera si provano tutti gli sport; in Carriera quelli col drone si sbloccano più avanti.)
+if (DRONE_ONLY) { $('tutorial-btn').classList.add('hidden'); $('practice-btn').classList.add('hidden'); }
 for (const s of SPORT_LIST) {
   const b = document.createElement('button');
   b.textContent = t(s.name);
@@ -500,6 +519,20 @@ $('album-btn').addEventListener('pointerup', (e) => {
   e.stopPropagation(); // non far partire la partita
   showAlbum();
 });
+/** Golf: il regista annuncia ogni buca e commenta il risultato (birdie, par, bogey...). */
+let announcedHole = -1, announcedResults = 0;
+const RESULT = ['Albatross!', 'Eagle!', 'Birdie!', 'Par.', 'Bogey.', 'Doppio bogey.'];
+function announceHole(g: GolfSimulation) {
+  if (g.results.length > announcedResults) {
+    announcedResults = g.results.length;
+    const diff = g.results[announcedResults - 1];
+    voice.say(g.strokes === 1 ? 'Buca in uno!' : RESULT[THREE.MathUtils.clamp(diff + 3, 0, 5)]);
+  }
+  if (g.holeIdx !== announcedHole && g.holeIdx < g.round.length) {
+    announcedHole = g.holeIdx;
+    voice.say(t('Buca {n}: par {par}, {m} metri.', { n: g.hole.n, par: g.hole.par, m: Math.round(g.hole.length) }));
+  }
+}
 let last = performance.now();
 let appPaused = false;
 // Pausa scelta dal giocatore (diversa da quella del telefono quando l'app va in background).
@@ -556,6 +589,7 @@ stage.renderer.setAnimationLoop((now) => {
       crowd.update(dt * replay.speed, crowdState(world), secrets.gaps);
       sky.update();
       $('rp-speed').textContent = `x${replay.speed}`;
+      stage.update?.(match);
     } else {
       endReplay();
     }
@@ -568,7 +602,7 @@ stage.renderer.setAnimationLoop((now) => {
   gyro.update(dt);
   cam.update(dt);
   const view = cam.view();
-  if (drone.owned) {
+  if (drone.owned && !DRONE_ONLY) {
     const btn = $('drone-btn');
     btn.textContent = `DRONE ${Math.ceil(drone.battery)}s`;
     btn.classList.toggle('on', drone.active);
@@ -583,6 +617,7 @@ stage.renderer.setAnimationLoop((now) => {
     }
   }
 
+  if (golf && running) announceHole(golf);
   audio.handle(match.cues, match);
   audio.update(view, match.excitement, drone.airborne);
   // Il regista parla: stessa battuta dei sottotitoli.
@@ -606,6 +641,7 @@ stage.renderer.setAnimationLoop((now) => {
     cut.classList.remove('on');
   }
   debugOverlay?.draw(dt, match.time, view, director.focusTracker() ?? voice.order?.tracker ?? null, ambientInput(), enabled);
+  stage.update?.(match);
   stage.renderer.render(stage.scene, stage.camera);
 
   // Il replay aspetta la fine dell'esultanza: prima si festeggia, poi si rivede.

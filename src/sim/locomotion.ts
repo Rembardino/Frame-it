@@ -4,7 +4,7 @@ import type { Actor } from './match';
 
 const desired = new THREE.Vector3();
 const delta = new THREE.Vector3();
-const planted = new Set(['serve', 'receive', 'set', 'spike', 'block', 'shoot', 'jab', 'hook', 'uppercut', 'crouch', 'hug', 'kiss', 'sleep', 'kneel']);
+const planted = new Set(['serve', 'receive', 'set', 'spike', 'block', 'shoot', 'jab', 'hook', 'uppercut', 'crouch', 'hug', 'kiss', 'sleep', 'kneel', 'address', 'swing', 'practice', 'putt']);
 const grounded = (a: Actor) => a.pose === 'fall' || a.pose === 'dive' || a.pose === 'tackle';
 const player = (a: Actor) => !['ref', 'coach', 'fan', 'steward', 'spectator'].includes(a.role);
 

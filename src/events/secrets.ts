@@ -8,7 +8,7 @@
  * Per aggiungerne una: un oggetto in PLANS. I numeri da regolare stanno in CONFIG.secrets.
  */
 import * as THREE from 'three';
-import { CONFIG, SPORT, type SportId } from '../config';
+import { CONFIG, DRONE_ONLY, SPORT, type SportId } from '../config';
 import type { Actor, Match, Pose } from '../sim/match';
 import type { SeatRow } from '../render/stage';
 import { MomentTracker, actorSubject, frameInput } from '../scoring/moment';
@@ -224,7 +224,8 @@ export class SecretMoments {
     });
     if (this.stopped || this.active.length || now < this.next) return;
     this.next = now + rand(S().every[0], S().every[1]);
-    const options = PLANS.filter((p) => p.id !== this.last && (!p.sports || p.sports.includes(SPORT)));
+    // Negli sport col drone non c'è il corridoio a bordo campo: solo le tribune (green, paese, arrivo, molo).
+    const options = PLANS.filter((p) => p.id !== this.last && (!p.sports || p.sports.includes(SPORT)) && (!DRONE_ONLY || p.cast.seat === 'stand'));
     const forced = PLANS.find((p) => p.id === this.force);
     this.force = null;
     const plan = forced ?? options[Math.floor(Math.random() * options.length)];
@@ -241,7 +242,10 @@ export class SecretMoments {
     const want = (a: Actor) => look === 'plain' ? a.look === 'plain' : look === 'mascot' ? a.look === 'mascot' : a.look !== 'plain' && a.look !== 'mascot';
     let at: THREE.Vector3, forward: THREE.Vector3, along: THREE.Vector3;
     if (c.seat === 'stand') {
-      const row = this.rows[Math.floor(Math.random() * this.rows.length)];
+      // Sport col drone: una tribuna vicina all'azione (la palla, o il punto che si segue: le altre sono a centinaia di metri).
+      const rows = DRONE_ONLY ? this.rows.filter((r) => Math.hypot(r.from.x - m.ball.pos.x, r.from.z - m.ball.pos.z) < 90) : this.rows;
+      const row = rows[Math.floor(Math.random() * rows.length)];
+      if (!row) return null;
       at = new THREE.Vector3().lerpVectors(row.from, row.to, rand(0.15, 0.85));
       // Il tifoso "guarda" verso il suo +x locale ruotato di facing: heading = -facing.
       forward = new THREE.Vector3(Math.cos(-row.facing), 0, Math.sin(-row.facing));

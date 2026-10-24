@@ -166,7 +166,7 @@ export class DirectorVoice {
       if (now >= o.tracker.moment.end) this.finishOrder(o, now);
       return;
     }
-    if (this.ended || now < this.nextOrder || this.match.phase !== 'play') return;
+    if (this.ended || !ORDERS.length || now < this.nextOrder || this.match.phase !== 'play') return;
     if (this.plannedWrong === null) {
       this.plannedWrong = Math.random() < c.wrongOrderChance;
       this.waitingSince = now;

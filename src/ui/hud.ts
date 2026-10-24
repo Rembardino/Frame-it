@@ -49,10 +49,10 @@ export class Hud {
     // Scoreboard: il tempo di gioco viene mostrato come una partita vera (90' calcio, 40' basket).
     const mins = CONFIG.match.clockMinutes;
     this.score.textContent = match.sportSimulation?.scoreText() ?? `${match.score[0]} - ${match.score[1]}`;
-    this.clock.textContent = ended ? t('FINE') : SPORT === 'boxe'
+    this.clock.textContent = ended ? t('FINE') : match.sportSimulation?.clockText?.() ?? (SPORT === 'boxe'
       ? `R${Math.min(3, 1 + Math.floor(match.clock / (CONFIG.match.durationSec / 3)))}/3 · ${t('COLPI')}`
       : SPORT === 'tennis' ? t('GAME · PUNTI') : SPORT === 'pallavolo' ? t('PUNTI')
-      : `${Math.min(mins, Math.floor((match.clock / CONFIG.match.durationSec) * mins))}'`;
+      : `${Math.min(mins, Math.floor((match.clock / CONFIG.match.durationSec) * mins))}'`);
 
     // Regista in cuffia.
     const line = voice.current;
@@ -125,7 +125,8 @@ export class Hud {
     el.innerHTML = `
       <div class="sum">
         <div class="sum-title">${t('FINE PARTITA')}</div>
-        <div class="sum-score">${t(teams[0].name)} <b>${match.score[0]} - ${match.score[1]}</b> ${t(teams[1].name)}</div>
+        <div class="sum-score">${SPORT === 'golf' ? `${t(teams[0].name)} &amp; ${t(teams[1].name)} <b>${match.sportSimulation?.scoreText()}</b>`
+          : `${t(teams[0].name)} <b>${match.score[0]} - ${match.score[1]}</b> ${t(teams[1].name)}`}</div>
         <div class="sum-grid">
           <div><small>${t('Punti')}</small><b>${numberText(s.points)}</b>${isRecord ? `<em>${t('Nuovo record!')}</em>` : `<em>${t('Record')} ${numberText(record)}</em>`}</div>
           <div><small>${t('Stelle medie')}</small><b class="star">★ ${numberText(s.avgStars, 1)}</b></div>

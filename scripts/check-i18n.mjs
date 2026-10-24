@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { createServer } from 'vite';
 
 const languages = { en: 1, it: 0, es: 2, fr: 3, de: 4 };
-const sports = ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo'];
+const sports = ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo', 'golf', 'ciclismo', 'vela'];
 const placeholders = value => [...value.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort();
 async function withModules(search, saved, callback) {
   globalThis.location = { search };

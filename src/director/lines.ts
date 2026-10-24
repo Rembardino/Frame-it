@@ -2,7 +2,7 @@
  * Battute del regista — solo dati. Personalità: nervoso e ironico.
  * {label} viene sostituito col nome del momento.
  */
-import { SPORT } from '../config';
+import { DRONE_ONLY, SPORT } from '../config';
 import type { ShotSize } from '../scoring/scoring';
 
 const CALCIO_LINES = {
@@ -51,13 +51,36 @@ const SPORT_LINES: Partial<Record<typeof SPORT, Partial<typeof CALCIO_LINES>>> =
     bad: ['La schiacciata è sopra la rete: alza la camera!', 'Devi passare dal palleggiatore allo schiacciatore!'],
     end: ['Fine della sessione. Vediamo i tuoi scambi migliori.'],
   },
+  golf: {
+    kickoff: ['Siamo live sul percorso! Vola dietro il golfista e segui ogni palla fino a terra.', 'In onda dal tee: dopo ogni colpo vola dove si ferma la palla!'],
+    up: ['Non perderla!'],
+    goal: ['In buca! Primo piano sul golfista!', 'Dentro! Dammi la faccia di chi ha imbucato!'],
+    bad: ['Bello il prato. La palla era altrove.', 'La palla vola: il drone deve volare con lei!'],
+    end: ['Ultima buca in archivio. Vediamo cosa hai combinato.'],
+  },
+  ciclismo: {
+    kickoff: ['Siamo in diretta dalla tappa! Vola sopra il gruppo e non perderlo.', 'Ultimi due chilometri: il drone deve stare col gruppo!'],
+    up: ['Guarda in alto, sopra il gruppo!'],
+    goal: ['Vittoria! Primo piano sul vincitore!', 'Ha vinto la volata! Dammi le braccia al cielo!'],
+    bad: ['Bella la campagna. Il gruppo era altrove.', 'Il gruppo corre a 45 all’ora: il drone deve stargli dietro!'],
+    end: ['Tappa conclusa. Vediamo cosa hai combinato.'],
+  },
+  vela: {
+    kickoff: ['Siamo live sul campo di regata! Stai sopra le barche.', 'Catamarani in pre-partenza: preparati al colpo di cannone!'],
+    up: ['Guarda il mare, laggiù!'],
+    goal: ['Primi all’arrivo! Primo piano sull’equipaggio!', 'Vittoria! Dammi i velisti che esultano!'],
+    bad: ['Bello il mare. Le barche erano altrove.', 'A trenta nodi la barca scappa: anticipa la rotta!'],
+    end: ['Regata conclusa. Vediamo cosa hai combinato.'],
+  },
 };
 export const LINES = { ...CALCIO_LINES, ...SPORT_LINES[SPORT] };
 
 /** Giudizio finale in base alle stelle medie (soglia minima -> frase). */
 export const VERDICTS: [number, string][] = [
   [4.5, ({ calcio: 'Ti voglio alla finale di Champions.', basket: 'Ti voglio alle finali NBA.',
-    tennis: 'Ti voglio a Wimbledon.', boxe: 'Ti voglio a bordo ring per il titolo.', pallavolo: 'Ti voglio alla finale mondiale.' })[SPORT]],
+    tennis: 'Ti voglio a Wimbledon.', boxe: 'Ti voglio a bordo ring per il titolo.', pallavolo: 'Ti voglio alla finale mondiale.',
+    golf: 'Ti voglio alla domenica di un Major.', ciclismo: 'Ti voglio sulla moto della diretta al Grande Giro.',
+    vela: 'Ti voglio sul gommone TV della Coppa più antica del mondo.' })[SPORT]],
   [3.8, 'Niente male, ragazzo. Domani ti richiamo.'],
   [3.0, 'Ho visto di peggio. Non molto peggio.'],
   [2.0, 'La prossima volta la camera la tiene il magazziniere.'],
@@ -80,8 +103,8 @@ const ALL_ORDERS: OrderDef[] = [
   { id: 'referee', label: 'Arbitro', lines: ['Prendimi l\'arbitro!', 'L\'arbitro, voglio l\'arbitro!'], target: 'referee', size: 'medium' },
 ];
 
-/** Il basket non ha portieri. */
-export const ORDERS: OrderDef[] = [
+/** Il basket non ha portieri. Negli sport col drone la regia non dà ordini: si vola dietro l'azione. */
+export const ORDERS: OrderDef[] = DRONE_ONLY ? [] : [
   ...ALL_ORDERS.filter((o) => SPORT === 'calcio' || o.target !== 'keeper').map((o) =>
     SPORT === 'calcio' || SPORT === 'basket' ? o : { ...o, lines: o.target === 'coach'
       ? ['Primo piano sul coach!'] : o.target === 'crowd' ? ['Stacca sul pubblico!'] : ['Inquadra l’arbitro!'] }),

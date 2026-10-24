@@ -86,11 +86,13 @@ export const SHOP: ShopItem[] = [
   { id: 'pass-tennis', name: 'Accredito Tennis', desc: 'Lavori e partite in proprio nel tennis.', cost: [1500], sport: 'tennis' },
   { id: 'pass-pallavolo', name: 'Accredito Pallavolo', desc: 'Lavori e partite in proprio nella pallavolo.', cost: [1500], sport: 'pallavolo' },
   { id: 'pass-boxe', name: 'Accredito Boxe', desc: 'Lavori e partite in proprio nella boxe.', cost: [2500], sport: 'boxe' },
+  { id: 'pass-ciclismo', name: 'Accredito Ciclismo', desc: 'Riprese col drone sopra il gruppo. Serve il drone.', cost: [4000], sport: 'ciclismo', needs: 'drone' },
+  { id: 'pass-vela', name: 'Accredito Vela', desc: 'Riprese col drone sulla regata. Serve il drone.', cost: [6000], sport: 'vela', needs: 'drone' },
   { id: 'mic', name: 'Microfono direzionale', desc: 'Senti il campo: indizi del regista più frequenti e precisi.', cost: [800, 2000, 4000] },
   { id: 'track', name: 'Testa motorizzata', desc: 'Quando non tocchi lo schermo, la camera segue da sola la palla.', cost: [1200, 3000, 6000] },
   { id: 'lens', name: 'Obiettivo zoom', desc: 'Zoom più potente e più veloce.', cost: [1000, 2500] },
   { id: 'steady', name: 'Stabilizzatore', desc: 'Niente tremolio e movimenti più fluidi nel voto.', cost: [700, 1800] },
-  { id: 'drone', name: 'Drone', desc: 'Vola sopra l’azione quando vuoi. Ha una batteria a partita.', cost: [5000] },
+  { id: 'drone', name: 'Drone', desc: 'Vola sopra l’azione quando vuoi. Ha una batteria a partita. Sblocca il golf!', cost: [5000] },
   { id: 'battery', name: 'Batteria drone', desc: '+15 secondi di volo a partita per livello.', cost: [1500, 3000, 6000, 10000], needs: 'drone' },
   { id: 'gear-calcio', name: 'Grandangolo da stadio', desc: 'Calcio: inquadratura più larga per i lanci lunghi.', cost: [1200], sport: 'calcio' },
   { id: 'gear-basket', name: 'Zoom rapido da parquet', desc: 'Basket: zoom ancora più rapido per i cambi di gioco.', cost: [1200], sport: 'basket' },
@@ -103,7 +105,7 @@ export const SHOP: ShopItem[] = [
 const CLIENTS = ['Polisportiva Aurora', 'Accademia Giovani', 'Torneo dei Quartieri', 'Lega Amatori',
   'Circolo Sportivo Riviera', 'Canale 7 Locale', 'TeleValle', 'Sport Week TV',
   'Campionato Regionale', 'Rete Sport Nazionale', 'Coppa Internazionale', 'Finale Europea Live'];
-const SPORTS: SportId[] = ['calcio', 'basket', 'tennis', 'pallavolo', 'boxe'];
+const SPORTS: SportId[] = ['calcio', 'basket', 'tennis', 'pallavolo', 'boxe', 'golf', 'ciclismo', 'vela'];
 
 // ==================================================================== stato
 
@@ -150,7 +152,8 @@ export function readPending(): PendingMatch | null {
 }
 
 export const level = (s: CareerState, id: string) => s.levels[id] ?? 0;
-export const unlocked = (s: CareerState, sport: SportId) => sport === 'calcio' || level(s, `pass-${sport}`) > 0;
+/** Il golf si riprende solo col drone: comprarlo apre il golf. */
+export const unlocked = (s: CareerState, sport: SportId) => sport === 'calcio' || level(s, sport === 'golf' ? 'drone' : `pass-${sport}`) > 0;
 
 // ==================================================================== negozio
 

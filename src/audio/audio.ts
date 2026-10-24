@@ -231,6 +231,15 @@ export class AudioEngine {
       case 'bell': ring([650, 1330, 2120, 3010], 1.6, 0.35); ring([650, 1330, 2120, 3010], 1.6, 0.35, t + 0.4); break;
       case 'whistle': this.whistle(t, 0.28 * (0.8 + power * 0.4), out); break;
       case 'whistleEnd': this.whistle(t, 0.35, out); this.whistle(t + 0.5, 0.35, out); this.whistle(t + 1, 1, out); break;
+      // ---- golf
+      case 'drive': ring([1850, 3150], 0.14, 0.32); thump(420, 170, 0.05, 0.45); this.noiseBurst(t, 0.2, 2600, 0.22, out, 'highpass'); break;
+      case 'iron': thump(320, 140, 0.06, 0.5); ring([1400], 0.07, 0.2); this.noiseBurst(t, 0.07, 1700, 0.35, out, 'bandpass'); break;
+      case 'putt': ring([950, 2100], 0.06, 0.22); break;
+      case 'cup': thump(520, 260, 0.05, 0.4 * power); thump(420, 220, 0.05, 0.25 * power); ring([780], 0.09, 0.12 * power, t + 0.07); break;
+      case 'land': thump(130, 70, 0.08, 0.35 * power); break;
+      case 'splash': this.noiseBurst(t, 0.55, 800, 0.9, out, 'lowpass'); this.noiseBurst(t, 0.3, 3200, 0.3, out, 'highpass'); break;
+      case 'sand': this.noiseBurst(t, 0.3, 1500, 0.55, out, 'bandpass'); break;
+      case 'tree': thump(230, 120, 0.08, 0.6); this.noiseBurst(t, 0.45, 2500, 0.3, out, 'highpass'); break;
     }
   }
 
@@ -278,7 +287,8 @@ export class AudioEngine {
   private place(at: THREE.Vector3) {
     const dx = at.x - this.listener.pos.x, dz = at.z - this.listener.pos.z;
     const dist = Math.hypot(dx, dz, at.y - this.listener.pos.y);
-    const ref = CONFIG.pitch.width * 0.6;
+    // Il percorso da golf è enorme: lì conta la distanza vera, non la larghezza del "campo".
+    const ref = Math.min(CONFIG.pitch.width * 0.6, 40);
     const right = (dx * Math.cos(this.listener.yaw) + dz * Math.sin(this.listener.yaw)) / Math.max(1, Math.hypot(dx, dz));
     return { gain: ref / (ref + dist), pan: THREE.MathUtils.clamp(right, -1, 1) * 0.8 };
   }

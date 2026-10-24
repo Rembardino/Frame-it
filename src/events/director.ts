@@ -10,9 +10,10 @@
  * un passaggio o un tiro deve aspettare la palla. Ogni evento ha un MomentTracker che lo valuta.
  */
 import * as THREE from 'three';
-import { CONFIG } from '../config';
+import { CONFIG, SPORT } from '../config';
 import { type Actor, type Match, type ShotOutcome, type TeamId, clampToPitch, dirOf, xzDist } from '../sim/match';
-import { MomentTracker, actorSubject, ballSubject, frameInput, goalSubject, starSubject, subjectCenter, type Subject } from '../scoring/moment';
+import { MomentTracker, actorSubject, animalSubject, ballSubject, flightSubject, frameInput, goalSubject, groupSubject, pinSubject, starSubject, subjectCenter, type Subject } from '../scoring/moment';
+import type { Animal } from '../sim/fauna';
 import type { Component, FrameInput, ScoreResult, Vec3, View } from '../scoring/scoring';
 import { LIBRARY } from './library';
 import type { Category, Cue, EventDef, Point, ShotPhase, Speed, Step } from './types';
@@ -56,8 +57,9 @@ export interface Indicator {
 }
 
 /** Punto del copione -> posizione sul campo, dal punto di vista della squadra che attacca. */
-function resolvePoint(p: Point, attack: TeamId, mirror: number, roles: Map<string, Actor>): THREE.Vector3 {
+function resolvePoint(p: Point, attack: TeamId, mirror: number, roles: Map<string, Actor>, m: Match): THREE.Vector3 {
   const d = dirOf(attack);
+  if ('spot' in p) return m.sportSimulation!.spot!(p.spot, p.off ?? [0, 0]);
   if ('goal' in p) return clampToPitch(new THREE.Vector3(d * (L / 2 - p.goal[0]), 0, p.goal[1] * mirror), 0.5);
   if ('near' in p) {
     const a = roles.get(p.near)!;
@@ -85,6 +87,8 @@ export class EventInstance {
   private pendingMoves = new Map<Actor, Step & { do: 'move' }>();
   private phaseSubjects = new Map<ShotPhase, { subjects: Subject[]; lead: number }>();
   private stoppedPlay = false;
+  /** Animali comparsi con questo evento. */
+  private animals: Animal[] = [];
 
   constructor(
     readonly def: EventDef,
@@ -194,13 +198,18 @@ export class EventInstance {
       case 'effect':
         m.startEffect(s.effect);
         return true;
+      case 'animal': {
+        const keys = m.sportSimulation?.animalRoute?.(s.route, s.species);
+        if (keys) this.animals.push(m.fauna.spawn(s.species, keys, m.time, s.n ?? 1));
+        return true;
+      }
     }
   }
 
   private move(a: Actor, s: Step & { do: 'move' }) {
     a.scripted = true;
     this.follows.delete(a);
-    a.target.copy(resolvePoint(s.to, this.attack, this.mirror, this.roles));
+    a.target.copy(resolvePoint(s.to, this.attack, this.mirror, this.roles, this.match));
     a.speedLimit = SPEED[s.speed ?? 'run']();
   }
 
@@ -243,6 +252,13 @@ export class EventInstance {
     if (name === 'ball') return ballSubject(this.match.ball, w);
     if (name === 'goal') return goalSubject(dirOf(this.attack), w);
     if (name === 'star') return starSubject(this.match);
+    // Golf: la palla in volo (con margine), quella che rotola, la bandiera.
+    if (name === 'flight' || name === 'roll') return flightSubject(this.match.ball, name === 'flight' ? 5 : 1.5, w);
+    if (name === 'pin') return pinSubject(this.match.sportSimulation!.pin!, w);
+    if (name === 'animal') return animalSubject(this.match, this.animals[0], w);
+    // Ciclismo: chi pedala ancora in gruppo. Vela: tutti gli equipaggi.
+    if (name === 'pack' || name === 'boats') return groupSubject(this.match, name === 'pack' ? 'Gruppo' : 'Barche', w);
+    if (name === 'leader') return groupSubject(this.match, 'In testa', w, () => this.match.sportSimulation!.leaders!());
     return actorSubject(this.roles.get(name)!, this.def.roles[name].label, w);
   }
 
@@ -287,7 +303,8 @@ export class Director {
   constructor(private match: Match, private enabled: Component[], opts: { forceRare?: boolean } = {}, private library: EventDef[] = LIBRARY) {
     const r = CONFIG.rare;
     const dur = CONFIG.match.durationSec;
-    this.rareAt = opts.forceRare ? 20 : Math.random() < r.chancePerMatch ? rand(r.window[0], r.window[1]) * dur : Infinity;
+    // ?rare nel golf: la buca in uno al primo par 3.
+    this.rareAt = opts.forceRare ? (SPORT === 'golf' ? 0 : 20) : Math.random() < r.chancePerMatch ? rand(r.window[0], r.window[1]) * dur : Infinity;
   }
 
   crowdLookUpFor(sec: number) {
@@ -376,7 +393,8 @@ export class Director {
     // Evento raro: solo in un momento tranquillo, una volta a partita.
     if (m.clock >= this.rareAt && !mainActive && !this.active.some((i) => i.def.category === 'rare')) {
       const def = this.pick('rare');
-      if (!def || this.start(def)) this.rareAt = Infinity;
+      // Se adesso non si può (nel golf: non si è su un tee di par 3), si riprova.
+      if (def && this.start(def)) { this.rareAt = Infinity; return; }
     }
     if (now >= this.nextMain && !mainActive) {
       const def = this.pick('main');
@@ -408,6 +426,7 @@ export class Director {
     for (const def of this.library) {
       if (def.category !== category || def.weight <= 0 || def.trigger || !filter(def)) continue;
       if (def.once && this.used.has(def.id)) continue;
+      if (def.when && !def.when(m)) continue;
       if (def.holderGoalDist) {
         if (!holder) continue;
         const dist = Math.abs(dirOf(holder.team) * L / 2 - holder.pos.x);
@@ -452,7 +471,7 @@ export class Director {
         case 'referee': a = free(m.referee) ? m.referee : null; break;
         case 'coach': a = m.coaches.find((x) => x.team === teamOf(r.side) && free(x)) ?? null; break;
         case 'keeper': a = m.actors.find((x) => x.role === 'gk' && x.team === teamOf(r.side) && !taken.has(x)) ?? null; break;
-        case 'extra': a = m.spawnExtra(r.kind, resolvePoint(r.at, attack, mirror, roles)); if (a) spawned.push(a); break;
+        case 'extra': a = m.spawnExtra(r.kind, resolvePoint(r.at, attack, mirror, roles, m)); if (a) spawned.push(a); break;
         case 'player': {
           let c = m.actors.filter((x) => x.team === teamOf(r.side) && x.role !== 'gk' && free(x) && (!r.roles || r.roles.includes(x.role)));
           if (r.farFromBall) c = c.filter((x) => xzDist(x.pos, b.pos) > D().distractionMinDist);

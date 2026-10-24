@@ -34,6 +34,8 @@ export interface Frame {
   ball: { x: number; y: number; z: number; spin: number; holderId: number | null; state: Ball['state']; inHands: boolean };
   world: WorldFrame;
   star: { planned: boolean; active: boolean; t: number; from: number[]; to: number[] };
+  /** Stato proprio dello sport (le barche della vela), se ne ha uno. */
+  sim?: number[];
 }
 
 /** Una clip esportabile: i fotogrammi e cosa rappresentano. */
@@ -83,6 +85,7 @@ export class Recorder {
         holderId: m.ball.holder?.id ?? null, state: m.ball.state, inHands: m.ball.inHands },
       world: { ...world },
       star: { planned: s.planned, active: s.active, t: s.t, from: s.from.toArray(), to: s.to.toArray() },
+      ...(m.sportSimulation?.capture ? { sim: m.sportSimulation.capture() } : {}),
     };
   }
 
@@ -127,6 +130,7 @@ export class Recorder {
     s.t = a.star.active === b.star.active ? lerp(a.star.t, b.star.t, u) : a.star.t;
     s.from.fromArray(a.star.from);
     s.to.fromArray(a.star.to);
+    if (a.sim && b.sim) m.sportSimulation?.restore?.(a.sim.map((x, i) => lerp(x, b.sim![i], u)));
     return {
       cam: {
         rx: lerpAngle(a.cam.rx, b.cam.rx, u), ry: lerpAngle(a.cam.ry, b.cam.ry, u), fov: lerp(a.cam.fov, b.cam.fov, u),

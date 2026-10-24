@@ -41,7 +41,7 @@
     </div>
 
     <div id="zoomctl" class="hidden"><button id="zin" data-i18n-aria="Avvicina: E o più" data-i18n-title="Avvicina (E o +)" aria-label="Zoom in: E or plus" title="Zoom in (E or +)">+</button><button id="zout" data-i18n-aria="Allontana: Q o meno" data-i18n-title="Allontana (Q o −)" aria-label="Zoom out: Q or minus" title="Zoom out (Q or −)">−</button><button id="zreset" data-i18n-aria="Allontana al massimo" data-i18n-title="Allontana al massimo" aria-label="Zoom all the way out" title="Zoom all the way out">1×</button></div>
-    <div id="dronepad" class="hidden"><div id="drone-stick"><span></span></div><div id="drone-alt"><button id="drone-up">▲</button><button id="drone-down">▼</button></div></div>
+    <div id="dronepad" class="hidden"><div id="drone-left" class="dzone"><div class="dbase"><b class="up">▲</b><b class="dn">▼</b><b class="lt">↺</b><b class="rt">↻</b><span></span></div></div><button id="drone-speed" data-mode="normal" aria-label="Drone speed">NORMALE</button><div id="drone-right" class="dzone"><div class="dbase"><b class="up">↑</b><b class="dn">↓</b><b class="lt">←</b><b class="rt">→</b><span></span></div></div></div>
     <div id="gyro-controls" class="hidden"><button id="pause-btn" class="secondary" data-i18n-aria="Pausa" aria-label="Pause">❚❚</button><button id="drone-btn" class="secondary hidden">DRONE</button><button id="sound-btn" class="secondary sound-toggle">Audio: ON</button><button id="gyro-toggle" class="secondary" aria-pressed="false" data-i18n="Giroscopio: OFF">Gyroscope: OFF</button><button id="gyro-center" class="secondary hidden" data-i18n="Ricentra">Recenter</button></div>
     <div id="gyro-feedback" class="gyro-feedback hidden" role="status"></div>
 
@@ -74,7 +74,7 @@
 
     <div id="pause" class="overlay hidden" role="dialog" aria-modal="true">
       <div class="logo" data-i18n="PAUSA">PAUSED</div>
-      <div class="pause-actions"><button id="resume-btn" class="primary" data-i18n="Riprendi la partita">Resume match</button><button id="menu-btn" class="secondary" data-i18n="Torna al menu">Back to menu</button></div>
+      <div class="pause-actions"><button id="resume-btn" class="primary" data-i18n="Riprendi la partita">Resume match</button><button id="menu-btn" class="secondary" data-i18n="Torna al menu">Back to menu</button><button id="drone-mode-btn" class="secondary hidden">Sticks: Mode 2</button></div>
     </div>
 
     <div id="rotate" class="overlay" data-i18n="Ruota il telefono in orizzontale">Rotate your phone to landscape</div>

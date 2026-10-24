@@ -6,8 +6,12 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { CONFIG, SPORT } from '../config';
+import type { Match } from '../sim/match';
 import { sportCourt } from './sportCourts';
 import { courtSurface, surfaceGrain, rod } from './surfaces';
+import { golfCourse } from './golf';
+import { cyclingWorld } from './cycling';
+import { sailingWorld } from './sailing';
 
 const L = CONFIG.pitch.length;
 const W = CONFIG.pitch.width;
@@ -37,6 +41,10 @@ export function createStage(container: HTMLElement) {
   scene.fog = new THREE.Fog(0x172c47, 100, 360);
 
   const camera = new THREE.PerspectiveCamera(CONFIG.camera.startFov, 1, 0.1, 1000);
+  // Gli sport col drone hanno un mondo loro, all'aperto e di giorno: niente stadio.
+  if (SPORT === 'golf') return { renderer, scene, camera, ...golfCourse(renderer, scene, camera) };
+  if (SPORT === 'ciclismo') return { renderer, scene, camera, ...cyclingWorld(renderer, scene, camera) };
+  if (SPORT === 'vela') return { renderer, scene, camera, ...sailingWorld(renderer, scene, camera) };
 
   scene.add(new THREE.HemisphereLight(0xdceaff, 0x55654d, 1.65));
   const sun = new THREE.DirectionalLight(0xffefd8, 2.5);
@@ -60,7 +68,7 @@ export function createStage(container: HTMLElement) {
   scene.add(stands);
   scene.add(stadiumSeats(seatRows), grandstandRoof());
 
-  return { renderer, scene, camera, seatRows };
+  return { renderer, scene, camera, seatRows, update: undefined as ((match: Match) => void) | undefined };
 }
 
 // ------------------------------------------------------------------ cielo
@@ -421,7 +429,7 @@ function floodlights() {
   return g;
 }
 
-function stadiumSeats(rows: SeatRow[]) {
+export function stadiumSeats(rows: SeatRow[]) {
   const positions: { point: THREE.Vector3; facing: number; index: number }[] = [];
   for (const row of rows) {
     const count = Math.floor(row.from.distanceTo(row.to) / CONFIG.crowd.spacing);

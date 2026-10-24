@@ -56,6 +56,16 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
     p.turn = -0.12 + wiggle(1.3) * 0.07; p.tiltSide = wiggle(1.9) * 0.05;
     p.lift = Math.abs(Math.sin(time * 4.6 + a.id)) * 0.035;
   };
+  /** Golf: piedi larghi, ginocchia flesse, busto in avanti, braccia giù e mani unite sul bastone. */
+  const address = (putter: boolean) => {
+    plant();
+    p.legSpread = putter ? 0.09 : 0.13; p.legL = p.legR = 0.16; p.kneeL = p.kneeR = -0.32;
+    p.lean = putter ? -0.58 : -0.5;
+    p.armL = p.armR = putter ? 0.72 : 0.75; p.raiseL = p.raiseR = -0.38; p.elbowL = p.elbowR = 0.08;
+    p.turn = p.tiltSide = p.lift = p.headUp = 0;
+  };
+  // In bici: le gambe seguono i pedali (cinematica a due ossa), busto piegato sul manubrio.
+  if (SPORT === 'ciclismo' && player && pose !== 'fall') return ride(p, a, pose, time);
   switch (pose) {
     case 'normal':
       if (player && (SPORT === 'tennis' || SPORT === 'pallavolo')) {
@@ -156,6 +166,39 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
       else p.raiseL = p.raiseR = 1.5;
       p.armL = p.armR = 0; p.elbowL = p.elbowR = 0.12; break;
     case 'dejected': p.lean = -0.22; p.armL *= 0.3; p.armR *= 0.3; break;
+    // ---- golf. Golfista destro: il bersaglio è alla sua sinistra (−z locale, il lato del braccio R che tiene il bastone).
+    case 'address': address(false); break;
+    case 'swing': case 'practice': {
+      address(false);
+      // +1 = in cima al backswing, 0 = impatto (a metà del gesto), −1 = finale.
+      const c = pose === 'swing'
+        ? curve(u, [[0, 0], [0.4, 1], [0.5, 0], [0.62, -0.8], [0.8, -1], [1, -1]])
+        : curve(u, [[0, 0], [0.45, 0.32], [0.75, -0.18], [1, 0]]);
+      const back = Math.max(0, c), thru = Math.max(0, -c);
+      // Le mani restano unite sul bastone: le due braccia girano insieme come un pendolo (lontano dal bersaglio
+      // nel backswing, verso il bersaglio nel finale), il busto ruota con loro, il gomito "di dietro" si piega.
+      const swing = back * 2.5 - thru * 2.65;
+      p.raiseL += swing; p.raiseR -= swing;
+      p.armL += (back + thru) * 0.1; p.armR += (back + thru) * 0.1;
+      p.turn = -back * 1.05 + thru * 1.2;
+      p.elbowL += back * 1.3; p.elbowR += thru * 1.3;
+      p.wristFlexR = -(back + thru) * 0.2;
+      p.lean += thru * 0.35;
+      p.kneeL -= thru * 0.45; p.legL += thru * 0.2; p.kneeR -= back * 0.2;
+      break;
+    }
+    case 'grind':
+      // Vela: chino sulle manovelle, braccia che girano.
+      plant(); p.lean = -0.55; p.kneeL = p.kneeR = -0.5; p.legL = p.legR = 0.3; p.legSpread = 0.12;
+      p.armL = 1.3 + Math.sin(time * 9) * 0.45; p.armR = 1.3 + Math.sin(time * 9 + Math.PI) * 0.45;
+      p.elbowL = p.elbowR = 0.7; p.raiseL = p.raiseR = -0.25; break;
+    case 'putt': {
+      address(true);
+      // Pendolo delle spalle: le mani vanno indietro lungo la linea e poi attraversano la palla.
+      const k = curve(u, [[0, 0], [0.3, 1], [0.42, 0], [0.7, -0.85], [1, -0.7]]) * 0.2;
+      p.raiseL += k; p.raiseR -= k; p.turn = -k * 0.5;
+      break;
+    }
     // ---- spettatori dei momenti segreti
     case 'hug':
       // Da dietro e un po' di lato, braccia attorno alla vita di lei, dondolando piano.
@@ -194,6 +237,31 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
   return p;
 }
 
+/** Pedalata: anca sopra la sella, piedi sui pedali che girano attorno al movimento centrale. */
+function ride(p: MotionPose, a: Actor, pose: Pose, time: number): MotionPose {
+  const sprint = pose === 'sprint', joy = pose === 'celebrate';
+  // Fuori sella nello scatto il corpo sale e scende a ogni pedalata; seduti, solo un filo di dondolio.
+  p.lift = sprint ? 0.12 + Math.abs(Math.sin(a.runPhase)) * 0.025 : 0;
+  p.lean = sprint ? -0.55 : joy ? -0.2 : pose === 'dejected' ? -0.9 : -0.78;
+  p.legSwing = p.strideSide = 0; p.legSpread = 0.05; p.bodyWeight = 0;
+  p.tiltSide = -Math.sin(a.runPhase) * (sprint ? 0.07 : 0.02); p.turn = 0;
+  const hipY = 0.92 + p.lift;
+  for (const side of [0, 1]) {
+    // Bici verso +x: in alto il pedale va avanti, come le ruote (angolo che decresce = senso orario visto da destra).
+    const angle = -a.runPhase + side * Math.PI;
+    const dx = 0.16 + Math.cos(angle) * 0.17, dy = 0.3 + Math.sin(angle) * 0.17 - hipY;
+    const dist = clamp(Math.hypot(dx, dy), 0.25, 0.86), L1 = 0.43, L2 = 0.44;
+    const thigh = Math.atan2(dx, -dy) + Math.acos(clamp((L1 * L1 + dist * dist - L2 * L2) / (2 * L1 * dist), -1, 1));
+    const knee = -(Math.PI - Math.acos(clamp((L1 * L1 + L2 * L2 - dist * dist) / (2 * L1 * L2), -1, 1)));
+    if (side) { p.legR = thigh; p.kneeR = knee; } else { p.legL = thigh; p.kneeL = knee; }
+  }
+  // Mani sul manubrio; nell'esultanza le braccia al cielo.
+  p.armL = p.armR = sprint ? 1.25 : 1.45; p.elbowL = p.elbowR = 0.25; p.raiseL = p.raiseR = -0.04;
+  if (joy) { p.armL = p.armR = 0; p.raiseL = p.raiseR = 2.6 + Math.sin(time * 8) * 0.1; p.elbowL = p.elbowR = 0.15; }
+  p.headUp = 0.02;
+  return p;
+}
+
 export function actorMotion(a: Actor, time: number, carrying = false): MotionPose {
   const pose = samplePose(a, time, a.pose, a.poseTime, a.poseDur, carrying);
   const blend = ease(a.poseBlendTime / CONFIG.visuals.poseBlendSec);
@@ -217,7 +285,8 @@ export function netContactPoint(a: Actor, time: number, poseTime = a.poseTime) {
   const p = samplePose(a, time, a.pose, poseTime, a.poseDur);
   const hand = (side: number) => {
     const right = side < 0;
-    const point = new THREE.Vector3(0, SPORT === 'tennis' ? -0.57 : -0.04, 0);
+    // Racchetta, testa del bastone da golf, o il palmo.
+    const point = new THREE.Vector3(0, SPORT === 'tennis' ? -0.57 : SPORT === 'golf' ? -0.98 : -0.04, 0);
     point.applyEuler(new THREE.Euler(0, right ? p.wristR : p.wristL, right ? p.wristFlexR : p.wristFlexL));
     point.y -= 0.27;
     point.applyAxisAngle(new THREE.Vector3(0, 0, 1), right ? p.elbowR : p.elbowL);
