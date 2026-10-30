@@ -20,9 +20,9 @@ GAME_Y = 440            # il gioco (1080x1350) va da qui a 1790; sopra il titolo
 HEAD_Y, TAG_POS = 130, (24, GAME_Y + 86)
 # (scena, tratti di fotogrammi registrati (da, a, passo)): passo 3 = tre volte più veloce (il volo della buca in uno).
 # Totale con il finale ≈ 50 s.
-SCENES = [('d1-calcio-drone', [(0, 155, 1)]), ('d2-golf-drone', [(15, 195, 1)]), ('d3-ciclismo-aquila', [(10, 210, 1)]),
-          ('x1-proposta', [(0, 222, 1)]), ('x2-bacio', [(0, 135, 1)]), ('x3-mascotte', [(0, 165, 1)]),
-          ('x4-stella', [(0, 115, 1)]), ('x5-golf-ace', [(0, 45, 1), (45, 170, 3), (170, 248, 1)])]
+SCENES = [('c1-basket-camera', [(10, 165, 1)]), ('d1-calcio-drone', [(0, 155, 1)]), ('c2-boxe-camera', [(0, 160, 1)]),
+          ('d2-golf-drone', [(15, 170, 1)]), ('d3-ciclismo-aquila', [(10, 160, 1)]), ('x1-proposta', [(20, 200, 1)]),
+          ('x2-bacio', [(0, 135, 1)]), ('x4-stella', [(0, 115, 1)]), ('x5-golf-ace', [(0, 45, 1), (45, 170, 3), (170, 248, 1)])]
 END_SEC = 5
 
 
