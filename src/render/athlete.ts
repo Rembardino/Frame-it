@@ -18,9 +18,11 @@ export interface Athlete {
   /** Ciclisti: la bici (va sul gruppo radice, non sul corpo) e le pedivelle che girano. */
   bike?: { group: THREE.Group; crank: THREE.Object3D };
 }
-const SKIN = [0xe8b58d, 0xba8059, 0x805139, 0xd59b74, 0x593b2e];
-const HAIR = [0x241c19, 0x4a3022, 0x171a23, 0x9b6b38];
-const surface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0 });
+const SKIN = [0xe8b58d, 0xba8059, 0x805139, 0xd59b74, 0x593b2e, 0xf0c9a6, 0x6e4530];
+const HAIR = [0x241c19, 0x4a3022, 0x171a23, 0x9b6b38, 0xd8b56a, 0x2b2b2e];
+/** Scarpe: ogni giocatore sceglie le sue, come nel calcio di oggi. */
+const SHOES = [0xf4efdb, 0x20273a, 0xff5a1f, 0x3ddc84, 0xffe14a, 0x1fa7ff, 0xff3b9a, 0xf4efdb];
+const surface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0 });
 /** Bocca chiusa = una linea sottile; scalandola in altezza si apre (vedi render/actors.ts). */
 const mouthGeometry = new THREE.SphereGeometry(1, 10, 6).scale(0.008, 0.006, 0.021);
 const mouthMaterial = new THREE.MeshStandardMaterial({ color: 0x4a1d1f, roughness: 0.7 });
@@ -144,36 +146,53 @@ export function createAthlete(actor: Actor): Athlete {
   /** I golfisti hanno i pantaloni lunghi. */
   const legSkin = golfer ? kit.shorts : limbSkin;
   const accent = actor.team === 0 ? 0xf3f6ff : 0xffddb0;
+  /** Dettagli della divisa: capitano, barba, maglia a strisce (seconda squadra di calcio e basket). */
+  const captain = player && !boxer && actor.id % 7 === 3;
+  const beard = !costume && look !== 'mascot' && actor.id % 4 === 1;
+  const bald = !costume && look !== 'mascot' && actor.id % 11 === 5;
+  const striped = player && !boxer && !golfer && !rider && !sailor && actor.team === 1 && (SPORT === 'calcio' || SPORT === 'basket');
   const body = new THREE.Group(), torso = new THREE.Group(); torso.position.y = 1.04; body.add(torso);
   body.add(mesh([
     slab(kit.shorts, [0, 0.97, 0], [0.235, 0.18, 0.335]),
     slab(boxer ? 0xf6f2e8 : accent, [0, 1.035, 0], [0.237, 0.025, 0.338]),
+    // Striscia laterale sui pantaloncini.
+    ...(player && !boxer ? [-1, 1].map((side): Part => slab(accent, [0, 0.95, side * 0.168], [0.02, 0.13, 0.004])) : []),
   ], true));
   const trunk: Part[] = [shaped(chest, boxer ? skin : kit.shirt, [0, 0, 0]), band(skin, [0, 0.6, 0], [0.052, 0.12, 0.057])];
   if (!boxer) {
     trunk.push(band(accent, [0, 0.54, 0], [0.071, 0.017, 0.078]));
+    // Colletto a V.
+    if (!sleeveless) trunk.push(slab(accent, [0.125, 0.49, 0.04], [0.006, 0.07, 0.012]), slab(accent, [0.125, 0.49, -0.04], [0.006, 0.07, 0.012]));
     for (const side of [-1, 1]) {
       trunk.push(slab(accent, [0, 0.27, side * 0.197], [0.04, 0.24, 0.018]));
-      if (!sleeveless) trunk.push(section(kit.shirt, [0, 0.425, side * 0.23], [0.079, 0.14, 0.071]));
+      if (!sleeveless) {
+        trunk.push(section(kit.shirt, [0, 0.425, side * 0.23], [0.079, 0.14, 0.071]));
+        trunk.push(band(accent, [0, 0.358, side * 0.23], [0.041, 0.016, 0.037]));
+      }
     }
+    if (striped) for (const z of [-0.085, 0, 0.085]) trunk.push(slab(kit.shorts === kit.shirt ? accent : kit.shorts, [0.132, 0.3, z], [0.006, 0.42, 0.032]));
     trunk.push(slab(accent, [0.139, 0.37, 0.088], [0.005, 0.043, 0.031]));
+    // Logo dello sponsor sul petto e stemma.
+    if (player) trunk.push(slab(0xf7f3e8, [0.14, 0.2, 0], [0.004, 0.035, 0.12]), slab(0xffd23f, [0.139, 0.37, -0.088], [0.005, 0.03, 0.03]));
   }
   torso.add(mesh(trunk, true));
   if (player && !boxer && !golfer) torso.add(jerseyNumber(actor.id % 99 + 1));
   if (SPORT === 'golf' && actor.role === 'coach') torso.add(golfBag(team.shirt));
 
   const head = new THREE.Group(); head.position.y = 0.74;
-  const face: Part[] = [shaped(skull, skin, [0, 0, 0]), shaped(hairCap, hair, [-0.008, 0, 0]),
+  const face: Part[] = [shaped(skull, skin, [0, 0, 0]),
     shaped(nose, skin, [0.128, 0, 0]),
     oval(skin, [-0.01, -0.005, 0.112], [0.015, 0.03, 0.018]),
     oval(skin, [-0.01, -0.005, -0.112], [0.015, 0.03, 0.018]),
   ];
+  if (!bald) face.push(shaped(hairCap, hair, [-0.008, 0, 0]));
   for (const side of [-1, 1]) {
     face.push(oval(0xf3eee0, [0.12, 0.016, side * 0.047], [0.004, 0.007, 0.011]));
     face.push(oval(0x28252b, [0.124, 0.017, side * 0.046], [0.002, 0.005, 0.005]));
     face.push(slab(hair, [0.119, 0.042, side * 0.047], [0.006, 0.007, 0.025]));
   }
-  if (actor.id % 3 === 0) face.push({ geometry: hairCap, color: hair, at: [-0.012, 0.012, 0], size: [1, 1.1, 1] });
+  if (beard) face.push(oval(hair, [0.075, -0.1, 0], [0.055, 0.045, 0.082]));
+  if (actor.id % 3 === 0 && !bald) face.push({ geometry: hairCap, color: hair, at: [-0.012, 0.012, 0], size: [1, 1.1, 1] });
   if (SPORT === 'tennis' && player) face.push(band(0xf5f2e9, [0, 0.049, 0], [0.121, 0.022, 0.114]));
   if (SPORT === 'pallavolo' && player && actor.id % 2 === 0) face.push(section(hair, [-0.135, 0.015, 0], [0.029, 0.18, 0.035]));
   if (golfer) face.push({ geometry: hairCap, color: team.shorts, at: [-0.004, 0.022, 0], size: [1.07, 1, 1.07] }, slab(team.shorts, [0.13, 0.072, 0], [0.1, 0.012, 0.15]));
@@ -195,15 +214,20 @@ export function createAthlete(actor: Actor): Athlete {
     ], true));
     const knee = new THREE.Group(); knee.position.y = -0.43;
     const highSock = SPORT === 'calcio' || boxer || extra || actor.role === 'ref';
-    const shoe = player ? (actor.team === 0 ? 0xf4efdb : 0x20273a) : 0x20273a;
+    const shoe = player ? SHOES[(actor.id * 5 + actor.team) % SHOES.length] : 0x20273a;
     const lower: Part[] = [
       oval(legSkin, [0, 0, 0], [0.05, 0.052, 0.058]),
       section(legSkin, [0, -0.2, 0], [0.056, 0.4, 0.06]),
       section(kit.socks, [0, highSock ? -0.245 : -0.35, 0], [0.048, highSock ? 0.29 : 0.08, 0.055]),
+      // Bordo del calzettone e, nel calcio, il parastinchi che gonfia la calza davanti.
+      band(accent, [0, highSock ? -0.105 : -0.315, 0], [0.05, 0.018, 0.057]),
       shaped(shoeShape, shoe, [0.054, -0.41, 0]),
       { geometry: shoeShape, color: 0xdce2ea, at: [0.054, -0.449, 0], size: [1.02, 0.25, 1.04] },
       slab(accent, [0.072, -0.399, side * 0.066], [0.1, 0.014, 0.004]),
+      // Lacci.
+      slab(0xf2f2f2, [0.09, -0.372, 0], [0.05, 0.004, 0.028]),
     ];
+    if (SPORT === 'calcio' && player) lower.push(section(kit.socks, [0.03, -0.24, 0], [0.04, 0.2, 0.05]));
     if (SPORT === 'pallavolo' && player) lower.push(slab(kit.shorts, [0.036, -0.012, 0], [0.063, 0.087, 0.112]));
     knee.add(mesh(lower)); root.add(knee); body.add(root); return { root, knee };
   };
@@ -211,6 +235,7 @@ export function createAthlete(actor: Actor): Athlete {
     const root = new THREE.Group(); root.position.set(0, 0.5, side * 0.238);
     const upper: Part[] = [section(limbSkin, [0, -0.15, 0], [0.05, 0.3, 0.056])];
     if (!sleeveless) upper.push(section(kit.shirt, [0, -0.042, 0], [0.059, 0.13, 0.063]));
+    if (captain && side > 0) upper.push(band(0xffd23f, [0, -0.1, 0], [0.056, 0.035, 0.062]));
     root.add(mesh(upper));
     const elbow = new THREE.Group(); elbow.position.y = -0.3;
     const lower: Part[] = [oval(limbSkin, [0, 0, 0], [0.036, 0.043, 0.041]), section(limbSkin, [0, -0.14, 0], [0.041, 0.28, 0.046])];

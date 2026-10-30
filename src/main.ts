@@ -8,6 +8,7 @@ import { createStage } from './render/stage';
 import { ActorViews } from './render/actors';
 import { Crowd, type CrowdState } from './render/crowd';
 import { SkyEffects } from './render/skyEffects';
+import { Effects } from './render/effects';
 import { Match } from './sim/match';
 import { Director, type DirectorResult } from './events/director';
 import { SecretMoments } from './events/secrets';
@@ -70,6 +71,8 @@ const secrets = new SecretMoments(match, stage.seatRows, params.get('secret'));
 const views = new ActorViews(stage.scene, match);
 const crowd = new Crowd(stage.scene, stage.seatRows);
 const sky = new SkyEffects(stage.scene, match);
+// Zolle, polvere, sudore, coriandoli e scia della palla: seguono le stesse cue dell'audio.
+const effects = DRONE_ONLY ? null : new Effects(stage.scene, stage.renderer, stage.camera, match, views);
 const cam = new CameraController(stage.camera, stage.renderer.domElement);
 // Golf, ciclismo e vela: si riprende solo col drone, che parte già in volo.
 const golf = SPORT === 'golf' ? match.sportSimulation as GolfSimulation : null;
@@ -586,6 +589,7 @@ stage.renderer.setAnimationLoop((now) => {
       setCamera(replay.angle(st.a, st.b, st.u, c));
       drone.syncPilot();
       views.update(dt * replay.speed);
+      effects?.update(dt * replay.speed);
       crowd.update(dt * replay.speed, crowdState(world), secrets.gaps);
       sky.update();
       $('rp-speed').textContent = `x${replay.speed}`;
@@ -618,6 +622,7 @@ stage.renderer.setAnimationLoop((now) => {
   }
 
   if (golf && running) announceHole(golf);
+  effects?.handle(match.cues);
   audio.handle(match.cues, match);
   audio.update(view, match.excitement, drone.airborne);
   // Il regista parla: stessa battuta dei sottotitoli.
@@ -627,6 +632,7 @@ stage.renderer.setAnimationLoop((now) => {
   }
 
   views.update(dt);
+  effects?.update(dt);
   crowd.update(dt, crowdState(worldNow()), secrets.gaps);
   sky.update();
   hud.update(dt, cam, match, voice, ended);

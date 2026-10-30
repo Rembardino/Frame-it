@@ -73,3 +73,7 @@ I test coprono tutti e cinque gli sport. Per boxe, tennis e pallavolo eseguono a
 Le pubblicità Android sono **attive** con gli ID AdMob di Frame It: banner nel menu iniziale e durante i replay delle azioni, interstitial dopo ciascuna partita se disponibile e consentito. Le sessioni di sviluppo usano unità di test. L’avviso di una nuova versione usa Google Play e compare nel menu; il controllo non blocca il gioco offline. Configurazione e limiti delle verifiche: [docs/mobile-services.md](docs/mobile-services.md). Piano: [docs/mobile-features-plan.md](docs/mobile-features-plan.md).
 
 Le configurazioni sono in `src/config.ts`. Le simulazioni dei nuovi sport sono separate in `src/sim/sports/`; i copioni sono in `src/events/racketAndRing.ts` e i campi in `src/render/sportCourts.ts`.
+
+## Resa grafica
+
+Scena serale da stadio, tutta procedurale: fari incrociati con ombre morbide e coni di luce nella foschia, erba con taglio incrociato e usura, parquet lucido, tribune a settori con scale e parapetti, cartelloni LED che scorrono, maxischermo col punteggio. Il pubblico si siede e si alza con l'eccitazione, fa l'ola, sventola bandiere e scatta foto; gli atleti hanno divise più dettagliate e scarpe personali. Le azioni lasciano traccia: zolle sui calci e sulle scivolate, terra rossa sui rimbalzi, sudore sui pugni, coriandoli al gol, scia e schiacciamento della palla (`src/render/effects.ts`). Piano e risultati: [docs/visual-plan.md](docs/visual-plan.md).
