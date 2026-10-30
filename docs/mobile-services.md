@@ -12,6 +12,8 @@ Android usa `expo-sensors` DeviceMotion a circa 30 Hz e invia le rotazioni al gi
 
 ## Pubblicità: attive dal 9 ottobre 2026
 
+Il contenitore Android resta bloccato in orizzontale. La WebView e lo sfondo del menu occupano tutta la larghezza: gli inset laterali della fotocamera non aggiungono una fascia vuota al gioco. Gli inset vengono trasmessi al CSS per proteggere solo comandi e contenuti; il banner resta sotto la WebView, con la propria area sicura. Chiusura ed errore di visualizzazione dell'interstitial ripristinano le barre di sistema nascoste prima di riprendere il gioco in primo piano.
+
 `mobile/app.json` → `extra.frameit.ads` contiene `enabled: true` e `testAds: false`, con gli ID forniti per Frame It:
 
 - App Android: `ca-app-pub-6724714927747840~8863376926`.
@@ -36,6 +38,8 @@ Il flusso UMP segue FF: prima raccoglie il consenso, recupera il risultato UMP s
 
 Il banner è montato nel menu iniziale e durante i replay delle azioni della partita quando l’app è in primo piano. Alla fine o al salto del replay viene rimosso. Non compare nel tutorial, nell’album, durante il gioco in diretta o nei risultati. I messaggi `replay-active` non cambiano la sessione della partita e non riarmano l’interstitial. L’interstitial viene precaricato durante ogni partita e ha una sola opportunità di visualizzazione al termine, dopo la chiusura delle valutazioni. A chiusura dell’annuncio il giocatore vede il riepilogo già preparato. Se non è pronto, manca consenso/rete, l’app è in background o l’SDK fallisce, il riepilogo rimane disponibile: nessuna attesa e nessun annuncio tardivo nella partita successiva. Nessun loop di retry né rewarded ad.
 
+Abbandonare una partita elimina l'interstitial precaricato. Gli eventi e gli errori asincroni di un annuncio precedente non possono eliminare quello della partita successiva. Il messaggio di apertura del riepilogo mantiene invece attivo l'annuncio già in visualizzazione fino alla sua chiusura.
+
 La versione di `react-native-google-mobile-ads` è fissata a **16.3.4**, come quella verificata nel riferimento FF, per evitare aggiornamenti automatici della dipendenza Android con Kotlin incompatibile. Google Play richiederà le dichiarazioni appropriate per gli SDK effettivamente inclusi/attivati prima della pubblicazione; le bozze legali esistenti restano da completare.
 
 ## Nuova versione disponibile
@@ -51,5 +55,7 @@ Comandi nella radice: `npm run check`, `npm run check:motion`, `npm run check:i1
 Comandi in `mobile/`: `npm run bundle:game`, `npx expo install --check`, `npx expo export --platform android`, `npx expo config --type introspect --json`.
 
 Le verifiche browser usano il sensore e il ponte nativo simulati. I test degli annunci eseguono il gestore reale con un SDK controllato. Export e introspezione controllano bundle e configurazione, senza compilare un AAB o pubblicare l’app. Sensibilità e assi del giroscopio sul telefono, form UMP, fill degli annunci e installazione di un aggiornamento Play richiedono ancora una prova su Android reale. Nessuna build cloud viene lanciata da questi controlli.
+
+`check:native` copre anche partite abbandonate, messaggi duplicati, errori tardivi, inizializzazione SDK ritardata e chiusura senza callback dopo lo smontaggio. `check:mobile` collega i messaggi della partita al gestore reale con SDK controllato, verifica una sola visualizzazione al termine e il ritorno al riepilogo, e controlla menu e comandi in landscape con banner e fotocamera simulata su entrambi i lati.
 
 Fonti tecniche: [Expo DeviceMotion](https://docs.expo.dev/versions/latest/sdk/devicemotion/), [AdMob: consenso europeo](https://docs.page/invertase/react-native-google-mobile-ads/european-user-consent), [AdMob: formati](https://docs.page/invertase/react-native-google-mobile-ads/ad-formats), [Expo In-App Updates](https://github.com/SohelIslamImran/expo-in-app-updates).

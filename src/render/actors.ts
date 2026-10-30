@@ -14,7 +14,10 @@ export class ActorViews {
   readonly group = new THREE.Group();
   private views: PlayerView[] = [];
   private ball: THREE.Mesh;
+  /** Il pivot porta posizione e schiacciamento; la palla dentro ruota su se stessa. */
+  private ballPivot = new THREE.Group();
   private ballShadow: THREE.Mesh;
+  private squash = 0;
 
   constructor(scene: THREE.Scene, private match: Match) {
     scene.add(this.group);
@@ -27,18 +30,24 @@ export class ActorViews {
       const shadow = new THREE.Mesh(shadowGeo, shadowMat);
       this.group.add(root, shadow); this.views.push({ actor, root, ...athlete, shadow });
     }
-    this.ball = createBall(); this.ball.castShadow = true;
-    this.ballShadow = new THREE.Mesh(shadowGeo, shadowMat); this.group.add(this.ball, this.ballShadow);
-    this.ball.visible = this.ballShadow.visible = SPORT !== 'boxe';
+    this.ball = createBall(); this.ball.castShadow = true; this.ballPivot.add(this.ball);
+    this.ballShadow = new THREE.Mesh(shadowGeo, shadowMat); this.group.add(this.ballPivot, this.ballShadow);
+    this.ballPivot.visible = this.ballShadow.visible = SPORT !== 'boxe';
   }
 
-  update(_dt: number) {
+  /** La palla tocca terra: si schiaccia un istante e torna tonda. */
+  bounce() { this.squash = 1; }
+
+  update(dt: number) {
     for (const view of this.views) {
       view.root.visible = view.shadow.visible = view.actor.active;
       if (view.actor.active) this.apply(view);
     }
     const b = this.match.ball;
-    this.ball.position.copy(b.pos); this.ball.rotation.set(0, 0, -b.spin);
+    this.ballPivot.position.copy(b.pos); this.ball.rotation.set(0, 0, -b.spin);
+    this.squash = Math.max(0, this.squash - dt * 9);
+    const s = Math.sin(this.squash * Math.PI) * 0.28;
+    this.ballPivot.scale.set(1 + s * 0.6, 1 - s, 1 + s * 0.6);
     this.ballShadow.position.set(b.pos.x, 0.015, b.pos.z);
     // Palla in buca o in acqua: niente ombra.
     this.ballShadow.visible = SPORT !== 'boxe' && b.pos.y > 0;

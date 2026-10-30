@@ -171,7 +171,7 @@ export class EventInstance {
       case 'shoot': {
         const a = role(s.who);
         if (m.ball.holder !== a) return false;
-        const outcome = this.director.resolveOutcome(s.outcome, this.attack);
+        const outcome = this.director.resolveOutcome(s.outcome, this.attack, s.goalChance);
         m.shoot(a, outcome);
         this.label = this.def.outcomeLabels?.[outcome] ?? this.def.label;
         return true;
@@ -305,6 +305,8 @@ export class Director {
     const dur = CONFIG.match.durationSec;
     // ?rare nel golf: la buca in uno al primo par 3.
     this.rareAt = opts.forceRare ? (SPORT === 'golf' ? 0 : 20) : Math.random() < r.chancePerMatch ? rand(r.window[0], r.window[1]) * dur : Infinity;
+    // Anche i tiri decisi dalla partita (angoli, battute senza copione) rispettano il punteggio.
+    match.resolveOutcome = (requested, attack, goalChance) => this.resolveOutcome(requested, attack, goalChance);
   }
 
   crowdLookUpFor(sec: number) {
@@ -314,7 +316,10 @@ export class Director {
   update(dt: number, view: View) {
     const m = this.match;
     const now = m.time;
-    for (const e of m.events.splice(0)) if (e.type === 'goal') this.trigger('goal', e.scorer);
+    for (const e of m.events.splice(0)) {
+      if (e.type === 'goal') this.trigger('goal', e.scorer);
+      else this.trigger(e.kind, e.taker);
+    }
     this.crowdHot.level = Math.max(0, this.crowdHot.level - dt * 0.35);
     this.lookUpTimer -= dt;
     this.crowdLookUp = Math.min(1, Math.max(0, this.crowdLookUp + (this.lookUpTimer > 0 ? 2.5 : -1.5) * dt));
@@ -341,14 +346,16 @@ export class Director {
     this.pendingDilemma = null;
   }
 
-  /** Esito di un tiro coerente col punteggio: chi è già avanti di maxGoalLead non segna più. */
-  resolveOutcome(requested: ShotOutcome | undefined, attack: TeamId): ShotOutcome {
+  /** Esito di un tiro coerente col punteggio: chi è già avanti di maxGoalLead non segna più.
+   *  goalChance = probabilità di gol di base dell'azione (rigore: alta), altrimenti quella del Director. */
+  resolveOutcome(requested: ShotOutcome | undefined, attack: TeamId, goalChance?: number): ShotOutcome {
     const lead = this.match.score[attack] - this.match.score[1 - attack];
     const goals = this.match.score[0] + this.match.score[1];
     const c = D();
     if (requested === 'goal') return lead >= c.maxGoalLead || goals >= c.goalBudget + 2 ? 'save' : 'goal';
     if (requested) return requested;
-    const pGoal = lead >= c.maxGoalLead || goals >= c.goalBudget ? 0 : c.goalChance + (lead < 0 ? 0.15 : 0);
+    const base = goalChance ?? c.goalChance;
+    const pGoal = lead >= c.maxGoalLead || goals >= c.goalBudget ? base * 0.15 : base + (lead < 0 ? 0.15 : 0);
     const r = Math.random();
     return r < pGoal ? 'goal' : r < pGoal + (1 - pGoal) * 0.6 ? 'save' : 'wide';
   }
@@ -415,8 +422,8 @@ export class Director {
     }
   }
 
-  private trigger(kind: 'goal', scorer: Actor) {
-    for (const def of this.library) if (def.trigger === kind) this.start(def, scorer);
+  private trigger(kind: NonNullable<EventDef['trigger']>, actor: Actor) {
+    for (const def of this.library) if (def.trigger === kind) this.start(def, actor);
   }
 
   private pick(category: Category, filter: (d: EventDef) => boolean = () => true): EventDef | null {
@@ -467,7 +474,7 @@ export class Director {
       let a: Actor | null = null;
       switch (r.pick) {
         case 'holder': a = b.holder; break;
-        case 'scorer': a = scorer; break;
+        case 'scorer': case 'taker': a = scorer; break;
         case 'referee': a = free(m.referee) ? m.referee : null; break;
         case 'coach': a = m.coaches.find((x) => x.team === teamOf(r.side) && free(x)) ?? null; break;
         case 'keeper': a = m.actors.find((x) => x.role === 'gk' && x.team === teamOf(r.side) && !taken.has(x)) ?? null; break;

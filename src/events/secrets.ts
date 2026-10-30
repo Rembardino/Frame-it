@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import { CONFIG, DRONE_ONLY, SPORT, type SportId } from '../config';
-import type { Actor, Match, Pose } from '../sim/match';
+import { UFO, type Actor, type Match, type Pose } from '../sim/match';
 import type { SeatRow } from '../render/stage';
 import { MomentTracker, actorSubject, frameInput } from '../scoring/moment';
 import { project, starsFor, type FrameEval, type ScoreResult, type ShotSize, type View } from '../scoring/scoring';
@@ -43,6 +43,10 @@ interface Plan {
   setup?: (a: Actor[], m: Match) => void;
   /** Copione: [secondi, azione]. */
   steps: [number, (a: Actor[], m: Match) => void][];
+  /** A ogni fotogramma, dopo il copione (t = secondi dalla reazione o dall'inizio). */
+  tick?: (a: Actor[], m: Match, t: number) => void;
+  /** Al massimo una volta a partita. */
+  once?: boolean;
   sports?: SportId[];
 }
 
@@ -64,6 +68,13 @@ const kiss = (m: Match, a: Actor, b: Actor, dur: number) => {
   pose(m, a, 'kiss', dur, b); pose(m, b, 'kiss', dur, a);
   a.poseDir = 1; b.poseDir = -1;
 };
+/** Punto a lato di uno spettatore: avanti = verso dove guarda (il campo), lato = alla sua sinistra, su = sopra i piedi. */
+const near = (a: Actor, ahead: number, side: number, up: number) => {
+  const fx = Math.cos(a.heading), fz = Math.sin(a.heading);
+  return new THREE.Vector3(a.pos.x + fx * ahead - fz * side, a.pos.y + up, a.pos.z + fz * ahead + fx * side);
+};
+/** Cima della testa di uno spettatore (m sopra i piedi). */
+const HEAD_TOP = 1.92 * CONFIG.visuals.spectatorScale;
 /** Camminata lungo il corridoio, nel verso dir. */
 const stroll = (a: Actor, dir: number, dist: number) => {
   a.target.set(a.pos.x + dir * dist, 0, a.pos.z);
@@ -126,6 +137,63 @@ export const PLANS: Plan[] = [
     ],
   },
   {
+    id: 's-ufo', label: 'Rapito dagli alieni!', size: 'medium', reactive: false, once: true, decisive: 6.1, duration: UFO.gone + 0.5,
+    // Allo stadio la tribuna lontana ha il tetto: la navicella prende uno che guarda la partita dal corridoio.
+    cast: { seat: DRONE_ONLY ? 'stand' : 'walkway', count: 1 },
+    // Arriva da dietro le tribune, accende il raggio e se lo porta via (in tribuna il posto resta vuoto).
+    setup: ([a], m) => { Object.assign(m.sky.ufo, { t0: m.time, seat: a.pos.clone(), side: Math.random() < 0.5 ? 1 : -1 }); m.sound('ufo', a.pos); },
+    steps: [
+      [UFO.arrive - 0.8, ([a], m) => pose(m, a, 'stumble', 1.2)],
+      [UFO.beamOn, ([a], m) => m.sound('beam', a.pos)],
+      [UFO.liftFrom, ([a], m) => pose(m, a, 'float', UFO.liftTo - UFO.liftFrom + 0.5)],
+      [UFO.liftTo, ([a], m) => { m.sound('pop', a.pos); m.despawnExtra(a); }],
+    ],
+    // Sale nel raggio girando su se stesso, fino alla pancia della navicella.
+    tick: ([a], m, t) => {
+      const seat = m.sky.ufo.seat!;
+      if (!a.active || t < UFO.liftFrom) return;
+      a.pos.set(seat.x, seat.y + m.ufoPose().lift * (UFO.height - 2.9), seat.z);
+      a.target.copy(a.pos); a.vel.set(0, 0, 0);
+      a.heading = Math.atan2(m.ball.pos.z - seat.z, m.ball.pos.x - seat.x) + 1.2 * (t - UFO.liftFrom) ** 1.6;
+    },
+  },
+  {
+    id: 's-gull', label: 'Gabbiano sulla testa!', size: 'medium', reactive: false, decisive: 4.3, duration: 9,
+    cast: { seat: 'stand', count: 1 },
+    // Arriva basso dal campo (sotto il tetto della tribuna), si posa sulla testa: lui per un po' non se ne accorge, poi lo scaccia.
+    steps: [
+      [0, ([a], m) => {
+        const side = Math.random() < 0.5 ? 1 : -1, head = near(a, 0, 0, HEAD_TOP);
+        m.fauna.spawn('gull', [
+          { p: near(a, 14, side * 6, HEAD_TOP + 1.5), t: 0 }, { p: near(a, 1.2, side * 0.3, HEAD_TOP + 0.35), t: 2.4 },
+          { p: head, t: 2.9 }, { p: head, t: 5.7 }, { p: near(a, 13, -side * 9, HEAD_TOP + 2), t: 8.7 },
+        ], m.time);
+      }],
+      [5.3, ([a], m) => { pose(m, a, 'argue', 2.2); m.say(a, 'shoo'); }],
+    ],
+  },
+  {
+    id: 's-dog', label: 'Cane in fuga!', size: 'medium', reactive: false, decisive: 4.5, duration: 10.5,
+    cast: { seat: 'walkway', count: 1 },
+    // Il cane scappa al padrone lungo il corridoio; lui lo rincorre, inciampa, e il cane torna a fargli le feste.
+    steps: [
+      [0, ([a], m) => {
+        const dir = Math.sign(-a.pos.x) || 1, p = (dx: number, dz = 0) => new THREE.Vector3(a.pos.x + dir * dx, 0, WALKWAY_Z + dz);
+        m.fauna.spawn('dog', [
+          { p: p(0.9), t: 0 }, { p: p(0.9), t: 0.7 }, { p: p(7, 0.5), t: 2 }, { p: p(12, -0.4), t: 3 }, { p: p(15.5), t: 3.8 },
+          { p: p(15.6), t: 5.6 }, { p: p(14.2, 0.6), t: 6.3 }, { p: p(14.3, 0.6), t: 8.2 }, { p: p(32), t: 10.5 },
+        ], m.time);
+        m.sound('bark', p(0.9));
+      }],
+      [0.8, ([a], m) => { pose(m, a, 'protest', 0.7); m.say(a, 'dog'); }],
+      [1.3, ([a]) => { a.target.set(a.pos.x + (Math.sign(-a.pos.x) || 1) * 13, 0, a.pos.z); a.speedLimit = CONFIG.match.runSpeed * 0.75; }],
+      [3.9, ([a], m) => pose(m, a, 'stumble', 0.4)],
+      [4.3, ([a], m) => pose(m, a, 'fall', 2.6)],
+      [5.9, ([a], m) => m.sound('bark', a.pos)],
+      [6.9, ([a], m) => { a.target.copy(a.pos); pose(m, a, 'dejected', 1.8); }],
+    ],
+  },
+  {
     id: 's-mascot', label: 'La mascotte inciampa!', size: 'medium', reactive: false, decisive: 3.95, duration: 8,
     cast: { seat: 'walkway', count: 1, look: 'mascot' }, sports: ['calcio', 'basket'],
     steps: [
@@ -164,6 +232,7 @@ class Secret {
       return;
     }
     while (this.step < p.steps.length && now - this.triggerAt >= p.steps[this.step][0]) p.steps[this.step++][1](this.actors, m);
+    p.tick?.(this.actors, m, now - this.triggerAt);
     if (now >= this.tracker.moment.end) this.done = true;
   }
 
@@ -194,6 +263,7 @@ export class SecretMoments {
   private leaving: { a: Actor; until: number }[] = [];
   private next = S().firstAt;
   private last = '';
+  private used = new Set<string>();
   private stopped = false;
 
   /** force = id di un piano da mettere in scena per primo, dopo 5 secondi (per provarlo: ?secret=s-couple). */
@@ -205,7 +275,9 @@ export class SecretMoments {
 
   /** Posti in tribuna occupati dagli spettatori dei momenti segreti (il pubblico finto lì si toglie). */
   get gaps(): THREE.Vector3[] {
-    return this.match.extras.filter((e) => e.role === 'spectator' && e.active && e.pos.y > 0.2).map((e) => e.pos);
+    // Chi è salito sulla navicella non torna: il suo posto resta vuoto.
+    const taken = this.match.sky.ufo.seat;
+    return [...this.match.extras.filter((e) => e.role === 'spectator' && e.active && e.pos.y > 0.2).map((e) => e.pos), ...(taken && taken.y > 0.2 ? [taken] : [])];
   }
 
   update(view: View) {
@@ -225,13 +297,14 @@ export class SecretMoments {
     if (this.stopped || this.active.length || now < this.next) return;
     this.next = now + rand(S().every[0], S().every[1]);
     // Negli sport col drone non c'è il corridoio a bordo campo: solo le tribune (green, paese, arrivo, molo).
-    const options = PLANS.filter((p) => p.id !== this.last && (!p.sports || p.sports.includes(SPORT)) && (!DRONE_ONLY || p.cast.seat === 'stand'));
+    const options = PLANS.filter((p) => p.id !== this.last && !(p.once && this.used.has(p.id)) && (!p.sports || p.sports.includes(SPORT)) && (!DRONE_ONLY || p.cast.seat === 'stand'));
     const forced = PLANS.find((p) => p.id === this.force);
     this.force = null;
     const plan = forced ?? options[Math.floor(Math.random() * options.length)];
     const actors = this.cast(plan.cast);
     if (!actors) return;
     this.last = plan.id;
+    this.used.add(plan.id);
     this.active.push(new Secret(plan, actors, this.match, now));
   }
 

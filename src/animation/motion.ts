@@ -156,6 +156,7 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
       plant(); p.legSpread = 0.2; p.legL = p.legR = 0.25; p.kneeL = p.kneeR = -0.65;
       p.lean = -0.22; p.raiseL = p.raiseR = 0.65; break;
     case 'stumble': p.tiltSide = wiggle(10) * 0.24; p.lean = -0.3 + wiggle(7) * 0.12; p.raiseL = 1.4 + wiggle(12) * 0.4; p.raiseR = 1.4 + wiggle(12, 1.5) * 0.4; break;
+    case 'float': p.tiltSide = wiggle(5) * 0.25; p.lean = wiggle(3) * 0.2; p.raiseL = 2.2 + wiggle(11) * 0.5; p.raiseR = 2.2 + wiggle(11, 1.5) * 0.5; p.legSwing = wiggle(9) * 0.6; break;
     case 'protest': p.armL = p.armR = 1.45 + wiggle(5) * 0.12; p.elbowL = p.elbowR = 0.25; p.raiseL = p.raiseR = 0.25; p.lean = 0.06; break;
     case 'argue': p.armR = 1.2 + wiggle(9) * 0.25; p.elbowR = 0.3; p.raiseL = 0.4; p.armL = -0.2; p.lean = -0.1 + wiggle(6) * 0.06; break;
     case 'shove': p.armL = p.armR = 0.9 + 0.7 * jump; p.elbowL = p.elbowR = 0.8 - jump * 0.7; p.lean = -0.25 * jump; break;

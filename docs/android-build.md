@@ -12,7 +12,7 @@ Lingua predefinita inglese, selettore English / Italiano / Español / Français 
 2. Dentro `mobile/`: `npm ci`, `npm run bundle:game`, `npx expo install --check`, `npx expo-doctor`.
 3. Verificare il bundle: `npx expo export --platform android`.
 4. Verificare accesso e progetto: `npx eas-cli@24.11.0 whoami`, `npx eas-cli@24.11.0 project:info`.
-5. AAB: `npm run build:aab`. Profilo `production`, versione app 1.0.8, versionCode incrementato da EAS, firma gestita da EAS.
+5. AAB: `npm run build:aab`. Profilo `production`, versione app 1.0.9, versionCode incrementato da EAS, firma gestita da EAS.
 6. APK installabile per prove su dispositivo: `npx eas-cli@24.11.0 build --platform android --profile preview`.
 
 `scripts/bundle-mobile.mjs` compila il gioco in IIFE e inserisce CSS e JS nell'HTML. Il risultato è `mobile/generated/game.js`, rigenerabile e ignorato da Git. L'hook EAS `eas-build-post-install` installa le dipendenze web dal lockfile e rigenera il gioco sul server prima del bundle nativo.

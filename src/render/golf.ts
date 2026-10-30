@@ -10,7 +10,7 @@ import { CONFIG } from '../config';
 import { CLUBHOUSE, COURSE, LAKE_BANK, LAKE_POLY, PATHS, TREES } from '../sim/sports/golfCourse';
 import type { Match } from '../sim/match';
 import { radialTexture, stadiumSeats, type SeatRow } from './stage';
-import { Ribbon, canvasTexture, createOutdoor, forest, layer, surfaceMaterial as mat, textCanvas, turf } from './outdoor';
+import { Ribbon, canvasTexture, createOutdoor, forest, groundLayer, layer, surfaceMaterial as mat, textCanvas, turf } from './outdoor';
 import { t } from '../i18n';
 
 export function golfCourse(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
@@ -36,13 +36,13 @@ export function golfCourse(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
 
   // ---------------------------------------------------------------- bandiere, buche, tee
   const white = new THREE.MeshStandardMaterial({ color: 0xf7f7f2, roughness: 0.5 });
-  const cupMat = new THREE.MeshBasicMaterial({ color: 0x1b2416, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -16 });
+  const cupMat = new THREE.MeshBasicMaterial({ color: 0x1b2416 });
   const flags: THREE.Object3D[] = [];
   for (const h of holes) {
     const [px, pz] = h.pin;
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.4, 6).translate(0, 1.2, 0), white);
     pole.position.set(px, 0, pz); pole.castShadow = true;
-    const cup = new THREE.Mesh(new THREE.CircleGeometry(0.16, 20).rotateX(-Math.PI / 2), cupMat);
+    const cup = groundLayer(new THREE.Mesh(new THREE.CircleGeometry(0.16, 20).rotateX(-Math.PI / 2), cupMat), 9);
     cup.position.set(px, 0.003, pz);
     const tex = canvasTexture(textCanvas(128, 96, (g) => {
       g.fillStyle = '#ffd23f'; g.fillRect(0, 0, 128, 96);

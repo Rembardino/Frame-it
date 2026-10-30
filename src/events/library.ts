@@ -3,7 +3,7 @@
  * Per aggiungere un evento copia uno di questi oggetti e cambia ruoli, tempi e inquadrature
  * (formato spiegato in types.ts). Tempi in secondi dall'inizio dell'evento, distanze in metri.
  */
-import { SPORT } from '../config';
+import { CONFIG, SPORT } from '../config';
 import { BASKET } from './basket';
 import { BOXING, BOXING_INVASION, TENNIS, VOLLEYBALL, sideEvents } from './racketAndRing';
 import { GOLF_EVENTS } from './golf';
@@ -175,6 +175,70 @@ const CALCIO: EventDef[] = [
     decisive: 2.0,
     duration: 3.6,
     shots: [{ from: 0, size: 'close', subjects: ['scorer'] }],
+  },
+  // ---------------------------------------------------------------- CALCI PIAZZATI (li mette in scena la partita, dopo i falli e i palloni usciti)
+  {
+    id: 'rigore',
+    label: 'Rigore',
+    outcomeLabels: { goal: 'Rigore: gol!', save: 'Rigore parato!', wide: 'Rigore sbagliato!' },
+    category: 'main',
+    hint: 'Rigore! Dischetto e portiere.',
+    weight: 0,
+    importance: 1,
+    trigger: 'penalty',
+    roles: { taker: { label: 'Rigorista', pick: 'taker' }, keeper: keeper() },
+    // Fischio a 4,2 s, rincorsa, il tiro appena il rigorista è sul pallone (il copione aspetta).
+    steps: [{ t: 5.0, do: 'shoot', who: 'taker', goalChance: CONFIG.match.penaltyGoalChance }],
+    cues: [
+      { t: 3.6, signal: 'crowdRise', who: 'taker' },
+      { t: 4.4, signal: 'crouch', who: 'keeper', dur: 1.0 },
+    ],
+    decisive: 5.6,
+    duration: 8,
+    shots: [
+      { from: 0, size: 'medium', subjects: ['taker', 'ball', 'goal'] },
+      { from: 5.0, size: 'medium', subjects: ['ball', 'goal', 'keeper', ['taker', 0.5]] },
+    ],
+  },
+  {
+    id: 'punizione',
+    label: 'Punizione',
+    outcomeLabels: { goal: 'Punizione: gol!', save: 'Punizione: parata!', wide: 'Punizione: fuori!' },
+    category: 'main',
+    hint: 'Punizione dal limite: barriera e portiere.',
+    weight: 0,
+    importance: 0.9,
+    trigger: 'freeKick',
+    roles: { taker: { label: 'Battitore', pick: 'taker' }, keeper: keeper() },
+    steps: [{ t: 5.0, do: 'shoot', who: 'taker', goalChance: 0.3 }],
+    cues: [
+      { t: 3.6, signal: 'crowdRise', who: 'taker' },
+      { t: 4.4, signal: 'crouch', who: 'keeper', dur: 1.0 },
+    ],
+    decisive: 5.6,
+    duration: 8,
+    shots: [
+      { from: 0, size: 'medium', subjects: ['taker', 'ball', 'goal'] },
+      { from: 5.0, size: 'medium', subjects: ['ball', 'goal', 'keeper'] },
+    ],
+  },
+  {
+    id: 'angolo',
+    label: "Calcio d'angolo",
+    category: 'main',
+    hint: 'Angolo! Occhio alla mischia in area.',
+    weight: 0,
+    importance: 0.7,
+    trigger: 'corner',
+    roles: { taker: { label: 'Battitore', pick: 'taker' }, keeper: keeper() },
+    steps: [], // cross e colpo al volo li batte la partita
+    cues: [{ t: 4.6, signal: 'crowdRise', who: 'keeper' }],
+    decisive: 6.4,
+    duration: 8.5,
+    shots: [
+      { from: 0, size: 'wide', subjects: ['taker', 'ball', 'goal'] },
+      { from: 5.0, size: 'medium', subjects: ['ball', 'goal', 'keeper'] },
+    ],
   },
 
   // ---------------------------------------------------------------- EVENTI RARI

@@ -1,5 +1,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Android supplies these values without narrowing the game or its backgrounds. */
+:root { --safe-left: env(safe-area-inset-left, 0px); --safe-right: env(safe-area-inset-right, 0px); }
+
 html, body {
   width: 100%;
   height: 100%;
@@ -15,9 +18,14 @@ html, body {
 }
 
 #app, #app canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* Finitura da ripresa TV: bordi leggermente più scuri (vignettatura dell'ottica). Non intercetta i tocchi. */
+#app::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 85% 80% at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.32) 100%);
+}
 
 /* ---------- HUD broadcast (non intercetta i tocchi) ---------- */
-#hud { position: fixed; inset: 0; pointer-events: none; --gx: max(18px, env(safe-area-inset-left)); --gy: 14px; }
+#hud { position: fixed; inset: 0; pointer-events: none; --gx: max(18px, var(--safe-left), var(--safe-right)); --gy: 14px; }
 
 .vf { position: absolute; width: 26px; height: 26px; border: 0 solid rgba(255, 255, 255, 0.75); }
 .vf.tl { top: var(--gy); left: var(--gx); border-top-width: 2px; border-left-width: 2px; }
@@ -61,6 +69,7 @@ html, body {
 .overlay {
   position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center;
+  padding-inline: max(var(--safe-left), var(--safe-right));
   background: radial-gradient(ellipse 70% 55% at 50% 35%, rgba(24, 48, 104, 0.5), transparent 75%),
     linear-gradient(180deg, rgba(5, 10, 24, 0.68), rgba(5, 7, 13, 0.95));
 }
@@ -146,7 +155,7 @@ html, body {
 /* ---------- Debug ---------- */
 .assist-canvas, .debug-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .debug-panel {
-  position: fixed; top: 54px; left: max(18px, env(safe-area-inset-left)); width: 210px; pointer-events: none;
+  position: fixed; top: 54px; left: max(18px, var(--safe-left)); width: 210px; pointer-events: none;
   padding: 8px 10px; border-radius: 6px; background: rgba(0, 0, 0, 0.6); font: 12px/1.35 system-ui, sans-serif;
 }
 .debug-panel .title { font-weight: 800; letter-spacing: 0.05em; }
@@ -167,7 +176,7 @@ html, body {
 
 /* ---------- Pulsanti zoom (pollice destro) ---------- */
 #zoomctl {
-  position: fixed; right: max(14px, env(safe-area-inset-right)); top: 50%; transform: translateY(-30%);
+  position: fixed; right: max(14px, var(--safe-right)); top: 50%; transform: translateY(-30%);
   display: flex; flex-direction: column; gap: 14px;
 }
 #zoomctl.hidden { display: none; }
@@ -184,8 +193,8 @@ html, body {
    Ogni leva nasce dove appoggi il pollice nella sua zona (.dzone) e torna a riposo quando lo alzi. */
 #dronepad.hidden { display: none; }
 .dzone { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); width: 210px; height: 190px; touch-action: none; -webkit-tap-highlight-color: transparent; }
-#drone-left { left: max(8px, env(safe-area-inset-left)); }
-#drone-right { right: max(8px, env(safe-area-inset-right)); }
+#drone-left { left: max(8px, var(--safe-left)); }
+#drone-right { right: max(8px, var(--safe-right)); }
 .dbase { position: absolute; bottom: 8px; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.55); background: rgba(0, 0, 0, 0.28); pointer-events: none; }
 #drone-left .dbase { left: 8px; }
 #drone-right .dbase { right: 8px; }
@@ -198,14 +207,14 @@ html, body {
 .dbase .rt { right: 7px; top: 50%; transform: translateY(-50%); }
 /* Velocità del drone (come l'interruttore C/N/S): sopra la leva sinistra, un tocco cambia. */
 #drone-speed {
-  position: fixed; left: max(16px, env(safe-area-inset-left)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 196px);
+  position: fixed; left: max(16px, var(--safe-left)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 196px);
   min-width: 92px; padding: 7px 12px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.55); background: rgba(0, 0, 0, 0.35);
   color: #fff; font: 800 12px/1 system-ui, sans-serif; letter-spacing: 0.08em; touch-action: none; -webkit-tap-highlight-color: transparent; cursor: pointer;
 }
 #drone-speed[data-mode="cine"] { border-color: #6fc3ff; color: #bfe3ff; }
 #drone-speed[data-mode="sport"] { border-color: #ff8a1f; color: #ffc48a; background: rgba(90, 40, 0, 0.45); }
 /* Col drone lo zoom si sposta accanto alla leva destra (sopra i pulsanti in basso). */
-body.droning #zoomctl { top: auto; bottom: max(58px, env(safe-area-inset-bottom)); right: calc(max(8px, env(safe-area-inset-right)) + 216px); transform: none; }
+body.droning #zoomctl { top: auto; bottom: max(58px, env(safe-area-inset-bottom)); right: calc(max(8px, var(--safe-right)) + 216px); transform: none; }
 body.practicing #dronepad, body.replaying #dronepad { display: none; }
 
 /* ---------- Scoreboard broadcast ---------- */
@@ -258,7 +267,7 @@ body.practicing #dronepad, body.replaying #dronepad { display: none; }
 #drone-btn.on { background: rgba(61, 220, 132, 0.45); border-color: #3ddc84; }
 body.practicing #drone-btn, body.replaying #drone-btn { display: none; }
 /* ---------- Carriera ---------- */
-#career { z-index: 4; background: radial-gradient(ellipse 80% 50% at 50% 0%, #15295a, #07112b 70%); justify-content: flex-start; padding: max(10px, env(safe-area-inset-top)) 12px 12px; }
+#career { z-index: 4; background: radial-gradient(ellipse 80% 50% at 50% 0%, #15295a, #07112b 70%); justify-content: flex-start; padding: max(10px, env(safe-area-inset-top)) max(12px, var(--safe-left), var(--safe-right)) 12px; }
 .cr-box { width: min(760px, 100%); max-height: 100%; display: flex; flex-direction: column; text-align: left; }
 .cr-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .cr-head > b { font: 900 italic 22px/1 system-ui, sans-serif; letter-spacing: 0.06em; padding-bottom: 3px; border-bottom: 3px solid #ffd23f; }
@@ -348,13 +357,13 @@ button.ghost {
 .rp-bar.top { top: 0; }
 /* Fascia in basso come il ticker delle dirette: la scritta scorre, il banner (nell'app) resta fermo subito sotto. */
 .rp-bar.bottom { bottom: 0; height: var(--rp-band); display: flex; align-items: stretch; overflow: hidden; background: linear-gradient(180deg, #13244d, #07112b); border-top: 2px solid #ffd23f; }
-.rp-bar.bottom b { flex: none; display: flex; align-items: center; padding: 0 22px 0 max(12px, env(safe-area-inset-left)); background: #ffd23f; color: #07112b; font: 900 italic 13px/1 system-ui, sans-serif; letter-spacing: 0.08em; clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+.rp-bar.bottom b { flex: none; display: flex; align-items: center; padding: 0 22px 0 max(12px, var(--safe-left)); background: #ffd23f; color: #07112b; font: 900 italic 13px/1 system-ui, sans-serif; letter-spacing: 0.08em; clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
 .rp-crawl { flex: 1; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
 #rp-ticker { display: flex; animation: crawl 14s linear infinite; }
 #rp-ticker span { padding: 0 24px; font: 800 13px/1 system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
 @keyframes crawl { to { transform: translateX(-50%); } }
 .rp-tag {
-  position: absolute; top: calc(8vh + 10px); left: max(18px, env(safe-area-inset-left));
+  position: absolute; top: calc(8vh + 10px); left: max(18px, var(--safe-left));
   display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 3px;
   background: #e0262b; font: 900 italic 16px/1.2 system-ui, sans-serif; letter-spacing: 0.12em;
 }
@@ -371,7 +380,7 @@ body.replaying #zoomctl, body.replaying .voice, body.replaying .hint, body.repla
 body.replaying .edge-canvas, body.replaying .assist-canvas, body.replaying .debug-canvas, body.replaying .debug-panel, body.replaying .pts,
 body.replaying .bug, body.replaying .rec, body.replaying .zoom, body.replaying .vf { display: none; }
 /* Nel replay il voto sale sotto la scritta REPLAY: lontano dalla fascia in basso e dal banner. */
-body.replaying .result { top: calc(8vh + 46px); bottom: auto; left: max(18px, env(safe-area-inset-left)); transform: none; }
+body.replaying .result { top: calc(8vh + 46px); bottom: auto; left: max(18px, var(--safe-left)); transform: none; }
 body.replaying .result.hidden { transform: translateY(-8px); }
 
 /* Menu and guide remain reachable on short landscape screens, including with a banner. */
@@ -388,7 +397,7 @@ button:focus-visible { outline: 2px solid #ffd23f; outline-offset: 3px; }
 .secondary[aria-pressed="true"] { border-color: #ffd23f; color: #ffd23f; }
 .text-button { border: 0; background: transparent; color: #bcc8de; }
 button:disabled { opacity: .4; cursor: default; }
-#start { padding: 20px 16px; overflow-y: auto; touch-action: pan-y; justify-content: safe center; }
+#start { padding: 20px max(16px, var(--safe-left), var(--safe-right)); overflow-y: auto; touch-action: pan-y; justify-content: safe center; }
 #start > * { flex-shrink: 0; }
 .menu-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
 .gyro-status { max-width: 540px; margin-top: 10px; font-size: 12px; line-height: 1.4; color: #bcc8de; }
@@ -398,8 +407,8 @@ button:disabled { opacity: .4; cursor: default; }
 body.replaying #gyro-controls { display: none; }
 .gyro-feedback { position: fixed; bottom: 52px; left: 50%; transform: translateX(-50%); max-width: 48vw; padding: 6px 10px; border-radius: 8px; background: rgba(8,14,32,.55); text-align: center; font-size: 11px; line-height: 1.4; pointer-events: none; text-shadow: 0 1px 3px #000; }
 body.replaying .gyro-feedback { display: none; }
-#tutorial { z-index: 9; padding: 14px; }
-.tutorial-card { width: min(760px, 94vw); max-height: 94vh; overflow-y: auto; touch-action: pan-y; padding: 20px 24px; border: 1px solid #ffffff30; border-top: 3px solid #ffd23f; border-radius: 14px; background: #0b1731; text-align: left; }
+#tutorial { z-index: 9; padding: 14px max(14px, var(--safe-left), var(--safe-right)); }
+.tutorial-card { width: min(760px, 94vw); max-width: 100%; max-height: 94vh; overflow-y: auto; touch-action: pan-y; padding: 20px 24px; border: 1px solid #ffffff30; border-top: 3px solid #ffd23f; border-radius: 14px; background: #0b1731; text-align: left; }
 .tutorial-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #a8b5cd; font-size: 11px; letter-spacing: .05em; }
 .tutorial-card h2 { margin: 6px 0 14px; font-size: clamp(20px, 3vw, 30px); line-height: 1.15; }
 .tutorial-copy p { margin: 10px 0; font-size: 14px; line-height: 1.55; color: #d8e1f2; }
@@ -425,24 +434,24 @@ body.practicing #start, body.practicing #hud, body.practicing .debug-canvas,
 body.practicing .debug-panel, body.practicing .edge-canvas, body.practicing .assist-canvas { display: none; }
 #camera-practice { position: fixed; inset: 0; pointer-events: none; z-index: 2; text-shadow: 0 1px 3px #000; }
 .practice-panel { padding: 10px 12px; border: 1px solid #ffffff30; border-radius: 9px; background: rgba(7,17,43,.58); }
-.practice-heading { position: absolute; top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); max-width: 53vw; }
+.practice-heading { position: absolute; top: max(10px, env(safe-area-inset-top)); left: max(10px, var(--safe-left)); max-width: 53vw; }
 .practice-heading small { color: #ffd23f; font-size: 11px; }
 .practice-heading h2 { font-size: clamp(16px, 2vw, 24px); margin: 3px 0; line-height: 1.15; }
 #practice-phase { font-size: 12px; color: #d6e4f8; }
-.practice-reference { position: absolute; right: max(10px, env(safe-area-inset-right)); top: 10px; width: clamp(140px, 24vw, 280px); padding: 5px; }
+.practice-reference { position: absolute; right: max(10px, var(--safe-right)); top: 10px; width: clamp(140px, 24vw, 280px); padding: 5px; }
 .practice-reference figcaption { font-size: 11px; color: #ffd23f; padding: 2px 4px 4px; }
 .practice-reference canvas { display: block; width: 100%; height: auto; border-radius: 4px; }
 #practice-guides { position: absolute; inset: 0; width: 100%; height: 100%; }
 #practice-guides rect { fill: #ffd23f08; stroke: #ffd23f; stroke-width: 1.5; stroke-dasharray: 8 6; vector-effect: non-scaling-stroke; }
 #practice-guides text { fill: #ffd23f; font: 11px system-ui; paint-order: stroke; stroke: #07112b; stroke-width: 3px; }
-.practice-feedback { position: absolute; left: max(10px, env(safe-area-inset-left)); bottom: 60px; max-width: min(390px, 43vw); }
+.practice-feedback { position: absolute; left: max(10px, var(--safe-left)); bottom: 60px; max-width: min(390px, 43vw); }
 #practice-score { font-size: 18px; color: #ffd23f; }
 #practice-components { font-size: 10px; color: #c8d5e9; margin-top: 4px; }
 .practice-feedback p { font-size: 12px; line-height: 1.35; margin-top: 6px; }
 #practice-advice { color: #fff; }
 #practice-hold { display: block; width: 100%; height: 5px; margin-top: 7px; accent-color: #ffd23f; }
 .practice-actions { position: absolute; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 6px; width: max-content; max-width: 90vw; flex-wrap: wrap; pointer-events: auto; }
-.practice-exit { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 110px; display: flex; gap: 4px; pointer-events: auto; }
+.practice-exit { position: absolute; left: max(8px, var(--safe-left)); top: 110px; display: flex; gap: 4px; pointer-events: auto; }
 .practice-exit .text-button { padding: 6px 10px; min-height: 32px; font-size: 11px; background: rgba(7,17,43,.35); color: #fff; }
 body.practicing #gyro-controls { top: auto; bottom: 58px; left: auto; right: 10px; transform: none; }
 @media (max-height: 450px) {
@@ -458,7 +467,7 @@ body.practicing #gyro-controls { top: auto; bottom: 58px; left: auto; right: 10p
   body.practicing #gyro-controls { bottom: 52px; }
 }
 @media (max-height: 450px) {
-  #start { padding: 12px 16px; }
+  #start { padding: 12px max(16px, var(--safe-left), var(--safe-right)); }
   #start .logo { font-size: 34px; padding: 8px 22px 10px; }
   #start .logo::before, #start .logo::after { width: 14px; height: 14px; }
   #start .tag { display: none; }
@@ -476,7 +485,7 @@ body.practicing #gyro-controls { top: auto; bottom: 58px; left: auto; right: 10p
 
 /* Compact translucent camera ratings keep the live action visible on phones. */
 @media (pointer: coarse), (max-width: 760px), (max-height: 450px) {
-  #hud { --gx: max(10px, env(safe-area-inset-left)); --gy: 8px; }
+  #hud { --gx: max(10px, var(--safe-left), var(--safe-right)); --gy: 8px; }
   .result { left: calc(var(--gx) + 8px); bottom: 38px; transform: none; min-width: 0; width: min(300px, 43vw); max-width: 43vw; padding: 7px 9px; background: rgba(8,14,32,.28); border-left-width: 2px; box-shadow: none; text-shadow: 0 1px 3px #000; }
   .result.hidden { transform: translateY(8px); }
   .r-head { gap: 6px; flex-wrap: wrap; }

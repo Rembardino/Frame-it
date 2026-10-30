@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, BackHandler, Pressable, StatusBar as NativeStatusBar, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -8,16 +8,23 @@ import { WebView } from 'react-native-webview';
 import gameHtml, { NATIVE_TEXT } from './generated/game';
 import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 import { bannerUnitId, useNativeServices } from './services/useNativeServices';
+import { webSafeAreaScript } from './services/display';
 
 const BASE_URL = 'https://frameit.local/';
 const SPORTS = ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo', 'golf', 'ciclismo', 'vela'];
 const LANGUAGES = ['en', 'it', 'es', 'fr', 'de'];
 
+function restoreFullscreen() {
+  NativeStatusBar.setHidden(true);
+  void NavigationBar.setVisibilityAsync('hidden').catch(() => {});
+}
+
 function Game() {
   useKeepAwake();
   const insets = useSafeAreaInsets();
   const webview = useRef(null);
-  const services = useNativeServices(webview);
+  const services = useNativeServices(webview, restoreFullscreen);
+  const safeAreaScript = useMemo(() => webSafeAreaScript(insets), [insets.left, insets.right]);
   const [sport, setSport] = useState('calcio');
   // No initial URL language: the WebView can restore its saved choice on cold launch.
   const [language, setLanguage] = useState(null);
@@ -33,19 +40,18 @@ function Game() {
   }), [sport, language]);
 
   useEffect(() => {
-    const immersive = () => NavigationBar.setVisibilityAsync('hidden').catch(() => {});
-    immersive();
-    const subscription = AppState.addEventListener('change', state => {
-      const active = state === 'active';
-      if (active) immersive();
-    });
+    restoreFullscreen();
     // Let Android's Back button leave the app, not navigate an inline document.
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
       BackHandler.exitApp();
       return true;
     });
-    return () => { subscription.remove(); back.remove(); };
+    return () => back.remove();
   }, []);
+
+  useEffect(() => {
+    webview.current?.injectJavaScript(safeAreaScript);
+  }, [safeAreaScript, session]);
 
   const restart = (nextSport = sport) => {
     if (services.showingAd()) return;
@@ -76,13 +82,15 @@ function Game() {
   };
 
   return (
-    <View style={[styles.container, { paddingLeft: insets.left, paddingRight: insets.right, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <StatusBar hidden />
       {!error && <WebView
         key={session}
         ref={webview}
         source={source}
         style={styles.webview}
+        injectedJavaScriptBeforeContentLoaded={safeAreaScript}
+        injectedJavaScript={safeAreaScript}
         originWhitelist={['*']}
         onShouldStartLoadWithRequest={({ url }) => url === 'about:blank' || url === BASE_URL || url.startsWith(BASE_URL + '?')}
         javaScriptEnabled
@@ -104,7 +112,7 @@ function Game() {
         onError={() => { setLoading(false); setError('Impossibile caricare il gioco. Tocca Riprova.'); }}
         onRenderProcessGone={() => { setLoading(false); setError('Il gioco è stato chiuso da Android. Tocca Riprova.'); }}
       />}
-      {!loading && !error && services.bannerVisible && <View style={styles.banner}><BannerAd
+      {!loading && !error && services.bannerVisible && <View style={[styles.banner, { paddingLeft: insets.left, paddingRight: insets.right }]}><BannerAd
         unitId={bannerUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
         onAdFailedToLoad={failure => console.warn('[Frame It] Banner:', failure)}

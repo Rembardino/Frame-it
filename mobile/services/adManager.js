@@ -66,11 +66,12 @@ export class AdManager {
   }
 
   setScreen(screen) {
-    if (screen === 'playing' && this.screen !== 'playing') {
+    const startingMatch = screen === 'playing' && this.screen !== 'playing';
+    this.screen = screen;
+    if (startingMatch) {
       this.matchHandled = false;
       this.prepare();
-    }
-    this.screen = screen;
+    } else if (screen !== 'playing' && !this.showing) this.clearAd();
   }
 
   prepare() {
@@ -81,10 +82,10 @@ export class AdManager {
       this.ready = false;
       this.unsubscribe = [
         ad.addAdEventListener(this.events.LOADED, () => { if (this.ad === ad) this.ready = true; }),
-        ad.addAdEventListener(this.events.CLOSED, () => this.finish()),
+        ad.addAdEventListener(this.events.CLOSED, () => this.finish(ad)),
         ad.addAdEventListener(this.events.ERROR, error => {
           this.warn('[Frame It] Interstitial:', error);
-          this.finish();
+          this.finish(ad);
         }),
       ];
       ad.load();
@@ -106,19 +107,22 @@ export class AdManager {
     this.showing = true;
     this.ready = false;
     this.onPause(true);
+    const ad = this.ad;
     try {
       // Load only during a match. Closed/error ads are discarded until the next match.
-      Promise.resolve(this.ad.show()).catch(error => {
+      Promise.resolve(ad.show()).catch(error => {
         this.warn('[Frame It] Interstitial show:', error);
-        this.finish();
+        this.finish(ad);
       });
     } catch (error) {
       this.warn('[Frame It] Interstitial show:', error);
-      this.finish();
+      this.finish(ad);
     }
   }
 
-  finish() {
+  finish(ad = this.ad) {
+    // A late show rejection from the previous match must not clear its successor.
+    if (ad !== this.ad) return;
     const wasShowing = this.showing;
     this.showing = false;
     this.clearAd();

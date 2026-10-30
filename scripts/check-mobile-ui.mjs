@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
+const { webSafeAreaScript } = await import('data:text/javascript;base64,' + Buffer.from(await readFile(new URL('../mobile/services/display.js', import.meta.url), 'utf8')).toString('base64'));
+
 const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false }, logLevel: 'error' });
 await server.listen();
 const base = `http://127.0.0.1:${server.httpServer.address().port}/`;
@@ -41,6 +43,41 @@ const orientation = (page, alpha, screen = 90) => page.evaluate(sample => {
 try {
   {
     const { page, context, errors } = await createPage();
+    // Route the real game's messages through the actual ad manager with a controlled SDK.
+    await page.evaluate(async () => {
+      const { AdManager } = await import('/mobile/services/adManager.js');
+      window.testInterstitials = [];
+      window.adPauses = [];
+      window.testAds = new AdManager({
+        enabled: true, events: { LOADED: 'loaded', CLOSED: 'closed', ERROR: 'error' },
+        consent: { gatherConsent: async () => ({ canRequestAds: true }) },
+        sdk: { initialize: async () => {} }, onState: () => {},
+        onPause: paused => {
+          window.adPauses.push(paused);
+          window.dispatchEvent(new Event(`frameit:${paused ? 'pause' : 'resume'}`));
+        },
+        createInterstitial: () => {
+          const listeners = new Map();
+          const ad = {
+            shows: 0,
+            addAdEventListener(type, callback) { listeners.set(type, callback); return () => listeners.delete(type); },
+            load() { listeners.get('loaded')(); },
+            show() { this.shows++; return Promise.resolve(); },
+            fire(type) { listeners.get(type)?.(); },
+          };
+          window.testInterstitials.push(ad);
+          return ad;
+        },
+      });
+      await window.testAds.initialize();
+      const postMessage = window.ReactNativeWebView.postMessage;
+      window.ReactNativeWebView.postMessage = value => {
+        postMessage(value);
+        const message = JSON.parse(value);
+        if (message.type === 'screen') window.testAds.setScreen(message.screen);
+        if (message.type === 'match-ended') window.testAds.matchEnded();
+      };
+    });
     await page.locator('#start-btn').click();
     assert.equal(await page.locator('#tutorial').isVisible(), true);
     assert.equal(await page.evaluate(() => window.frameit.match.time), 0, 'Tutorial must not advance the match');
@@ -139,11 +176,50 @@ try {
     assert.equal(await page.locator('#gyro-controls').isVisible(), false);
     assert.equal(await page.evaluate(() => window.frameit.cam.inputsEnabled), false);
     assert.equal(await page.evaluate(() => window.nativeMessages.filter(message => message.type === 'match-ended').length), 1);
+    assert.deepEqual(await page.evaluate(() => ({ shows: window.testInterstitials.map(ad => ad.shows), showing: window.testAds.showing, pauses: window.adPauses })),
+      { shows: [1], showing: true, pauses: [true] }, 'A completed match must present one interstitial and pause the game');
+    await page.evaluate(() => window.testInterstitials[0].fire('closed'));
+    assert.deepEqual(await page.evaluate(() => ({ showing: window.testAds.showing, pauses: window.adPauses })),
+      { showing: false, pauses: [true, false] }, 'Closing the interstitial must resume and preserve the prepared summary');
+    assert.equal(await page.locator('#summary').isVisible(), true);
     await page.locator('#sum-album').click();
     await page.locator('#album-close').click();
     assert.equal(await page.evaluate(() => window.nativeMessages.filter(message => message.type === 'screen').at(-1).screen), 'results', 'Closing the album after a match must not re-enable the home banner');
     await page.locator('#again').click();
     assert(await page.evaluate(() => window.nativeMessages.some(message => message.type === 'restart')));
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
+
+  // Reserve the bottom banner's height while keeping both landscape cutout positions full width.
+  for (const viewport of [{ width: 568, height: 270 }, { width: 896, height: 324 }]) {
+    const { page, context, errors } = await createPage(viewport);
+    for (const insets of [{ left: 48, right: 0 }, { left: 0, right: 48 }, { left: 0, right: 0 }]) {
+      await page.evaluate(webSafeAreaScript(insets));
+      for (const selector of ['#start', '#app canvas']) {
+        const bounds = await page.locator(selector).boundingBox();
+        assert.equal(bounds.x, 0, `${selector} must extend to the left edge`);
+        assert.equal(bounds.width, viewport.width, `${selector} must use the full width`);
+      }
+      const logo = await page.locator('#start .logo').boundingBox();
+      assert(Math.abs(logo.x + logo.width / 2 - viewport.width / 2) < 1, 'The home menu must stay centered with a cutout on either side');
+      assert.equal(await page.locator('#rotate').isVisible(), false);
+      for (const button of await page.locator('#start button:visible').all()) {
+        await button.scrollIntoViewIfNeeded();
+        const bounds = await button.boundingBox();
+        assert(bounds.x >= insets.left && bounds.x + bounds.width <= viewport.width - insets.right, 'Home controls must avoid the cutout');
+      }
+    }
+    await page.evaluate(webSafeAreaScript({ left: 48, right: 0 }));
+    await page.locator('#tutorial-btn').click();
+    const card = await page.locator('.tutorial-card').boundingBox();
+    assert(card.x >= 48 && card.x + card.width <= viewport.width - 48, 'The guide must fit inside the safe content area');
+    await page.locator('#tutorial-skip').click();
+    await page.locator('#start-btn').click();
+    await page.evaluate(webSafeAreaScript({ left: 0, right: 48 }));
+    const zoom = await page.locator('#zoomctl').boundingBox();
+    assert(zoom.x + zoom.width <= viewport.width - 48, 'Live controls must follow updated cutout insets');
+    await page.screenshot({ path: fileURLToPath(new URL(`landscape-cutout-${viewport.width}.png`, artifacts)) });
     assert.deepEqual(errors, []);
     await context.close();
   }
