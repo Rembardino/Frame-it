@@ -240,6 +240,11 @@ export class AudioEngine {
       case 'splash': this.noiseBurst(t, 0.55, 800, 0.9, out, 'lowpass'); this.noiseBurst(t, 0.3, 3200, 0.3, out, 'highpass'); break;
       case 'sand': this.noiseBurst(t, 0.3, 1500, 0.55, out, 'bandpass'); break;
       case 'tree': thump(230, 120, 0.08, 0.6); this.noiseBurst(t, 0.45, 2500, 0.3, out, 'highpass'); break;
+      // ---- momenti segreti
+      case 'ufo': this.warble(t, 11, 260, 7, 60, 0.16, out); this.warble(t, 11, 392, 4.5, 30, 0.08, out); break;
+      case 'beam': this.warble(t, 3.6, 900, 23, 140, 0.07, out, 1900); break;
+      case 'pop': thump(300, 1400, 0.12, 0.45); break;
+      case 'bark': thump(620, 300, 0.07, 0.5); this.noiseBurst(t, 0.06, 1100, 0.4, out, 'bandpass'); break;
     }
   }
 
@@ -252,6 +257,20 @@ export class AudioEngine {
     lfo.connect(depth).connect(o.frequency);
     e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(0.35, t + 0.015);
     e.gain.setValueAtTime(0.35, t + dur - 0.04); e.gain.linearRampToValueAtTime(0, t + dur);
+    o.connect(e).connect(out);
+    o.start(t); lfo.start(t); o.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02);
+  }
+
+  /** Tono che vibra (la navicella): f0 Hz con vibrato rate/depth, sale fino a f1 se c'è; sfuma all'inizio e alla fine. */
+  private warble(t: number, dur: number, f0: number, rate: number, depth: number, g: number, out: AudioNode, f1 = f0) {
+    const ctx = this.ctx!;
+    const o = ctx.createOscillator(), lfo = ctx.createOscillator(), d = ctx.createGain(), e = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f1, t + dur);
+    lfo.frequency.value = rate; d.gain.value = depth;
+    lfo.connect(d).connect(o.frequency);
+    e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(g, t + Math.min(1.2, dur / 4));
+    e.gain.setValueAtTime(g, t + dur * 0.75); e.gain.linearRampToValueAtTime(0, t + dur);
     o.connect(e).connect(out);
     o.start(t); lfo.start(t); o.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02);
   }

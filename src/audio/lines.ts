@@ -8,7 +8,9 @@ export type Shout =
   | 'call' | 'protest' | 'argue' | 'shove' | 'ouch' | 'goal' | 'basket' | 'celebrate' | 'dejected'
   | 'coach' | 'card' | 'foul' | 'count' | 'fan' | 'steward' | 'hide' | 'yes'
   /** Golf: il marshal prima del colpo, il compagno quando la palla va verso alberi o acqua. */
-  | 'quiet' | 'fore';
+  | 'quiet' | 'fore'
+  /** Momenti segreti: rapito dagli alieni, gabbiano in testa, cane che scappa. */
+  | 'help' | 'shoo' | 'dog';
 
 export const SHOUTS: Record<Shout, Record<Language, string[]>> = {
   call: {
@@ -143,5 +145,26 @@ export const SHOUTS: Record<Shout, Record<Language, string[]>> = {
     es: ['¡Fore!', '¡Bola!'],
     fr: ['Fore !', 'Balle !'],
     de: ['Fore!'],
+  },
+  help: {
+    it: ['Aiutoooo!', 'Mettetemi giù!'],
+    en: ['Heeelp!', 'Put me down!'],
+    es: ['¡Socorroooo!', '¡Bajadme!'],
+    fr: ['Au secouuurs !', 'Posez-moi !'],
+    de: ['Hiiilfe!', 'Lasst mich runter!'],
+  },
+  shoo: {
+    it: ['Sciò! Sciò!', 'Via, pennuto!'],
+    en: ['Shoo! Shoo!', 'Get off, bird!'],
+    es: ['¡Fuera! ¡Fuera!', '¡Quita, pajarraco!'],
+    fr: ['Ouste ! Ouste !', 'Dégage, l’oiseau !'],
+    de: ['Husch! Husch!', 'Weg da, Vogel!'],
+  },
+  dog: {
+    it: ['Fido! Torna qui!', 'Fermo! Seduto!'],
+    en: ['Rex! Come back!', 'Stop! Sit!'],
+    es: ['¡Toby! ¡Vuelve!', '¡Quieto! ¡Sentado!'],
+    fr: ['Médor ! Reviens !', 'Stop ! Assis !'],
+    de: ['Bello! Komm zurück!', 'Stopp! Sitz!'],
   },
 };

@@ -10,7 +10,7 @@ import type { Match } from '../sim/match';
 import { MARKS, type SailingSimulation } from '../sim/sports/sailing';
 import { blob, inside, seeded, type Tree } from '../sim/sports/shapes';
 import { radialTexture, stadiumSeats, type SeatRow } from './stage';
-import { Ribbon, canvasTexture, createOutdoor, forest, layer, surfaceMaterial as mat, textCanvas, turf } from './outdoor';
+import { Ribbon, canvasTexture, createOutdoor, forest, groundLayer, layer, surfaceMaterial as mat, textCanvas, turf } from './outdoor';
 
 const LAND = [blob({ c: [900, 700], r: [420, 230], rot: 0.3 }, 0, 4), blob({ c: [-1250, -250], r: [520, 950], rot: 0.1 }, 0, 6), blob({ c: [300, -1150], r: [900, 300] }, 0, 8)];
 const BEACH = [blob({ c: [900, 700], r: [420, 230], rot: 0.3 }, 14, 4), blob({ c: [-1250, -250], r: [520, 950], rot: 0.1 }, 18, 6), blob({ c: [300, -1150], r: [900, 300] }, 18, 8)];
@@ -90,7 +90,7 @@ export function sailingWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
   ripples.colorSpace = THREE.NoColorSpace;
   ripples.repeat.set(1400, 1400);
   const seaMat = world.water(0x1f6283);
-  Object.assign(seaMat, { normalMap: ripples, normalScale: new THREE.Vector2(0.1, 0.1), roughness: 0.16, envMapIntensity: 0.8, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+  Object.assign(seaMat, { normalMap: ripples, normalScale: new THREE.Vector2(0.1, 0.1), roughness: 0.16, envMapIntensity: 0.8 });
   // Due trame di onde a scale e direzioni diverse (il disegno non si ripete), sempre più lisce con la distanza
   // (da lontano il mare riflette il cielo e non mostra la trama a scacchi).
   seaMat.onBeforeCompile = (shader) => {
@@ -100,7 +100,7 @@ export function sailingWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
       mapN.xy += ( texture2D( normalMap, mat2( 0.8, -0.6, 0.6, 0.8 ) * vNormalMapUv * 0.29 ).xy * 2.0 - 1.0 ) * 0.7;
       mapN.xy /= 1.0 + length( vViewPosition ) * 0.008;`));
   };
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000).rotateX(-Math.PI / 2), seaMat);
+  const sea = groundLayer(new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000).rotateX(-Math.PI / 2), seaMat), 1);
   sea.receiveShadow = true;
   scene.add(sea);
   scene.add(layer(BEACH, mat(turf(renderer, '#e3d3a6', null, 0, 0.12, 31)), 6, 3), layer(LAND, mat(world.rough), 9, 4));

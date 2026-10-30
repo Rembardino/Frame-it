@@ -3,7 +3,7 @@
     "name": "Frame It: Live Sports TV",
     "slug": "frame-it",
     "owner": "rembardino",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "orientation": "landscape",
     "platforms": [
       "android"

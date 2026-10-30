@@ -12,7 +12,7 @@ export const bannerUnitId = testAds ? TestIds.ADAPTIVE_BANNER : configuration.ba
 const interstitialUnitId = testAds ? TestIds.INTERSTITIAL : configuration.interstitialId;
 const STORE_ID = 'com.frameitnow';
 
-export function useNativeServices(webview) {
+export function useNativeServices(webview, onResume) {
   const [screen, setScreen] = useState('menu');
   const [replayActive, setReplayActive] = useState(false);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
@@ -27,7 +27,11 @@ export function useNativeServices(webview) {
     // JSON is injected as a JS value, never concatenated into an HTML document.
     webview.current?.injectJavaScript(`window.dispatchEvent(new CustomEvent(${JSON.stringify(name)},{detail:${JSON.stringify(detail)}}));true;`);
   }, [webview]);
-  const pause = useCallback(paused => emit(`frameit:${paused || AppState.currentState !== 'active' ? 'pause' : 'resume'}`, null), [emit]);
+  const pause = useCallback(paused => {
+    const active = !paused && AppState.currentState === 'active';
+    if (active) onResume();
+    emit(`frameit:${active ? 'resume' : 'pause'}`, null);
+  }, [emit, onResume]);
 
   useEffect(() => {
     const ads = new AdManager({

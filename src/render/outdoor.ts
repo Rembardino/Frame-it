@@ -60,14 +60,25 @@ function shapeGeometry(p: Poly, tile: number, y: number) {
   return g;
 }
 
-/** Strato di superfici: order più alto = disegnato sopra (polygonOffset, niente sfarfallio da lontano). */
+/**
+ * Il terreno si disegna per primo, a strati in ordine fisso: prima il prato di base (che scrive la profondità,
+ * così nasconde ciò che sta sottoterra), poi ogni strato sopra il precedente senza confrontare le profondità.
+ * Superfici sovrapposte allo stesso livello non possono sfarfallare (col polygonOffset, su alcuni telefoni, sì).
+ */
+const GROUND = -100;
+export function groundLayer<T extends THREE.Mesh<THREE.BufferGeometry, THREE.Material>>(mesh: T, order: number) {
+  mesh.renderOrder = GROUND + order;
+  Object.assign(mesh.material, { depthTest: false, depthWrite: false });
+  return mesh;
+}
+
+/** Strato di superfici: order più alto = disegnato sopra. */
 export function layer(polys: Poly[], material: THREE.MeshStandardMaterial, tile: number, order: number, y = 0) {
-  Object.assign(material, { polygonOffset: true, polygonOffsetFactor: -order, polygonOffsetUnits: -order * 2 });
   const geometries = polys.map((p) => shapeGeometry(p, tile, y));
   const mesh = new THREE.Mesh(mergeGeometries(geometries)!, material);
   geometries.forEach((g) => g.dispose());
   mesh.receiveShadow = true;
-  return mesh;
+  return groundLayer(mesh, order);
 }
 
 function skyDome(radius: number) {
@@ -231,6 +242,7 @@ export function createOutdoor(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: rough, roughness: 1 }));
   rough.repeat.set(1000, 1000);
   floor.receiveShadow = true;
+  floor.renderOrder = GROUND;
   scene.add(floor);
   // L'acqua riflette il cielo (una piccola mappa d'ambiente fatta dallo stesso cielo).
   const envScene = new THREE.Scene(); envScene.add(skyDome(50));

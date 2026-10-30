@@ -38,6 +38,8 @@ export type Pose =
   | 'guard' | 'jab' | 'hook' | 'uppercut' | 'recoil'
   /** Spettatori dei momenti segreti. */
   | 'hug' | 'hide' | 'kiss' | 'dance' | 'sleep' | 'kneel'
+  /** Spettatore risucchiato dalla navicella: si dimena a mezz'aria. */
+  | 'float'
   /** Golf: in posizione sulla palla, swing pieno, prova dello swing, putt. */
   | 'address' | 'swing' | 'practice' | 'putt'
   /** Ciclismo: in piedi sui pedali. Vela: alle manovelle. */
@@ -52,7 +54,9 @@ export type EffectName = 'shootingStar';
 export type SoundName =
   | 'kick' | 'shot' | 'net' | 'save' | 'ooh' | 'goal' | 'whistle' | 'whistleEnd' | 'bounce' | 'swish' | 'rim'
   | 'racket' | 'volley' | 'punch' | 'knockdown' | 'bell' | 'point'
-  | 'drive' | 'iron' | 'putt' | 'cup' | 'land' | 'splash' | 'sand' | 'tree';
+  | 'drive' | 'iron' | 'putt' | 'cup' | 'land' | 'splash' | 'sand' | 'tree'
+  /** Momenti segreti: la navicella (ronzio, raggio traente, risucchio) e il cane che abbaia. */
+  | 'ufo' | 'beam' | 'pop' | 'bark';
 /** Segnali per l'audio: un suono in un punto del campo, o una frase urlata da un personaggio. Chi li legge li svuota. */
 export type Cue = { type: 'sound'; sound: SoundName; at: THREE.Vector3; power: number } | { type: 'say'; actor: Actor; line: Shout };
 
@@ -141,6 +145,8 @@ export const BALL_RADIUS = CONFIG.visuals.ballRadius * CONFIG.visuals.ballScale;
 const hoopX = (d: number) => d * (L / 2 - P.hoopFromBaseline);
 /** Dove aspettano gli extra quando non servono (fuori dallo stadio). */
 const PARKING = new THREE.Vector3(0, 0, -80);
+/** Copione della navicella (s dal suo arrivo) e quota (m) sopra il posto dello spettatore. */
+export const UFO = { height: 10, arrive: 3.5, beamOn: 4, liftFrom: 4.6, liftTo: 7.6, beamOff: 7.9, leave: 8.6, gone: 11 };
 /** Pose durante le quali l'attore non corre (scivola o sta a terra). */
 const LOCKED: Pose[] = ['dive', 'fall', 'tackle'];
 
@@ -249,8 +255,12 @@ export class Match {
   ballScripted = false;
   /** Animali degli eventi (cervi, stormi, delfini...): li disegna render/fauna.ts. */
   readonly fauna = new Fauna();
-  /** Cielo: stella cadente. from/to sono decisi quando l'evento parte, così il pubblico sa già dove guardare. */
-  readonly sky = { star: { planned: false, active: false, t: 0, dur: 1.3, from: new THREE.Vector3(), to: new THREE.Vector3() } };
+  /** Cielo: stella cadente. from/to sono decisi quando l'evento parte, così il pubblico sa già dove guardare.
+   *  ufo = la navicella del momento segreto: t0 = quando arriva, seat = il posto dello spettatore rapito (resta vuoto). */
+  readonly sky = {
+    star: { planned: false, active: false, t: 0, dur: 1.3, from: new THREE.Vector3(), to: new THREE.Vector3() },
+    ufo: { t0: -Infinity, seat: null as THREE.Vector3 | null, side: 1 },
+  };
 
   private phaseTime = 0;
   private possession: TeamId = 0;
@@ -447,7 +457,7 @@ export class Match {
     if (a.role === 'steward') return pose === 'tackle' ? 'steward' : null;
     if (a.role === 'fan') return pose === 'wave' ? 'fan' : pose === 'fall' ? 'ouch' : null;
     if (a.role === 'spectator') {
-      const lines: Partial<Record<Pose, Shout>> = { hide: 'hide', wave: 'fan', dance: 'fan', stumble: 'ouch', fall: 'ouch', celebrate: 'yes', dejected: 'dejected' };
+      const lines: Partial<Record<Pose, Shout>> = { hide: 'hide', wave: 'fan', dance: 'fan', stumble: 'ouch', fall: 'ouch', celebrate: 'yes', dejected: 'dejected', float: 'help' };
       return lines[pose] ?? null;
     }
     if (a.role === 'coach') return pose === 'argue' ? 'coach' : pose === 'celebrate' ? 'celebrate' : pose === 'dejected' ? 'dejected' : null;
@@ -508,6 +518,34 @@ export class Match {
     const s = this.sky.star;
     const u = clamp(s.t / s.dur, 0, 1);
     return { head: s.from.clone().lerp(s.to, u), tail: s.from.clone().lerp(s.to, Math.max(0, u - 0.3)) };
+  }
+
+  /**
+   * Dove sta la navicella all'istante time (dipende solo dal tempo: nei replay rifà lo stesso volo).
+   * beam = raggio traente 0..1, lift = quanto è salito lo spettatore 0..1, look = il pubblico guarda in su.
+   */
+  ufoPose(time = this.time) {
+    const u = this.sky.ufo, T = UFO, t = time - u.t0;
+    const visible = !!u.seat && t >= 0 && t <= T.gone;
+    const hover = (u.seat ?? PARKING).clone().add(new THREE.Vector3(0, T.height, 0));
+    const pos = hover.clone();
+    if (t < T.arrive) {
+      // Scende da lontano, dietro le tribune, frenando.
+      const k = 1 - (1 - clamp(t / T.arrive, 0, 1)) ** 3;
+      pos.add(new THREE.Vector3(-u.side * 140, 70, -90).multiplyScalar(1 - k));
+    } else if (t > T.leave) {
+      // Riparte accelerando, in alto e di lato.
+      const k = ((t - T.leave) / (T.gone - T.leave)) ** 2;
+      pos.add(new THREE.Vector3(u.side * 220, 150, -60).multiplyScalar(k));
+    }
+    pos.y += Math.sin(t * 2.3) * 0.25;
+    const ramp = (a: number, b: number) => clamp((t - a) / (b - a), 0, 1);
+    return {
+      visible, pos, t,
+      beam: ramp(T.beamOn, T.beamOn + 0.4) * (1 - ramp(T.beamOff, T.beamOff + 0.4)),
+      lift: (1 - Math.cos(Math.PI * ramp(T.liftFrom, T.liftTo))) / 2,
+      look: visible ? ramp(0.8, 2) * (1 - ramp(T.leave + 0.5, T.gone)) : 0,
+    };
   }
 
   /** Triplice fischio: gioco fermo per sempre. */

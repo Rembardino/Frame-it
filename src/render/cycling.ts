@@ -8,7 +8,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   BARRIERS, BRIDGE_S, FIELDS, FINISH_S, HOUSES, LENGTH, LINE, LINE_S, PASTURE, RIVER, RIVER_BANK, ROAD, ROAD_EDGE, ROAD_HALF, TREES, VILLAGE, roadAt, roadDir,
 } from '../sim/sports/cyclingRoute';
-import { strip } from '../sim/sports/shapes';
+import { poly, strip } from '../sim/sports/shapes';
 import { stadiumSeats, type SeatRow } from './stage';
 import { canvasTexture, createOutdoor, forest, layer, surfaceMaterial as mat, textCanvas, turf } from './outdoor';
 import { t } from '../i18n';
@@ -52,7 +52,9 @@ export function cyclingWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
     dashes.push(strip(edge, LINE_S, 0, LENGTH, () => 0.07));
   }
   scene.add(layer(dashes, mat(turf(renderer, '#f4f4f0', null, 0, 0.02, 26)), 2, 7));
-  scene.add(layer([strip(LINE, LINE_S, FINISH_S - 0.35, FINISH_S + 0.35, () => ROAD_HALF)], mat(turf(renderer, '#ffffff', null, 0, 0.02, 27)), 2, 8));
+  // Linea d'arrivo: un rettangolo di traverso alla strada (una striscia avrebbe le estremità tonde larghe quanto la strada).
+  const fl = roadAt(FINISH_S), fdir = roadDir(FINISH_S), corner = (a: number, b: number): [number, number] => [fl.x + fdir.x * a - fdir.z * b, fl.z + fdir.z * a + fdir.x * b];
+  scene.add(layer([poly([corner(-0.35, -ROAD_HALF), corner(0.35, -ROAD_HALF), corner(0.35, ROAD_HALF), corner(-0.35, ROAD_HALF)])], mat(turf(renderer, '#ffffff', null, 0, 0.02, 27)), 2, 8));
   forest(scene, TREES);
 
   // ---------------------------------------------------------------- ponte, case, chiesa

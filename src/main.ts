@@ -150,7 +150,7 @@ function ambientInput() {
 }
 
 const worldNow = (): WorldFrame => ({
-  excitement: match.excitement, hotX: director.crowdHot.x, hotLevel: director.crowdHot.level, lookUp: director.crowdLookUp,
+  excitement: match.excitement, hotX: director.crowdHot.x, hotLevel: director.crowdHot.level, lookUp: Math.max(director.crowdLookUp, match.ufoPose().look),
 });
 const crowdState = (w: WorldFrame): CrowdState => ({ excitement: w.excitement, hot: { x: w.hotX, level: w.hotLevel }, lookUp: w.lookUp });
 const camNow = (): CameraFrame => ({

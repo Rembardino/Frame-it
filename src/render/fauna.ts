@@ -149,9 +149,9 @@ export class FaunaViews {
       v.legs.forEach((leg, k) => { leg.rotation.z = moving ? Math.sin(phase + (hop ? (k < 2 ? 0 : 1) : [0, Math.PI, Math.PI, 0][k])) * 0.5 : 0; });
       if (hop || (!b.fly && !b.swim && a.species !== 'cow')) v.root.position.y += Math.abs(Math.sin(phase)) * b.h * (hop ? 0.25 : 0.04);
       // Ali: battono in volo (l'aquila plana), chiuse sull'acqua.
-      const flying = p.pos.y > 0.4;
+      const flying = p.pos.y > 0.4 && moving; // posato (sulla testa di uno spettatore): ali chiuse
       const flap = !flying ? 0.1 : a.species === 'eagle' ? 0.15 * Math.sin(time * 2 + i) + 0.1 : Math.sin(time * (a.species === 'gull' ? 7 : 13) + i * 1.7) * 0.7;
-      v.wings.forEach((w, k) => { w.rotation.x = (k ? -1 : 1) * flap; });
+      v.wings.forEach((w, k) => { w.rotation.x = (k ? -1 : 1) * flap; w.scale.z = flying ? 1 : 0.35; });
     }
     for (const [species, pool] of this.pools) pool.forEach((v, k) => { if (k >= (used.get(species) ?? 0)) v.root.visible = false; });
   }

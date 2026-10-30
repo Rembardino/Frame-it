@@ -12,6 +12,7 @@ import { courtSurface, surfaceGrain, rod } from './surfaces';
 import { golfCourse } from './golf';
 import { cyclingWorld } from './cycling';
 import { sailingWorld } from './sailing';
+import { FaunaViews } from './fauna';
 
 const L = CONFIG.pitch.length;
 const W = CONFIG.pitch.width;
@@ -68,7 +69,9 @@ export function createStage(container: HTMLElement) {
   scene.add(stands);
   scene.add(stadiumSeats(seatRows), grandstandRoof());
 
-  return { renderer, scene, camera, seatRows, update: undefined as ((match: Match) => void) | undefined };
+  // Animali dei momenti segreti (il gabbiano in tribuna, il cane a bordo campo).
+  const fauna = new FaunaViews(scene);
+  return { renderer, scene, camera, seatRows, update: ((match: Match) => fauna.update(match)) as ((match: Match) => void) | undefined };
 }
 
 // ------------------------------------------------------------------ cielo

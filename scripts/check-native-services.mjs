@@ -15,6 +15,7 @@ assert.equal(live.testAds, false);
 assert.equal(live.appId, 'ca-app-pub-111~222');
 
 const appConfig = JSON.parse(await readFile(new URL('../mobile/app.json', import.meta.url), 'utf8'));
+assert.equal(appConfig.expo.orientation, 'landscape');
 const configured = resolveAdsConfig(appConfig.expo.extra.frameit.ads);
 assert.equal(configured.enabled, true);
 assert.equal(configured.testAds, false);
@@ -27,7 +28,7 @@ for (const screen of ['menu', 'tutorial', 'album', 'playing', 'results']) {
   }
 }
 
-function scenario({ enabled = true, consentAllowed = true, gatherFails = false, initFails = false, showFails = false } = {}) {
+function scenario({ enabled = true, consentAllowed = true, gatherFails = false, initFails = false, loadFails = false, showFails = false, showThrows = false } = {}) {
   const ads = [], pauses = [], states = [], calls = { consent: 0, initialize: 0, cached: 0, warnings: 0 };
   const info = { canRequestAds: consentAllowed, privacyOptionsRequirementStatus: 'required' };
   const manager = new AdManager({
@@ -44,8 +45,8 @@ function scenario({ enabled = true, consentAllowed = true, gatherFails = false, 
       const ad = {
         loads: 0, shows: 0,
         addAdEventListener(type, callback) { listeners.set(type, callback); return () => listeners.delete(type); },
-        load() { this.loads++; },
-        show() { this.shows++; return showFails ? Promise.reject(new Error('no fill')) : Promise.resolve(); },
+        load() { this.loads++; if (loadFails) throw new Error('load unavailable'); },
+        show() { this.shows++; if (showThrows) throw new Error('show unavailable'); return showFails ? Promise.reject(new Error('no fill')) : Promise.resolve(); },
         fire(type, detail) { listeners.get(type)?.(detail); },
         listenerCount: () => listeners.size,
       };
@@ -110,4 +111,97 @@ function scenario({ enabled = true, consentAllowed = true, gatherFails = false, 
   s.manager.setScreen('playing'); s.manager.matchEnded(); assert.equal(s.ads.length, 0);
   assert.equal(s.states.at(-1).allowed, false);
 }
-console.log('OK: live Frame It IDs, menu/replay banner placement, disabled fallback, UMP/cache/revocation, one interstitial per match, offline/no-fill/show errors, background and cleanup');
+{
+  const s = scenario();
+  await s.manager.initialize();
+  s.manager.matchEnded();
+  assert.equal(s.ads.length, 0, 'The menu must not request an interstitial');
+  s.manager.setScreen('playing');
+  s.manager.setScreen('playing');
+  assert.equal(s.ads.length, 1, 'Duplicate playing messages must not request another ad');
+  s.ads[0].fire('loaded');
+  s.manager.setScreen('menu');
+  assert.equal(s.ads[0].listenerCount(), 0, 'Abandoning a match must discard its ad');
+  s.manager.setScreen('playing');
+  assert.equal(s.ads.length, 2, 'A new match must preload a fresh ad');
+  s.ads[0].fire('loaded');
+  assert.equal(s.manager.ready, false, 'A discarded ad cannot mark its successor ready');
+  s.ads[1].fire('loaded');
+  s.manager.matchEnded();
+  s.manager.setScreen('results');
+  assert.equal(s.manager.showing, true, 'The results message must not dispose an open interstitial');
+  assert.equal(s.ads[1].listenerCount(), 3);
+  s.ads[1].fire('closed');
+  s.ads[1].fire('closed');
+  assert.deepEqual(s.pauses, [true, false], 'Closing must resume exactly once');
+}
+{
+  const s = scenario();
+  await s.manager.initialize(); s.manager.setScreen('playing'); s.ads[0].fire('loaded');
+  let rejectPrevious;
+  s.ads[0].show = () => new Promise((resolve, reject) => { rejectPrevious = reject; });
+  s.manager.matchEnded();
+  s.ads[0].fire('closed');
+  s.manager.setScreen('playing'); s.ads[1].fire('loaded'); s.manager.matchEnded();
+  rejectPrevious(new Error('late native rejection'));
+  await Promise.resolve();
+  assert.equal(s.manager.showing, true, 'A late rejection cannot close the next interstitial');
+  assert.equal(s.manager.ad, s.ads[1]);
+  assert.deepEqual(s.pauses, [true, false, true]);
+  s.ads[1].fire('closed');
+  assert.deepEqual(s.pauses, [true, false, true, false]);
+}
+for (const showThrows of [false, true]) {
+  const s = scenario({ showThrows });
+  await s.manager.initialize(); s.manager.setScreen('playing');
+  if (showThrows) {
+    s.ads[0].fire('loaded'); s.manager.matchEnded();
+    assert.deepEqual(s.pauses, [true, false], 'A synchronous show error must resume the game');
+  } else {
+    s.ads[0].fire('error', new Error('no fill'));
+    assert.equal(s.manager.ad, null);
+    assert.deepEqual(s.pauses, [], 'A load error must not pause the game');
+    s.manager.matchEnded();
+    assert.equal(s.ads[0].shows, 0);
+  }
+  assert.equal(s.ads[0].listenerCount(), 0);
+  s.manager.setScreen('playing');
+  assert.equal(s.ads.length, 2, 'A failed ad must not prevent the next match loading');
+}
+{
+  const s = scenario({ loadFails: true });
+  await s.manager.initialize(); s.manager.setScreen('playing'); s.manager.matchEnded();
+  assert.equal(s.manager.ad, null);
+  assert.equal(s.ads[0].listenerCount(), 0);
+  assert.deepEqual(s.pauses, []);
+}
+for (const endBeforeInitialized of [false, true]) {
+  const s = scenario();
+  let initialize;
+  s.manager.sdk.initialize = () => new Promise(resolve => { initialize = resolve; });
+  const pending = s.manager.initialize();
+  await Promise.resolve();
+  s.manager.setScreen('playing');
+  assert.equal(s.ads.length, 0);
+  if (endBeforeInitialized) s.manager.matchEnded();
+  initialize();
+  await pending;
+  assert.equal(s.ads.length, endBeforeInitialized ? 0 : 1, 'Late SDK initialization may only preload during a current match');
+}
+{
+  const s = scenario({ consentAllowed: false, gatherFails: true });
+  await s.manager.initialize(); s.manager.setScreen('playing'); s.manager.matchEnded();
+  assert.equal(s.calls.cached, 1);
+  assert.equal(s.calls.initialize, 0, 'Cached consent must also explicitly allow requests');
+  assert.equal(s.ads.length, 0);
+}
+{
+  const s = scenario();
+  await s.manager.initialize(); s.manager.setScreen('playing'); s.ads[0].fire('loaded'); s.manager.matchEnded();
+  s.manager.dispose();
+  s.ads[0].fire('closed');
+  assert.deepEqual(s.pauses, [true], 'Disposing must not resume an unmounted game');
+  assert.equal(s.ads[0].listenerCount(), 0);
+  assert.equal(s.manager.showing, false);
+}
+console.log('OK: landscape-only config, live Frame It IDs, menu/replay banner, UMP/cache/revocation, one interstitial per match, abandoned matches, duplicate/late events, delayed SDK, load/show errors, background and cleanup');
