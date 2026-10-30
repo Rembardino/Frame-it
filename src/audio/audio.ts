@@ -42,7 +42,7 @@ export class AudioEngine {
   private ttsOwner: 'director' | 'actor' | null = null;
 
   constructor() {
-    try { this.muted = localStorage.getItem('frameit.sound') === 'off'; } catch { /* niente salvataggi */ }
+    try { const saved = localStorage.getItem('frameit.sound.v2'); this.muted = saved ? saved === 'off' : !A().defaultOn; } catch { this.muted = !A().defaultOn; }
     if (this.synth) {
       const load = () => {
         const all = this.synth!.getVoices().filter((v) => v.lang.replace('_', '-').toLowerCase().startsWith(LANGUAGE));
@@ -67,7 +67,7 @@ export class AudioEngine {
 
   setMuted(m: boolean) {
     this.muted = m;
-    try { localStorage.setItem('frameit.sound', m ? 'off' : 'on'); } catch { /* idem */ }
+    try { localStorage.setItem('frameit.sound.v2', m ? 'off' : 'on'); } catch { /* idem */ }
     if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : A().master, this.ctx.currentTime, 0.05);
     if (m) this.stopTts();
   }
@@ -98,7 +98,7 @@ export class AudioEngine {
 
   /** Una battuta del regista in cuffia (nessuna bocca: non si vede). */
   director(text: string) {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx || this.muted || !A().speech) return;
     // Il regista ha la precedenza sulla voce vera: interrompe un personaggio.
     if (this.ttsOwner === 'actor') this.stopTts();
     const track = syllables(text, 5.4);
@@ -121,7 +121,7 @@ export class AudioEngine {
     const { gain, pan } = this.place(a.pos);
     const dur = a.say.dur;
     if (this.ctx) this.talking.push(this.ctx.currentTime + dur);
-    if (!this.ctx || this.muted || gain < 0.08) return;
+    if (!this.ctx || this.muted || gain < 0.08 || !A().speech) return;
     const style: VoiceStyle = { f0: this.pitchOf(a), shout: true, radio: false };
     if (!this.tts(text, 'actor', 1.15, style.f0 / 130, { actor: a, say: a.say, match }, gain)) this.babble(track, style, gain, pan);
   }

@@ -292,6 +292,10 @@ const BASE = {
   },
 
   audio: {
+    /** Audio spento finché il giocatore non lo accende dal pulsante (la scelta viene salvata). */
+    defaultOn: false,
+    /** Voci del regista e dei personaggi: false = nessuna voce (la bocca si muove lo stesso). */
+    speech: false,
     /** Volume generale (0..1) e dei singoli gruppi. */
     master: 0.8,
     crowd: 0.08,

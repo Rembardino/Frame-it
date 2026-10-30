@@ -547,8 +547,9 @@ function adBoards() {
     textures.push(t);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.9), new THREE.MeshBasicMaterial({ map: t }));
     m.position.set(x, 0.5, z);
-    m.rotation.y = rotY;
-    m.rotation.x = -0.12;
+    // Prima la rotazione verso il campo, poi la leggera inclinazione all'indietro (sul proprio asse, non su quello del mondo).
+    m.rotation.order = 'YXZ';
+    m.rotation.set(-0.12, rotY, 0);
     const back = new THREE.Mesh(new THREE.BoxGeometry(len, 0.95, 0.12), casing);
     back.position.set(0, 0, -0.07); m.add(back);
     return m;
