@@ -111,6 +111,13 @@ const BASE = {
     /** Dopo l'esultanza: secondi prima del calcio d'inizio. Se dopo resetCutSec qualcuno è ancora fuori posto, stacco TV: tutti al loro posto, 1 s di squadre schierate, fischio. */
     resetSec: 3.5,
     resetCutSec: 2.5,
+    /** Calci piazzati (calcio). Fallo in area = rigore; entro freeKickRange metri dalla porta = punizione diretta con barriera. */
+    freeKickRange: 26,
+    /** Barriera: distanza dal pallone (m). Secondi di preparazione prima del fischio (poi la rincorsa). */
+    wallDistance: 6.5,
+    setPieceReadySec: 4.2,
+    /** Probabilità di gol dal dischetto (il Director la riduce se il punteggio è già largo). */
+    penaltyGoalChance: 0.75,
   },
 
   visuals: {

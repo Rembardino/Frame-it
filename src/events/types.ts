@@ -3,7 +3,7 @@
  * i segnali premonitori (cues), l'istante decisivo e l'inquadratura ideale.
  * Aggiungere un evento = aggiungere un oggetto in library.ts, senza toccare il codice.
  */
-import type { EffectName, Match, Pose, Role, ShotOutcome } from '../sim/match';
+import type { EffectName, Match, Pose, Role, SetPieceKind, ShotOutcome } from '../sim/match';
 import type { ShotSize } from '../scoring/scoring';
 import type { SportAction } from '../sim/sports/types';
 import type { Species } from '../sim/fauna';
@@ -24,6 +24,7 @@ export type RolePick = { label: string } & (
   | { pick: 'coach'; side: Side }
   | { pick: 'extra'; kind: 'fan' | 'steward'; at: Point }
   | { pick: 'scorer' }                       // solo per eventi scatenati da un gol
+  | { pick: 'taker' }                        // chi batte il calcio piazzato (eventi scatenati da rigore, punizione, angolo)
 );
 
 /**
@@ -41,7 +42,7 @@ export type Step = { t: number } & (
   | { do: 'move'; who: string; to: Point; speed?: Speed }
   | { do: 'follow'; who: string; target: string; off?: [number, number]; speed?: Speed }
   | { do: 'pass'; from: string; to: string }
-  | { do: 'shoot'; who: string; outcome?: ShotOutcome }    // senza esito decide il Director (punteggio coerente)
+  | { do: 'shoot'; who: string; outcome?: ShotOutcome; goalChance?: number }    // senza esito decide il Director (punteggio coerente); goalChance = probabilità di gol di base
   | { do: 'pose'; who: string; pose: Pose; dur: number; face?: string }
   | { do: 'whistle' }                                      // gioco fermo
   | { do: 'restart'; side: Side }                          // riprende il gioco
@@ -87,8 +88,8 @@ export interface EventDef {
   weight: number;
   /** 0..1: quanto conta (intensità degli indicatori ai bordi, riepilogo). */
   importance: number;
-  /** Parte da solo quando succede qualcosa (es. dopo un gol). */
-  trigger?: 'goal';
+  /** Parte da solo quando succede qualcosa (dopo un gol; quando si batte un rigore, una punizione, un angolo). */
+  trigger?: 'goal' | SetPieceKind;
   /** Si può scegliere solo quando è vera (golf: il tipo di colpo, la distanza dalla buca, l'acqua vicina...). */
   when?: (m: Match) => boolean;
   /** Distanza (m) dalla porta attaccata entro cui deve trovarsi chi ha palla. */

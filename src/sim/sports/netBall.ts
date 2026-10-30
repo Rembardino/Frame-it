@@ -31,7 +31,9 @@ export class NetBall {
     b.flight = null;
     this.heldHeight = height;
     this.catchFrom.copy(b.pos); this.catchTime = 0;
-    this.catchDuration = b.pos.distanceTo(actor.pos) > 3 ? 0.65 : 0.16;
+    // Da lontano (fine punto: la palla torna a chi batte) il raccordo dura di più, così non "spara" attraverso il campo.
+    const distance = b.pos.distanceTo(actor.pos);
+    this.catchDuration = distance > 3 ? Math.max(0.65, distance / 20) : 0.16;
     b.vel.set(0, 0, 0);
   }
 

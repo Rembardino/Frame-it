@@ -4,6 +4,8 @@ import type { SportAction, SportSimulation } from './types';
 import { NetBall } from './netBall';
 import { CONFIG } from '../../config';
 
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
 export class VolleyballSimulation implements SportSimulation {
   private ball: NetBall;
   private wait = 1;
@@ -64,8 +66,31 @@ export class VolleyballSimulation implements SportSimulation {
     const team = kind === 'spike' ? 1 - a.team : a.team;
     const role = kind === 'receive' ? 'mid' : kind === 'set' ? 'fwd' : 'def';
     const next = this.match.actors.find((p) => p.team === team && p.role === role && p !== a)!;
+    this.wait = 0.08;
+    // Errori di gioco: attacco fuori o a rete, ricezione sbagliata. Chiudono lo scambio senza copione.
+    if (kind === 'spike' && Math.random() < 0.14) return this.attackError(a);
+    if (kind === 'receive' && this.touch > 1 && Math.random() < 0.07) return this.digError(a);
     // Lo scambio di sottofondo resta in gioco; il punto decisivo viene dal copione.
-    this.action(kind === 'spike' ? 'rallySpike' : kind, a, next); this.wait = 0.08;
+    this.action(kind === 'spike' ? 'rallySpike' : kind, a, next);
+  }
+
+  /** Schiacciata lunga o sulla rete: punto alla difesa. */
+  private attackError(actor: Actor) {
+    const side = actor.team === 0 ? -1 : 1, radius = CONFIG.visuals.ballRadius * CONFIG.visuals.ballScale;
+    const long = Math.random() < 0.6;
+    const to = long ? new THREE.Vector3(-side * rand(9.6, 10.6), radius, rand(-4.2, 4.2)) : new THREE.Vector3(side * 0.35, 1.7, THREE.MathUtils.clamp(actor.pos.z + rand(-1, 1), -3.5, 3.5));
+    this.match.setPose(actor, 'spike', 0.75, this.match.actors.find((p) => p.team !== actor.team));
+    this.ball.launch(actor, to, long ? 0.75 : 0.45, long ? 0.4 : 0.2, false, null, (1 - actor.team) as TeamId);
+    this.match.excitement = 0.6;
+  }
+
+  /** Ricezione sbagliata: la palla schizza a terra o fuori dalla propria metà. */
+  private digError(actor: Actor) {
+    const side = actor.team === 0 ? -1 : 1, radius = CONFIG.visuals.ballRadius * CONFIG.visuals.ballScale;
+    const to = new THREE.Vector3(side * rand(2, 7.5), radius, THREE.MathUtils.clamp(actor.pos.z + rand(-4, 4), -4.6, 4.6));
+    this.match.setPose(actor, 'receive', 0.75, null);
+    this.ball.launch(actor, to, 0.7, 1.1, false, null, (1 - actor.team) as TeamId);
+    this.match.excitement = 0.55;
   }
 
   private get servingPlayer() {
@@ -107,7 +132,8 @@ export class VolleyballSimulation implements SportSimulation {
     const to = finish ? new THREE.Vector3(side * (kind === 'block' ? 2 : 5.5), 0.2, actor.pos.z * 0.5) : next.pos.clone().setY(kind === 'set' ? 3.1 : 1.2);
     if (!finish && !this.match.ballScripted) {
       to.x = (next.team === 0 ? -1 : 1) * (next.role === 'fwd' ? 1.4 : next.role === 'mid' ? 3.8 : 6.2);
-      to.z = THREE.MathUtils.clamp(next.base.z * 0.65 + Math.sin(this.match.time * 0.7) * 1.2, -3.6, 3.6);
+      // Le schiacciate dello scambio cambiano direzione: diagonale, parallela, al centro.
+      to.z = THREE.MathUtils.clamp(next.base.z * 0.65 + Math.sin(this.match.time * 0.7) * 1.2 + (kind === 'rallySpike' ? rand(-2, 2) : 0), -3.6, 3.6);
     }
     this.match.setPose(actor, kind === 'receive' ? 'receive' : kind === 'set' ? 'set' : kind === 'block' ? 'block'
       : kind === 'serve' || kind === 'ace' ? 'serve' : 'spike', 0.75, next);

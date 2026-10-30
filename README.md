@@ -39,6 +39,8 @@ La regia, il replay, il voto dell'inquadratura e il record locale funzionano per
 
 Gli atleti frenano prima di invertire la corsa, evitano gli incroci e riducono il movimento durante tiri e salti. Passi laterali e all'indietro seguono la direzione effettiva. Calcio e basket hanno supporto, inserimenti, tagli e marcature; i tennisti anticipano la palla e recuperano il centro, la pallavolo prepara copertura e muro, i pugili si spostano attorno all'avversario e arretrano ai colpi. Le azioni dei giochi di rete aspettano la traiettoria in corso; dopo un gol il battitore torna al centro senza teletrasportarsi. Piano e verifiche: [docs/gameplay-plan.md](docs/gameplay-plan.md).
 
+Nel calcio i falli vicino alla porta portano a rigori e punizioni con barriera (azioni a tutti gli effetti: indizio, inquadratura ideale, voto, replay); il pallone che esce produce rimesse laterali, calci d'angolo e rimesse dal fondo. Gli scambi di tennis e pallavolo variano direzione e velocità e possono finire con un errore; nella boxe una parte dei colpi finisce sulla guardia. Dettagli: [docs/dynamics-plan.md](docs/dynamics-plan.md).
+
 ## Android AAB (Expo)
 
 Il contenitore Expo in `mobile/` include il gioco offline e usa il progetto `@rembardino/frame-it`, package Android `com.frameitnow`.

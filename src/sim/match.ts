@@ -44,8 +44,10 @@ export type Pose =
   | 'address' | 'swing' | 'practice' | 'putt'
   /** Ciclismo: in piedi sui pedali. Vela: alle manovelle. */
   | 'sprint' | 'grind';
-export type MatchPhase = 'play' | 'goal' | 'reset' | 'dead';
+export type MatchPhase = 'play' | 'goal' | 'reset' | 'dead' | 'setPiece';
 export type ShotOutcome = 'goal' | 'save' | 'wide';
+/** Calci piazzati del calcio: rigore, punizione diretta, calcio d'angolo. */
+export type SetPieceKind = 'penalty' | 'freeKick' | 'corner';
 
 /** Effetti speciali (eventi rari). Per aggiungerne uno: nome qui, stato in Match.sky, disegno in render/skyEffects.ts. */
 export type EffectName = 'shootingStar';
@@ -60,8 +62,10 @@ export type SoundName =
 /** Segnali per l'audio: un suono in un punto del campo, o una frase urlata da un personaggio. Chi li legge li svuota. */
 export type Cue = { type: 'sound'; sound: SoundName; at: THREE.Vector3; power: number } | { type: 'say'; actor: Actor; line: Shout };
 
-/** Fatti della partita letti dall'Event Director. */
-export type MatchEvent = { type: 'goal'; scorer: Actor; at: number };
+/** Fatti della partita letti dall'Event Director. setPiece = sta per battersi un calcio piazzato (taker lo batte). */
+export type MatchEvent =
+  | { type: 'goal'; scorer: Actor; at: number }
+  | { type: 'setPiece'; kind: SetPieceKind; taker: Actor; at: number };
 
 export interface Actor {
   id: number;
@@ -129,6 +133,24 @@ export interface Ball {
   flight: Flight | null;
   /** Rotazione accumulata, solo per la grafica. */
   spin: number;
+}
+
+/** Calcio piazzato in corso: posizioni assegnate, fischio, rincorsa, battuta. */
+interface SetPiece {
+  kind: SetPieceKind;
+  team: TeamId;
+  taker: Actor;
+  spot: THREE.Vector3;
+  /** Secondi dall'inizio. */
+  t: number;
+  /** Stacco TV già fatto per chi era in ritardo. */
+  cut: boolean;
+  /** Fischio dato: parte la rincorsa. */
+  whistled: boolean;
+  /** Angolo: chi stacca sul cross. */
+  receiver: Actor | null;
+  /** Posizioni assegnate a chi partecipa (gli altri tengono la formazione). */
+  targets: Map<Actor, THREE.Vector3>;
 }
 
 const L = CONFIG.pitch.length;
@@ -277,6 +299,16 @@ export class Match {
   private catchFrom: THREE.Vector3 | null = null;
   /** Basket: quanto vale il tiro in volo (2 o 3). */
   private shotPoints = 2;
+  /** Calcio: calcio piazzato in corso (rigore, punizione, angolo). */
+  private setPiece: SetPiece | null = null;
+  /** Ultima squadra che ha toccato il pallone: decide a chi va la rimessa quando esce. */
+  private lastTouch: TeamId = 0;
+  /** Il prossimo a raggiungere il pallone fermo lo rimette con le mani (rimessa laterale). */
+  private throwIn = false;
+  /** Chi riceve il cross dall'angolo tira al volo appena gli arriva. */
+  private firstTimeShooter: Actor | null = null;
+  /** Esito dei tiri decisi dalla partita (angoli, battute senza copione): lo imposta il Director per tenere il punteggio coerente. */
+  resolveOutcome: ((requested: ShotOutcome | undefined, attack: TeamId, goalChance?: number) => ShotOutcome) | null = null;
 
   constructor() {
     let id = 0;
@@ -386,7 +418,12 @@ export class Match {
           if (xzDist(t.pos, this.ball.pos) < 1) {
             this.restartTaker = null;
             this.setPhase('play');
-            this.giveBall(t, 0.8);
+            if (this.throwIn) {
+              // Rimessa laterale: pallone sopra la testa, lancio con due mani a un compagno vicino.
+              this.throwIn = false;
+              this.setPose(t, 'throw', 0.9);
+              this.giveBall(t, 0.55, true);
+            } else this.giveBall(t, 0.8);
           }
         } else if (this.phaseTime > this.deadDelay) {
           const next = this.onDeadEnd;
@@ -394,6 +431,9 @@ export class Match {
           this.setPhase('play');
           next?.();
         }
+        break;
+      case 'setPiece':
+        this.updateSetPiece(dt);
         break;
     }
     this.updateReferee();
@@ -486,12 +526,151 @@ export class Match {
     this.deadBall(Infinity, () => {});
   }
 
-  /** Riprende il gioco: il giocatore libero più vicino della squadra va sul pallone e riparte. */
+  /** Riprende il gioco: nel calcio, vicino alla porta, con un rigore o una punizione; altrimenti il più vicino va sul pallone. */
   restartPlay(team: TeamId) {
     if (this.phase !== 'dead' || this.deadDelay !== Infinity) return;
+    const kind = this.setPieceFor(team);
+    if (kind) return this.startSetPiece(kind, team);
     this.restartTaker =
       this.nearest(this.ball.pos, (a) => a.team === team && a.role !== 'gk' && !a.scripted) ??
       this.nearest(this.ball.pos, (a) => a.team === team && a.role !== 'gk');
+  }
+
+  // ---------------------------------------------------------------- calci piazzati (calcio)
+
+  /** Fallo in area = rigore; entro freeKickRange metri dalla porta attaccata = punizione diretta. */
+  private setPieceFor(team: TeamId): SetPieceKind | null {
+    if (BASKET || this.sportSimulation || this.over) return null;
+    const d = dirOf(team), b = this.ball.pos;
+    const dist = Math.abs(d * L / 2 - b.x);
+    if (dist < 0.2 * L && Math.abs(b.z) < 0.3 * W && b.x * d > 0) return 'penalty';
+    if (dist < M.freeKickRange) return 'freeKick';
+    return null;
+  }
+
+  /** Mette tutti al loro posto: battitore in rincorsa, barriera, portiere, attaccanti in area; poi fischio e battuta. */
+  private startSetPiece(kind: SetPieceKind, team: TeamId) {
+    const d = dirOf(team), b = this.ball;
+    const spot = kind === 'penalty' ? new THREE.Vector3(d * (L / 2 - 0.15 * L), 0, 0)
+      : kind === 'corner' ? new THREE.Vector3(d * (L / 2 - 0.3), 0, Math.sign(b.pos.z || 1) * (W / 2 - 0.3))
+      : clampToPitch(b.pos.clone(), 1).setY(0);
+    b.pos.copy(spot).setY(BALL_RADIUS); b.state = 'dead'; b.holder = null; b.flight = null; b.inHands = false; b.vel.set(0, 0, 0);
+    this.ballScripted = false;
+    this.restartTaker = null;
+    const goal = new THREE.Vector3(d * L / 2, 0, 0);
+    const toGoal = goal.clone().sub(spot).setY(0).normalize();
+    const sideways = new THREE.Vector3(-toGoal.z, 0, toGoal.x);
+    const attackers = this.actors.filter((a) => a.team === team && a.role !== 'gk');
+    const defenders = this.actors.filter((a) => a.team !== team && a.role !== 'gk');
+    const gk = this.actors.find((a) => a.team !== team && a.role === 'gk')!;
+    const taker = kind === 'penalty'
+      ? attackers.find((a) => a.role === 'fwd' && a.pose !== 'fall') ?? attackers[0]
+      : this.nearest(spot, (a) => a.team === team && a.role !== 'gk' && a.pose !== 'fall') ?? attackers[0];
+    const targets = new Map<Actor, THREE.Vector3>();
+    // Rincorsa: qualche metro dietro il pallone, un po' di lato per l'angolo di tiro.
+    targets.set(taker, clampToPitch(spot.clone().addScaledVector(toGoal, kind === 'penalty' ? -3.8 : -3).addScaledVector(sideways, (taker.id % 2 ? 1 : -1) * 1.2), 0.5));
+    let receiver: Actor | null = null;
+    const box = 0.2 * L;
+    if (kind === 'penalty') {
+      targets.set(gk, new THREE.Vector3(d * (L / 2 - 0.35), 0, 0));
+      // Tutti gli altri fuori dall'area, lungo il limite e la lunetta, attaccanti e difensori mischiati.
+      const others = [...attackers.filter((a) => a !== taker), ...defenders].sort((p, q) => p.pos.z - q.pos.z);
+      others.forEach((a, i) => {
+        const z = -8 + (16 * i) / Math.max(1, others.length - 1);
+        const arc = Math.max(0, 1 - (z / 6) ** 2) * 1.6;
+        targets.set(a, new THREE.Vector3(d * (L / 2 - box - 1 - arc - (a.team === team ? 0.5 : 0)), 0, z));
+      });
+    } else {
+      const nearPost = Math.sign(spot.z || 1);
+      if (kind === 'freeKick') {
+        // Barriera a distanza regolamentare, spostata di mezzo uomo a coprire il palo vicino.
+        const n = xzDist(spot, goal) < 16 ? 4 : 3;
+        const center = spot.clone().addScaledVector(toGoal, M.wallDistance).addScaledVector(sideways, 0.4 * nearPost * Math.sign(sideways.z || 1));
+        const wall = [...defenders].sort((p, q) => xzDist(p.pos, center) - xzDist(q.pos, center)).slice(0, n);
+        wall.forEach((a, i) => targets.set(a, clampToPitch(center.clone().addScaledVector(sideways, (i - (n - 1) / 2) * 0.52), 0.5)));
+        targets.set(gk, new THREE.Vector3(d * (L / 2 - 0.4), 0, -nearPost * 1.1));
+      } else targets.set(gk, new THREE.Vector3(d * (L / 2 - 0.5), 0, -nearPost * 0.6));
+      // Attaccanti in area (sul corner anche chi stacca), ognuno marcato da un difensore libero.
+      const runners = attackers.filter((a) => a !== taker).sort((p, q) => q.pos.x * d - p.pos.x * d).slice(0, kind === 'corner' ? 4 : 3);
+      const markers = defenders.filter((a) => !targets.has(a));
+      runners.forEach((a, i) => {
+        const z = (i % 2 ? 1 : -1) * (1.5 + Math.floor(i / 2) * 2.2) * (kind === 'corner' ? -nearPost : 1);
+        const depth = kind === 'corner' ? 5 + i * 1.3 : box - 2.5 + i * 0.7;
+        targets.set(a, new THREE.Vector3(d * (L / 2 - depth), 0, z));
+        const m = markers.shift();
+        if (m) targets.set(m, new THREE.Vector3(d * (L / 2 - depth + 1), 0, z * 0.9));
+      });
+      if (kind === 'corner') receiver = runners[0] ?? null;
+    }
+    for (const a of this.actors) {
+      if (!LOCKED.includes(a.pose)) this.setPose(a, 'normal');
+      a.faceTarget = null;
+    }
+    this.setPiece = { kind, team, taker, spot, t: 0, cut: false, whistled: false, receiver, targets };
+    this.setPhase('setPiece');
+    this.events.push({ type: 'setPiece', kind, taker, at: this.time });
+  }
+
+  private updateSetPiece(dt: number) {
+    const sp = this.setPiece!;
+    sp.t += dt;
+    this.updateFormation();
+    for (const [a, p] of sp.targets) {
+      if (LOCKED.includes(a.pose)) continue;
+      a.target.copy(p);
+      a.speedLimit = a === sp.taker ? M.walkSpeed * 1.4 : M.jogSpeed;
+    }
+    const ready = M.setPieceReadySec;
+    if (!sp.cut && sp.t > ready - 0.6) {
+      // Stacco TV: chi è ancora in ritardo salta al suo posto.
+      sp.cut = true;
+      if ([...sp.targets].some(([a, p]) => xzDist(a.pos, p) > 1.2)) {
+        for (const [a, p] of sp.targets) { a.pos.copy(p).setY(0); a.vel.set(0, 0, 0); a.heading = Math.atan2(sp.spot.z - p.z, sp.spot.x - p.x); }
+        this.cuts++;
+      }
+    }
+    if (!sp.whistled && sp.t >= ready) {
+      sp.whistled = true;
+      this.sound('whistle', this.referee.pos, 0.7);
+      this.setPose(sp.taker, 'windUp', 1.4);
+      this.excitement = Math.max(this.excitement, sp.kind === 'penalty' ? 0.7 : 0.5);
+    }
+    if (!sp.whistled) return;
+    const taker = sp.taker;
+    if (this.ball.holder !== taker) {
+      taker.target.copy(sp.spot);
+      taker.speedLimit = sp.kind === 'penalty' ? M.runSpeed : M.jogSpeed;
+      if (xzDist(taker.pos, sp.spot) < 0.8 || sp.t > ready + 2.5) {
+        // Da qui il Director può chiamare shoot(); se nessuno lo fa entro mezzo secondo batte la partita.
+        this.giveBall(taker, 0.5);
+        this.lastTouch = sp.team;
+      }
+    } else if ((this.holdTimer -= dt) <= 0) this.kickSetPiece();
+  }
+
+  /** Battuta decisa dalla partita: tiro (rigore, punizione) o cross in area (angolo). */
+  private kickSetPiece() {
+    const sp = this.setPiece!;
+    if (sp.kind === 'corner' && sp.receiver) {
+      const to = sp.receiver.pos.clone().addScaledVector(sp.receiver.vel, 0.4);
+      clampToPitch(to, 1).setY(BALL_RADIUS);
+      const dist = xzDist(to, this.ball.pos);
+      this.firstTimeShooter = sp.receiver;
+      this.launch(to, dist / (M.passSpeed * 1.1), 2.2 + dist * 0.06, 'pass', sp.taker, sp.receiver);
+      sp.receiver.target.copy(to).setY(0);
+      this.endSetPiece();
+      return;
+    }
+    const chance = sp.kind === 'penalty' ? M.penaltyGoalChance : undefined;
+    const outcome = this.resolveOutcome?.(undefined, sp.team, chance) ?? (chance !== undefined && Math.random() < chance ? 'goal' : undefined);
+    this.shoot(sp.taker, outcome);
+  }
+
+  /** Il pallone è stato battuto: si torna al gioco normale. */
+  private endSetPiece() {
+    if (!this.setPiece) return;
+    this.setPiece = null;
+    this.setPhase('play');
   }
 
   /** Prepara un effetto (all'inizio dell'evento): sceglie dove apparirà. */
@@ -564,6 +743,8 @@ export class Match {
   /** Tiro verso la porta avversaria. Senza esito indicato lo sceglie a caso coi pesi di CONFIG. */
   shoot(h: Actor, outcome?: ShotOutcome) {
     this.ballScripted = false; // da qui in poi decide la fisica: gol, parata o fuori
+    this.endSetPiece(); // la battuta di un rigore o di una punizione riporta al gioco
+    this.lastTouch = h.team;
     if (BASKET) return this.shootHoop(h, outcome ?? (Math.random() < 0.5 ? 'goal' : 'save'));
     const d = dirOf(h.team);
     const gk = this.actors.find((a) => a.team !== h.team && a.role === 'gk')!;
@@ -862,6 +1043,8 @@ export class Match {
 
   private pass(h: Actor) {
     const d = dirOf(h.team);
+    // Rimessa laterale (o rilancio a mano del portiere): corta e a parabola, da sopra la testa.
+    const throwing = this.ball.inHands && !BASKET;
     let best: Actor | null = null;
     let bestScore = -Infinity;
     for (const a of this.actors) {
@@ -873,17 +1056,18 @@ export class Match {
       const marked = marker && xzDist(marker.pos, a.pos) < (BASKET ? 1 : 2.5) ? 6 : 0;
       // Niente tiri automatici: vicino alla porta avversaria si preferisce scaricare indietro o di lato.
       const tooDeep = !BASKET && Math.abs(d * L / 2 - a.pos.x) < 14 ? 8 : 0;
-      const score = forward * 0.5 - Math.abs(dist - (BASKET ? 6 : 14)) * 0.35 - marked - tooDeep + Math.random() * 5;
+      const score = forward * 0.5 - Math.abs(dist - (BASKET ? 6 : throwing ? 9 : 14)) * 0.35 - marked - tooDeep + Math.random() * 5;
       if (score > bestScore) { bestScore = score; best = a; }
     }
     if (!best) { this.holdTimer = 0.5; return; }
 
     if (Math.random() < 0.12) this.say(best, 'call');
     const to = best.pos.clone().addScaledVector(best.vel, 0.6);
-    if (Math.random() < M.badPassChance) to.add(new THREE.Vector3(rand(-6, 6), 0, rand(-6, 6)));
+    if (Math.random() < M.badPassChance && !throwing) to.add(new THREE.Vector3(rand(-6, 6), 0, rand(-6, 6)));
     clampToPitch(to, 1).setY(BASKET ? 1.2 : BALL_RADIUS);
     const dist = xzDist(to, this.ball.pos);
-    this.launch(to, dist / M.passSpeed, dist > 22 ? dist * 0.12 : BASKET ? 0.4 : 0.15, 'pass', h, best);
+    if (throwing && h.role !== 'gk') this.ball.pos.y = 2 * CONFIG.visuals.playerScale;
+    this.launch(to, dist / (throwing ? M.passSpeed * 0.8 : M.passSpeed), throwing ? 1 + dist * 0.05 : dist > 22 ? dist * 0.12 : BASKET ? 0.4 : 0.15, 'pass', h, best);
   }
 
   private launch(to: THREE.Vector3, dur: number, arc: number, kind: Flight['kind'], kicker: Actor | null, receiver: Actor | null = null) {
@@ -909,6 +1093,7 @@ export class Match {
     b.vel.set(0, 0, 0);
     this.catchFrom = b.pos.clone();
     this.possession = a.team;
+    this.lastTouch = a.team;
     this.holdTimer = hold;
   }
 
@@ -969,7 +1154,13 @@ export class Match {
     // Passaggio: quelli da copione arrivano sempre.
     if (f.receiver && (this.ballScripted || xzDist(f.receiver.pos, f.to) < 1.8)) {
       this.giveBall(f.receiver);
+      // Cross dall'angolo: chi lo riceve tira al volo.
+      if (this.firstTimeShooter === f.receiver && this.phase === 'play' && !this.over) {
+        this.firstTimeShooter = null;
+        this.shoot(f.receiver, this.resolveOutcome?.(undefined, f.receiver.team) ?? undefined);
+      }
     } else {
+      this.firstTimeShooter = null;
       const dir = tmp.subVectors(f.to, f.from).setY(0).normalize();
       this.looseBall(5, Math.atan2(dir.z, dir.x));
       b.pos.y = BALL_RADIUS;
@@ -1017,7 +1208,10 @@ export class Match {
     } else if (b.state === 'loose') {
       b.pos.addScaledVector(b.vel, dt);
       b.vel.multiplyScalar(Math.exp(-1.2 * dt));
-      // Rimbalza sui bordi invece di uscire (semplificazione: niente rimesse laterali).
+      const football = !BASKET && !this.sportSimulation && this.phase === 'play' && !this.ballScripted && !this.over;
+      if (football && Math.abs(b.pos.z) > W / 2 + 0.2) return this.ballOut('side');
+      if (football && Math.abs(b.pos.x) > L / 2 + 0.2) return this.ballOut('end');
+      // Basket e copioni: rimbalza sui bordi invece di uscire.
       if (Math.abs(b.pos.x) > L / 2 - 0.5) { b.vel.x *= -0.6; clampToPitch(b.pos, 0.5); }
       if (Math.abs(b.pos.z) > W / 2 - 0.5) { b.vel.z *= -0.6; clampToPitch(b.pos, 0.5); }
       if (this.phase === 'play' && !this.ballScripted) {
@@ -1026,6 +1220,35 @@ export class Match {
       }
     }
     b.spin += Math.hypot(b.pos.x - px, b.pos.z - pz) / BALL_RADIUS;
+  }
+
+  /** Pallone fuori: rimessa laterale con le mani, oppure dal fondo (rimessa del portiere o calcio d'angolo). */
+  private ballOut(edge: 'side' | 'end') {
+    const b = this.ball;
+    const team = (1 - this.lastTouch) as TeamId;
+    this.sound('whistle', this.referee.pos, 0.4);
+    if (edge === 'side') {
+      b.pos.set(clamp(b.pos.x, -L / 2 + 1, L / 2 - 1), BALL_RADIUS, Math.sign(b.pos.z) * (W / 2 + 0.2));
+      b.vel.set(0, 0, 0); b.state = 'dead';
+      this.deadBall(Infinity, () => {});
+      this.throwIn = true;
+      this.restartTaker = this.nearest(b.pos, (a) => a.team === team && a.role !== 'gk' && !a.scripted)
+        ?? this.nearest(b.pos, (a) => a.team === team && a.role !== 'gk');
+      return;
+    }
+    const endSide = Math.sign(b.pos.x) || 1;
+    // Dietro la porta che la squadra "team" attacca = calcio d'angolo; dietro la propria = rimessa dal fondo.
+    if (dirOf(team) === endSide) {
+      b.pos.set(endSide * (L / 2 - 0.3), BALL_RADIUS, Math.sign(b.pos.z || 1) * (W / 2 - 0.3));
+      b.vel.set(0, 0, 0); b.state = 'dead';
+      this.deadBall(Infinity, () => {});
+      this.startSetPiece('corner', team);
+      return;
+    }
+    const gk = this.actors.find((a) => a.team === team && a.role === 'gk')!;
+    b.pos.set(endSide * (L / 2 - 0.08 * L + 0.5), BALL_RADIUS, Math.sign(b.pos.z || 1) * 0.15 * W);
+    b.vel.set(0, 0, 0); b.state = 'dead';
+    this.deadBall(1.8, () => this.giveBall(gk, 1));
   }
 
   // ---------------------------------------------------------------- movimento
