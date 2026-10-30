@@ -15,6 +15,12 @@ await mkdir(artifacts, { recursive: true });
 try {
   for (const sport of ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo']) {
     const page = await browser.newPage({ viewport: { width: 960, height: 540 }, hasTouch: true, isMobile: true });
+    await page.addInitScript(() => {
+      let seed = 731;
+      Math.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      // Ignore how many animation frames ran before the test paused the game.
+      window.addEventListener('frameit:pause', () => { seed = 731; });
+    });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`${base}?debug&lang=it&sport=${sport}`);
@@ -52,7 +58,7 @@ try {
       stage.renderer.setAnimationLoop(() => stage.renderer.render(stage.scene, stage.camera));
       return { athletes: match.actors.length, time: match.time, action: action?.pose, geometries: stage.renderer.info.memory.geometries };
     });
-    assert(metrics.time > 9.9 && metrics.geometries > 0 && metrics.action, `${sport}: no animated sporting action rendered`);
+    assert(metrics.time > 9.9 && metrics.geometries > 0 && metrics.action, `${sport}: no animated sporting action rendered: ${JSON.stringify(metrics)}`);
     await page.screenshot({ path: fileURLToPath(new URL(`${sport}.png`, artifacts)) });
     assert.deepEqual(errors, [], `${sport}: browser errors`);
     console.log(`${sport}: ${metrics.athletes} athletes, ${metrics.action} animation, WebGL scene and mobile HUD rendered`);

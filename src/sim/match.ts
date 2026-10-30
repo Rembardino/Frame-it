@@ -1212,8 +1212,10 @@ export class Match {
       if (football && Math.abs(b.pos.z) > W / 2 + 0.2) return this.ballOut('side');
       if (football && Math.abs(b.pos.x) > L / 2 + 0.2) return this.ballOut('end');
       // Basket e copioni: rimbalza sui bordi invece di uscire.
-      if (Math.abs(b.pos.x) > L / 2 - 0.5) { b.vel.x *= -0.6; clampToPitch(b.pos, 0.5); }
-      if (Math.abs(b.pos.z) > W / 2 - 0.5) { b.vel.z *= -0.6; clampToPitch(b.pos, 0.5); }
+      if (!football) {
+        if (Math.abs(b.pos.x) > L / 2 - 0.5) { b.vel.x *= -0.6; clampToPitch(b.pos, 0.5); }
+        if (Math.abs(b.pos.z) > W / 2 - 0.5) { b.vel.z *= -0.6; clampToPitch(b.pos, 0.5); }
+      }
       if (this.phase === 'play' && !this.ballScripted) {
         const c = this.nearest(b.pos, (a) => !a.scripted && !LOCKED.includes(a.pose));
         if (c && xzDist(c.pos, b.pos) < 0.9) this.giveBall(c);

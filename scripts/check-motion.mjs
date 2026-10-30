@@ -11,7 +11,7 @@ try {
     globalThis.location = { search: '?sport=' + sport };
     const server = await createServer({ configFile: false, server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' });
     try {
-      const { Match } = await server.ssrLoadModule('/src/sim/match.ts');
+      const { Match, BALL_RADIUS } = await server.ssrLoadModule('/src/sim/match.ts');
       const { actorMotion } = await server.ssrLoadModule('/src/animation/motion.ts');
       const { Recorder } = await server.ssrLoadModule('/src/recorder/recorder.ts');
       const { CONFIG } = await server.ssrLoadModule('/src/config.ts');
@@ -116,6 +116,31 @@ try {
           `${sport}: waiting action never resumes`);
       }
       if (sport === 'calcio') {
+        // Slow balls must cross the touchline/goal line and restart for the correct team.
+        for (const [edge, side, lastTouch, kind] of [
+          ['side', 1, 0, 'throw'], ['side', -1, 1, 'throw'],
+          ['end', 1, 0, 'goalKick'], ['end', -1, 1, 'goalKick'],
+          ['end', 1, 1, 'corner'], ['end', -1, 0, 'corner'],
+        ]) {
+          const out = new Match();
+          out.actors.forEach(a => { a.pos.set(0, 0, 0); a.target.copy(a.pos); a.scripted = true; });
+          out.lastTouch = lastTouch;
+          out.ball.state = 'loose'; out.ball.holder = null; out.ball.flight = null; out.ball.inHands = false;
+          out.ball.pos.set(edge === 'end' ? side * (CONFIG.pitch.length / 2 - 0.6) : 0, BALL_RADIUS,
+            edge === 'side' ? side * (CONFIG.pitch.width / 2 - 0.6) : 3);
+          out.ball.vel.set(edge === 'end' ? side * 4 : 0, 0, edge === 'side' ? side * 4 : 0);
+          for (let i = 0; i < 120 && out.phase === 'play'; i++) out.update(dt);
+          const label = `calcio: ${kind} at ${side} ${edge}`;
+          assert(out.phase === (kind === 'corner' ? 'setPiece' : 'dead'), `${label}: ball bounces off an invisible wall`);
+          if (kind === 'corner') {
+            assert(out.setPiece?.kind === 'corner' && out.setPiece.team === 1 - lastTouch, `${label}: wrong corner team`);
+          } else if (kind === 'throw') {
+            assert(out.restartTaker?.team === 1 - lastTouch, `${label}: wrong throw-in team`);
+          } else {
+            for (let i = 0; i < 180 && out.phase === 'dead'; i++) out.update(dt);
+            assert(out.ball.holder?.role === 'gk' && out.ball.holder.team === 1 - lastTouch, `${label}: wrong goalkeeper`);
+          }
+        }
         const restart = new Match(); restart.ballScripted = true;
         // Force a long recovery, as can happen when a forward has followed a scripted run.
         const taker = restart.actors.find(a => a.team === 1 && a.role === 'fwd');
