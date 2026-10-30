@@ -18,7 +18,7 @@ const FPS = 30;
  * clean = nasconde la scheda del voto (parlerebbe di un'altra azione e copre la leva sinistra).
  */
 export const SCENES = [
-  { id: 'c1-basket-camera', sport: 'basket', mode: 'camera', seconds: 5.5, events: ['b-contropiede'], at: 0.3 },
+  { id: 'c1-basket-camera', sport: 'basket', mode: 'camera', seconds: 5.5, events: ['b-contropiede', 'b-tripla', 'b-penetrazione', 'b-giropalla'], at: 0.3 },
   { id: 'd1-calcio-drone', sport: 'calcio', mode: 'drone', seconds: 6, events: ['contropiede'], at: 0.8, wide: 1.3, clean: true },
   { id: 'd2-golf-drone', sport: 'golf', mode: 'drone', seconds: 6.5, events: ['g-drive', 'g-wood'], at: 1.9, clean: true },
   { id: 'd3-ciclismo-aquila', sport: 'ciclismo', mode: 'drone', seconds: 7, params: '&rare', events: ['c-aquila'], at: 2, wide: 1.5, clean: true },
