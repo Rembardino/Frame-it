@@ -12,6 +12,7 @@ export interface ActorFrame {
   x: number; y: number; z: number; vx: number; vz: number;
   heading: number; runPhase: number;
   pose: Pose; poseTime: number; poseDur: number; poseDir: number;
+  gesture?: string; gestureVariant?: number; previousGesture?: string; previousGestureVariant?: number; appearance?: number;
   previousPose: Pose; previousPoseTime: number; previousPoseDur: number; poseBlendTime: number;
   poseFrom: MotionPose | null;
   active: boolean;
@@ -75,6 +76,8 @@ export class Recorder {
         x: a.pos.x, y: a.pos.y, z: a.pos.z, vx: a.vel.x, vz: a.vel.z,
         heading: a.heading, runPhase: a.runPhase,
         pose: a.pose, poseTime: a.poseTime, poseDur: a.poseDur, poseDir: a.poseDir,
+        gesture: a.gesture, gestureVariant: a.gestureVariant, previousGesture: a.previousGesture,
+        previousGestureVariant: a.previousGestureVariant, appearance: a.appearance,
         previousPose: a.previousPose, previousPoseTime: a.previousPoseTime,
         previousPoseDur: a.previousPoseDur, poseBlendTime: a.poseBlendTime,
         poseFrom: a.poseFrom,
@@ -106,15 +109,21 @@ export class Recorder {
       actor.vel.z = lerp(fa.vz, fb.vz, u);
       actor.heading = lerpAngle(fa.heading, fb.heading, u);
       actor.runPhase = lerp(fa.runPhase, fb.runPhase, u);
-      const f = u < 0.5 || fa.pose !== fb.pose ? fa : fb;
+      const samePose=fa.pose===fb.pose&&fa.gesture===fb.gesture&&(fa.gestureVariant??0)===(fb.gestureVariant??0);
+      const f = u < 0.5 || !samePose ? fa : fb;
       actor.pose = f.pose;
       actor.poseDur = f.poseDur;
       actor.poseDir = f.poseDir;
-      actor.poseTime = fa.pose === fb.pose ? lerp(fa.poseTime, fb.poseTime, u) : f.poseTime;
+      actor.gesture = f.gesture;
+      actor.gestureVariant = f.gestureVariant;
+      actor.previousGesture = f.previousGesture;
+      actor.previousGestureVariant = f.previousGestureVariant;
+      actor.appearance = f.appearance ?? actor.appearance;
+      actor.poseTime = samePose ? lerp(fa.poseTime, fb.poseTime, u) : f.poseTime;
       actor.previousPose = f.previousPose;
       actor.previousPoseTime = f.previousPoseTime;
       actor.previousPoseDur = f.previousPoseDur;
-      actor.poseBlendTime = fa.pose === fb.pose ? lerp(fa.poseBlendTime, fb.poseBlendTime, u) : f.poseBlendTime;
+      actor.poseBlendTime = samePose ? lerp(fa.poseBlendTime, fb.poseBlendTime, u) : f.poseBlendTime;
       actor.poseFrom = f.poseFrom;
       actor.active = fa.active;
       actor.say = f.say;

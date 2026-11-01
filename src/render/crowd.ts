@@ -10,6 +10,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from '../config';
 import type { SeatRow } from './stage';
 import { radialTexture } from './stage';
+import { createCrowdHumans } from './characters';
 
 interface Fan {
   x: number;
@@ -49,6 +50,8 @@ const FLASHES = 48;
 const SCALE = 1.5;
 
 export class Crowd {
+  readonly ready: Promise<void>;
+  private fanState?: THREE.InstancedBufferAttribute;
   private fans: Fan[] = [];
   private body: THREE.InstancedMesh;
   private arms: THREE.InstancedMesh;
@@ -161,6 +164,14 @@ export class Crowd {
     this.armsL = armsL;
     this.update(0, { excitement: 0, hot: { x: 0, level: 0 }, lookUp: 0 });
     scene.add(this.body, head, hair, scarf, sleeves, forearms, this.arms, armsL, this.phones, this.flagPoles, this.flagCloth, this.flashes);
+    this.ready=createCrowdHumans(count,shirts).then(({meshes,fanState})=>{
+      const matrices=this.body.instanceMatrix;
+      for(const old of [this.body,head,hair,scarf,sleeves,forearms,this.arms,armsL]){
+        scene.remove(old);old.geometry.dispose();
+      }
+      for(const mesh of meshes){mesh.instanceMatrix=matrices;scene.add(mesh);}
+      this.body=meshes[0];this.fanState=fanState;
+    });
   }
 
   /** gaps = posti occupati dagli spettatori "veri" dei momenti segreti: lì il tifoso finto sparisce. */
@@ -186,6 +197,8 @@ export class Crowd {
       const standTarget = excite > f.standAt || wave > 0.3 || look > 0.3 ? 1 : 0;
       f.stand += (standTarget - f.stand) * k;
       const stand = f.stand;
+      const raised = !gaps.some(g=>Math.abs(g.y-f.y)<.3&&Math.hypot(g.x-f.x,g.z-f.z)<.6) && (look>.05?f.pointer:excite*f.energy>.55||wave>.6);
+      this.fanState?.setXY(i,stand,raised?Math.min(1,Math.max(look,excite,wave)):0);
       const idle = Math.sin(t * 1.5 + f.phase) * 0.025;
       const jump = excite * f.energy * Math.max(0, Math.sin(t * 9 + f.phase)) * 0.4 * stand * (1 - look);
       const rise = wave * 0.35 * (1 - look);
@@ -216,6 +229,7 @@ export class Crowd {
       }
     }
     this.body.instanceMatrix.needsUpdate = true;
+    if(this.fanState)this.fanState.needsUpdate=true;
     if (showArms) this.arms.instanceMatrix.needsUpdate = true;
     if (flagPos) this.flagPoles.instanceMatrix.needsUpdate = true;
     this.updateFlashes(dt, s.excitement + s.hot.level * 0.5);

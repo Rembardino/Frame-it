@@ -39,6 +39,7 @@ interface Shot {
   t: number; impact: number; carry: number; apex: number; hopDur: number; hopArc: number; roll: number;
   cup: boolean; water: boolean; tree: boolean;
   launched: boolean; landed: boolean; done: boolean; lipped: boolean;
+  followed: boolean;
 }
 
 type Stage = 'setup' | 'ready' | 'shot' | 'walk' | 'holed' | 'done';
@@ -101,6 +102,9 @@ export class GolfSimulation implements SportSimulation {
         if (this.golfer.pose === 'normal') m.setPose(this.golfer, 'address');
         break;
       case 'shot':
+        if(this.shot?.launched&&!this.shot.followed&&this.golfer.pose==='normal'){
+          this.shot.followed=true;m.setPose(this.golfer,'address',1.4,null,'golfFollow');
+        }
         if (this.shot?.done) this.afterShot();
         break;
       case 'walk':
@@ -126,7 +130,8 @@ export class GolfSimulation implements SportSimulation {
     this.shot = this.plan(action);
     this.strokes++;
     this.stage = 'shot';
-    m.setPose(actor, putt ? 'putt' : 'swing', putt ? 1.25 : 1.7);
+    m.setPose(actor, putt ? 'putt' : 'swing', putt ? 1.25 : 1.7, null,
+      putt ? 'golfPutt' : ['chip','bunker','approach'].includes(this.next.kind) ? 'golfChip' : 'golfDrive');
   }
 
   scoreText() {
@@ -327,7 +332,7 @@ export class GolfSimulation implements SportSimulation {
       action, kind, from, land: pin.clone(), hop: pin.clone(), rest: pin.clone(), bend: null,
       t: 0, impact: kind === 'putt' ? T.puttImpact : T.impact, carry: T.carry[kind], apex: T.apex[kind],
       hopDur: HOP[kind][1], hopArc: HOP[kind][2], roll: 0,
-      cup: false, water: false, tree: false, launched: false, landed: false, done: false, lipped: false,
+      cup: false, water: false, tree: false, launched: false, landed: false, done: false, lipped: false, followed: false,
     };
     /** Arriva sul green in rest, atterrando un po' prima lungo la linea del colpo. */
     const toGreen = (rest: THREE.Vector3, back: number) => {

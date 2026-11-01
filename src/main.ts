@@ -134,7 +134,7 @@ for (const [id, on] of [['mode-assist', true], ['mode-expert', false]] as const)
 }
 let seenCuts = 0;
 // In debug gli oggetti di gioco sono raggiungibili dalla console del browser (e dai test automatici).
-if (debug) Object.assign(window, { frameit: { match, director, voice, cam, gyro, recorder, replay, stage, views, hud, practice, drone, audio, secrets, crowd } });
+if (debug) Promise.all([views.ready,crowd.ready]).then(()=>Object.assign(window, { frameit: { match, director, voice, cam, gyro, recorder, replay, stage, views, hud, practice, drone, audio, secrets, crowd } })).catch(()=>{});
 
 function resize() {
   stage.renderer.setSize(innerWidth, innerHeight);
@@ -473,8 +473,23 @@ addEventListener('keydown', (e) => { if (e.code === 'KeyF' && cameraCanMove()) d
 // Schermata iniziale: il tocco avvia la partita e chiede schermo intero + orizzontale (dove supportato).
 let running = false;
 const startScreen = $('start');
+let modelsReady=false, modelsFailed=false, pendingStart=false;
+const assetStatus=document.createElement('p');assetStatus.setAttribute('role','status');assetStatus.setAttribute('aria-live','polite');
+const loadingText={en:'Loading characters…',it:'Caricamento personaggi…',es:'Cargando personajes…',fr:'Chargement des personnages…',de:'Figuren werden geladen…'};
+const failedText={en:'Characters could not load. Please retry.',it:'Impossibile caricare i personaggi. Riprova.',es:'No se pudieron cargar los personajes. Reintenta.',fr:'Impossible de charger les personnages. Réessayez.',de:'Figuren konnten nicht geladen werden. Bitte erneut versuchen.'};
+assetStatus.textContent=loadingText[LANGUAGE];$('start-btn').insertAdjacentElement('afterend',assetStatus);
+const modelButtons=['start-btn','tutorial-btn','practice-btn'].map(id=>$(id) as HTMLButtonElement);
+modelButtons.forEach(b=>b.disabled=true);
+Promise.all([views.ready,crowd.ready]).then(()=>{
+  modelsReady=true;assetStatus.remove();modelButtons.forEach(b=>b.disabled=false);
+  if(pendingStart)start();
+}).catch(error=>{
+  console.error('Character assets could not load',error);modelsFailed=true;assetStatus.textContent=failedText[LANGUAGE];
+  const button=$('start-btn') as HTMLButtonElement;button.disabled=false;button.textContent=t('Riprova');
+});
 function start() {
   if (running) return;
+  if(!modelsReady){pendingStart=true;return;}
   audio.unlock();
   startScreen.classList.add('hidden');
   $('zoomctl').classList.toggle('hidden', !CONFIG.camera.zoomButtons);
@@ -492,6 +507,8 @@ function start() {
     .catch(() => {}); // iOS / iframe: niente fullscreen, pazienza
 }
 function requestStart() {
+  if(modelsFailed){location.reload();return;}
+  if(!modelsReady)return;
   if (running) return;
   if (tutorialSeen() || DRONE_ONLY) start();
   else tutorial.open(start, true);

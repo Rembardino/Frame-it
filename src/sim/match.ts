@@ -35,7 +35,7 @@ export type Pose =
   | 'protest' | 'argue' | 'shove' | 'card' | 'windUp' | 'kick' | 'crouch' | 'wave'
   /** Basket: tiro in sospensione e passaggio a due mani. */
   | 'shoot' | 'throw' | 'racket' | 'backhand' | 'serve' | 'receive' | 'set' | 'spike' | 'block'
-  | 'guard' | 'jab' | 'hook' | 'uppercut' | 'recoil'
+  | 'guard' | 'jab' | 'hook' | 'uppercut' | 'recoil' | 'combo' | 'count' | 'getUp'
   /** Spettatori dei momenti segreti. */
   | 'hug' | 'hide' | 'kiss' | 'dance' | 'sleep' | 'kneel'
   /** Spettatore risucchiato dalla navicella: si dimena a mezz'aria. */
@@ -89,6 +89,12 @@ export interface Actor {
   poseTime: number;
   /** Durata della posa (s), poi torna 'normal'. */
   poseDur: number;
+  /** Imported gesture and variation are simulation state, so saved replays keep the same animation. */
+  gesture?: string;
+  gestureVariant?: number;
+  previousGesture?: string;
+  previousGestureVariant?: number;
+  appearance?: number;
   previousPose: Pose;
   previousPoseTime: number;
   previousPoseDur: number;
@@ -121,6 +127,7 @@ interface Flight {
   kicker: Actor | null;
   receiver: Actor | null;
   shot: ShotOutcome | null;
+  control?: 'footballHeader' | 'footballKnee';
 }
 
 export interface Ball {
@@ -218,7 +225,7 @@ export function clampToPitch(v: THREE.Vector3, margin: number) {
 
 function makeActor(id: number, team: TeamId, role: Role, base = { x: 0, z: 0 }): Actor {
   return {
-    id, team, role, base,
+    id, team, role, base, appearance: Math.floor(Math.random() * 14),
     active: true,
     scripted: false,
     pos: new THREE.Vector3(),
@@ -241,6 +248,7 @@ function makeActor(id: number, team: TeamId, role: Role, base = { x: 0, z: 0 }):
 }
 
 export class Match {
+  private gestureCounts = new Map<string, number>();
   readonly sportSimulation: SportSimulation | null;
   /** I 14 giocatori. */
   readonly actors: Actor[] = [];
@@ -437,6 +445,11 @@ export class Match {
         break;
     }
     this.updateReferee();
+    if(SPORT==='calcio')for(const gk of this.actors.filter(a=>a.role==='gk')){
+      const elapsed=this.time+gk.id*.7;
+      if(gk.pose==='normal'&&!gk.scripted&&this.ball.holder!==gk&&Math.floor(elapsed/11)!==Math.floor((elapsed-dt)/11))
+        this.setPose(gk,'wave',1.5,null,'keeperDirect');
+    }
     this.updateCoaches();
     const star = this.sky.star;
     if (star.active && (star.t += dt) >= star.dur) star.active = false;
@@ -453,6 +466,8 @@ export class Match {
     const speed = M.passSpeed * 1.2;
     const target = to.pos.clone().addScaledVector(to.vel, xzDist(from.pos, to.pos) / speed);
     clampToPitch(target, 1).setY(BASKET ? 1.2 : BALL_RADIUS);
+    const aerial=this.gestureCounts.get('aerial-pass')??0;this.gestureCounts.set('aerial-pass',aerial+1);
+    if(SPORT==='calcio'&&aerial%4===2)target.y=1.25*CONFIG.visuals.playerScale;
     const dist = xzDist(target, b.pos);
     this.launch(target, dist / speed, dist > 22 ? dist * 0.12 : BASKET ? 0.3 + dist * 0.06 : 0.15, 'pass', from, to);
     to.target.copy(target).setY(0);
@@ -460,11 +475,18 @@ export class Match {
   }
 
   /** Imposta una posa per dur secondi. Cadere o entrare in scivolata fa perdere la palla. */
-  setPose(a: Actor, pose: Pose, dur = Infinity, face: Actor | null = null) {
+  setPose(a: Actor, pose: Pose, dur = Infinity, face: Actor | null = null, gesture?: string) {
+    if (SPORT === 'boxe' && a.role === 'ref' && pose === 'card') pose = 'count';
     a.poseFrom = actorMotion(a, this.time, this.ball.holder === a);
     a.previousPose = a.pose;
     a.previousPoseTime = a.poseTime;
     a.previousPoseDur = a.poseDur;
+    a.previousGesture = a.gesture;
+    a.previousGestureVariant = a.gestureVariant;
+    a.gesture = gesture;
+    const key = `${a.id}:${gesture ?? pose}`;
+    a.gestureVariant = this.gestureCounts.get(key) ?? 0;
+    this.gestureCounts.set(key, a.gestureVariant + 1);
     a.poseBlendTime = 0;
     a.pose = pose;
     a.poseTime = 0;
@@ -653,7 +675,7 @@ export class Match {
     const sp = this.setPiece!;
     if (sp.kind === 'corner' && sp.receiver) {
       const to = sp.receiver.pos.clone().addScaledVector(sp.receiver.vel, 0.4);
-      clampToPitch(to, 1).setY(BALL_RADIUS);
+      clampToPitch(to, 1).setY(1.55 * CONFIG.visuals.playerScale);
       const dist = xzDist(to, this.ball.pos);
       this.firstTimeShooter = sp.receiver;
       this.launch(to, dist / (M.passSpeed * 1.1), 2.2 + dist * 0.06, 'pass', sp.taker, sp.receiver);
@@ -777,7 +799,7 @@ export class Match {
     this.ball.flight!.shot = outcome;
 
     gk.scripted = false;
-    this.setPose(gk, 'dive', 1.4);
+    this.setPose(gk, 'dive', 1.4, null, outcome === 'save' ? (ty > 1.1 ? 'keeperCatch' : 'keeperDive') : outcome === 'wide' ? 'keeperMiss' : 'keeperBlock');
     gk.poseTime = -0.15; // tempo di reazione
     gk.poseDir = Math.sign(reach - gk.pos.z) || 1;
     gk.target.set(gk.pos.x, 0, reach);
@@ -849,7 +871,7 @@ export class Match {
   private kickoff(team: TeamId) {
     this.setPhase('play');
     this.sound('whistle', this.referee.pos, 0.7);
-    for (const a of this.actors) this.setPose(a, 'normal');
+    for (const a of this.actors) this.setPose(a, 'normal', SPORT==='calcio'?.75:Infinity,null,SPORT==='calcio'?'footballEntry':undefined);
     const taker = this.actors.find((a) => a.team === team && a.role === (BASKET ? 'mid' : 'fwd'))!;
     this.giveBall(taker, 0.6);
   }
@@ -1022,7 +1044,7 @@ export class Match {
       c.target.set(c.base.x + Math.sin(this.time * 0.25 + c.seed) * 2.5, 0, c.base.z);
       c.speedLimit = M.walkSpeed;
       c.faceTarget = this.referee; // guardano verso il campo
-      if (c.pose === 'normal' && Math.random() < 0.002) this.setPose(c, 'argue', 2, this.referee);
+      if (c.pose === 'normal' && Math.random() < 0.002) this.setPose(c, 'argue', 2, this.referee,c.team===1?'phone':undefined);
     }
   }
 
@@ -1030,7 +1052,7 @@ export class Match {
     const d = dirOf(h.team);
     if (this.ball.inHands) {
       h.target.copy(h.pos);
-    } else if (!h.scripted) {
+    } else if (!h.scripted && !['footballTrick','footballTurn','footballKnee','footballHeader'].includes(h.gesture??'')) {
       h.speedLimit = M.dribbleSpeed;
       h.target.set(h.pos.x + d * 4, 0, h.pos.z * 0.85 + Math.sin(this.time + h.seed) * 2);
       // Basket: palleggia fino al suo posto d'attacco, non dentro l'area (i tiri li decide l'Event Director).
@@ -1072,13 +1094,15 @@ export class Match {
 
   private launch(to: THREE.Vector3, dur: number, arc: number, kind: Flight['kind'], kicker: Actor | null, receiver: Actor | null = null) {
     const b = this.ball;
+    const fromHands = b.inHands;
     b.state = 'flight';
     b.holder = null;
     b.inHands = false;
     b.flight = { from: b.pos.clone(), to: to.clone(), t: 0, dur: Math.max(dur, 0.25), arc, kind, kicker, receiver, shot: null };
     if (kicker && !BASKET) this.sound(kind === 'shot' ? 'shot' : 'kick', b.pos, Math.min(1, 0.4 + xzDist(b.pos, to) / 30));
     if (kicker && (kicker.pose === 'normal' || kicker.pose === 'windUp')) {
-      if (!BASKET) this.setPose(kicker, 'kick', 0.35);
+      if (!BASKET) this.setPose(kicker, fromHands ? 'throw' : 'kick', fromHands ? .7 : .45, null,
+        kicker.role === 'gk' ? (fromHands ? ((kicker.gestureVariant??0)%2?'keeperKick':'keeperThrow') : 'keeperPass') : kind === 'shot' ? 'footballShot' : 'footballPass');
       else if (kind === 'shot') this.setPose(kicker, 'shoot', 0.6);
       else this.setPose(kicker, 'throw', 0.3);
     }
@@ -1095,6 +1119,14 @@ export class Match {
     this.possession = a.team;
     this.lastTouch = a.team;
     this.holdTimer = hold;
+    if (SPORT === 'calcio' && !a.scripted && a.pose !== 'throw') {
+      if (a.role === 'gk' && inHands) this.setPose(a,'crouch',.65,null,'keeperCatch');
+      else if (a.role !== 'gk' && a.pose === 'normal') {
+        const n=this.gestureCounts.get(`control:${a.id}`)??0;this.gestureCounts.set(`control:${a.id}`,n+1);
+        const gesture=n%4===2?'footballTrick':n%4===3?'footballTurn':'footballReceive';
+        this.setPose(a,'windUp',gesture==='footballReceive'?.45:.85,null,gesture);a.target.copy(a.pos);
+      }
+    }
   }
 
   private looseBall(speed: number, angle: number) {
@@ -1158,6 +1190,9 @@ export class Match {
       if (this.firstTimeShooter === f.receiver && this.phase === 'play' && !this.over) {
         this.firstTimeShooter = null;
         this.shoot(f.receiver, this.resolveOutcome?.(undefined, f.receiver.team) ?? undefined);
+        this.setPose(f.receiver,'kick',1.1,null,(f.receiver.gestureVariant??0)%2?'footballHeader':'footballAcrobatic');
+      } else if(SPORT==='calcio'&&f.to.y>1) {
+        this.setPose(f.receiver,'windUp',.7,null,f.control??'footballKnee');
       }
     } else {
       this.firstTimeShooter = null;
@@ -1188,6 +1223,9 @@ export class Match {
       } else {
         const reach = 0.5 + 0.15 * Math.sin(h.runPhase);
         b.pos.set(h.pos.x + cos * reach, BALL_RADIUS, h.pos.z + sin * reach);
+        const u=THREE.MathUtils.clamp(h.poseTime/Math.max(.001,h.poseDur),0,1);
+        if(h.gesture==='footballTrick'||h.gesture==='footballKnee')b.pos.y+=Math.sin(Math.PI*u)*.75*CONFIG.visuals.playerScale;
+        if(h.gesture==='footballHeader')b.pos.y+=Math.sin(Math.PI*u)*1.4*CONFIG.visuals.playerScale;
       }
       if (this.catchFrom) { this.catchOffset.subVectors(this.catchFrom, b.pos); this.catchFrom = null; }
       this.catchOffset.multiplyScalar(Math.exp(-dt * 12));
@@ -1250,7 +1288,7 @@ export class Match {
     const gk = this.actors.find((a) => a.team === team && a.role === 'gk')!;
     b.pos.set(endSide * (L / 2 - 0.08 * L + 0.5), BALL_RADIUS, Math.sign(b.pos.z || 1) * 0.15 * W);
     b.vel.set(0, 0, 0); b.state = 'dead';
-    this.deadBall(1.8, () => this.giveBall(gk, 1));
+    this.deadBall(1.8, () => {this.giveBall(gk,1);this.setPose(gk,'crouch',.9,null,'keeperPlace');});
   }
 
   // ---------------------------------------------------------------- movimento
@@ -1263,6 +1301,7 @@ export class Match {
       a.poseBlendTime = Math.min(CONFIG.visuals.poseBlendSec, a.poseBlendTime + dt);
       a.poseTime += dt;
       if (a.poseTime > a.poseDur) {
+        if (a.pose === 'fall' && SPORT === 'boxe') { this.setPose(a,'getUp',1.2); continue; }
         this.setPose(a, SPORT === 'boxe' && a.role === 'fwd' ? 'guard' : 'normal', Infinity,
           SPORT === 'boxe' && a.role === 'fwd' ? this.actors.find(opponent => opponent.team !== a.team)! : null);
       }
@@ -1308,6 +1347,7 @@ export class Match {
     a.scripted = false;
     a.faceTarget = null;
     a.pose = 'normal'; a.poseTime = 0; a.poseDur = Infinity;
+    a.gesture=undefined;a.previousGesture=undefined;a.gestureVariant=0;a.previousGestureVariant=0;
     a.previousPose = 'normal'; a.poseBlendTime = CONFIG.visuals.poseBlendSec; a.poseFrom = null;
     a.say = null;
     return a;
