@@ -78,6 +78,6 @@ Le configurazioni sono in `src/config.ts`. Le simulazioni dei nuovi sport sono s
 
 ## Resa grafica
 
-Il branch `nuovi-modelli` usa il modello umano importato per atleti, arbitri, staff e pubblico, con varianti di aspetto e 166 clip d'animazione distinte. I 14 personaggi fantasy sono riservati alle mascotte. Inventario completo, criteri di utilizzo, rigenerazione e verifiche: [docs/nuovi-modelli.md](docs/nuovi-modelli.md).
+Il branch `nuovi-modelli` usa tre modelli umani importati per atleti, arbitri, staff e pubblico, con varianti di aspetto e 198 clip d'animazione distinte. Da `RPG 3D` arrivano anche pugili a torso scoperto, atlete e nuovi movimenti per sport e pubblico. I 14 personaggi fantasy sono riservati alle mascotte. Inventario, rigenerazione e verifiche: [docs/nuovi-modelli.md](docs/nuovi-modelli.md) e [docs/rpg-assets.md](docs/rpg-assets.md).
 
 Scena serale da stadio, tutta procedurale: fari incrociati con ombre morbide e coni di luce nella foschia, erba con taglio incrociato e usura, parquet lucido, tribune a settori con scale e parapetti, cartelloni LED che scorrono, maxischermo col punteggio. Il pubblico si siede e si alza con l'eccitazione, fa l'ola, sventola bandiere e scatta foto; gli atleti hanno divise più dettagliate e scarpe personali. Le azioni lasciano traccia: zolle sui calci e sulle scivolate, terra rossa sui rimbalzi, sudore sui pugni, coriandoli al gol, scia e schiacciamento della palla (`src/render/effects.ts`). Piano e risultati: [docs/visual-plan.md](docs/visual-plan.md).

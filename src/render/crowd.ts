@@ -198,19 +198,20 @@ export class Crowd {
       f.stand += (standTarget - f.stand) * k;
       const stand = f.stand;
       const raised = !gaps.some(g=>Math.abs(g.y-f.y)<.3&&Math.hypot(g.x-f.x,g.z-f.z)<.6) && (look>.05?f.pointer:excite*f.energy>.55||wave>.6);
-      this.fanState?.setXY(i,stand,raised?Math.min(1,Math.max(look,excite,wave)):0);
+      this.fanState?.setXYZW(i,stand,raised?Math.min(1,Math.max(look,excite,wave)):0,
+        (.5+.5*Math.sin(t*.8+f.phase))*(1-stand)*.65,standTarget>=stand?1:-1);
       const idle = Math.sin(t * 1.5 + f.phase) * 0.025;
       const jump = excite * f.energy * Math.max(0, Math.sin(t * 9 + f.phase)) * 0.4 * stand * (1 - look);
       const rise = wave * 0.35 * (1 - look);
       // Seduto: più basso e un po' più corto; in piedi: altezza piena.
-      const seatDrop = (1 - stand) * 0.28;
+      const seatDrop = (1 - stand) * (this.fanState ? .1 : .28);
       this.p.set(f.x, f.y + idle * (1 - look) + jump + rise - seatDrop, f.z);
       // Applausi/esultanza: oscillazione laterale del busto quando si esulta.
       this.tilt.setFromAxisAngle(this.xAxis, Math.sin(t * 7 + f.phase) * 0.08 * excite * stand);
       this.q.multiplyQuaternions(f.rot, this.lean).multiply(this.tilt);
       const gap = gaps.length > 0 && gaps.some((g) => Math.abs(g.y - f.y) < 0.3 && Math.hypot(g.x - f.x, g.z - f.z) < 0.6);
       if (gap) this.m.compose(this.p, this.q, this.zero);
-      else { this.s.set(f.wide * SCALE, f.tall * SCALE * (0.8 + 0.2 * stand), f.wide * SCALE); this.m.compose(this.p, this.q, this.s); }
+      else { this.s.set(f.wide * SCALE, f.tall * SCALE * (this.fanState?1:0.8+0.2*stand), f.wide * SCALE); this.m.compose(this.p, this.q, this.s); }
       this.body.setMatrixAt(i, this.m);
       if (showArms) {
         // Braccia su: chi indica il cielo, una parte di chi esulta (a turno, con la propria energia), la cresta dell'ola.

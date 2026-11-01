@@ -15,6 +15,20 @@ const templates = new Map<string,Promise<THREE.Group>>();
 type Clip = typeof manifest.clips[number];
 const pools = new Map<string,Clip[]>();
 for (const clip of manifest.clips) for (const group of clip.groups) pools.set(group,[...(pools.get(group) ?? []),clip]);
+export function resolveAssetClip(m: AssetMotion | null) {
+  if(!m)return undefined;
+  const all=pools.get(m.group)??[],pool=(m.catalog??3)<3?all.filter(c=>!c.id.startsWith('quaternius_')):all;
+  return pool.length?pool[((m.variant%pool.length)+pool.length)%pool.length]:undefined;
+}
+export const isHumanModel=(name: string)=>['footballer','rpg-boxer','rpg-athlete-female'].includes(name);
+function modelForActor(a: Actor) {
+  if(a.look==='mascot')return FANTASY[(a.appearance??a.id)%FANTASY.length];
+  const athlete=!['ref','coach','fan','steward','spectator'].includes(a.role);
+  if(athlete&&SPORT==='boxe')return 'rpg-boxer';
+  if(athlete&&a.team===1&&['basket','tennis','pallavolo','golf'].includes(SPORT))return 'rpg-athlete-female';
+  if(!athlete&&['coach','steward','spectator'].includes(a.role)&&a.id%2===1)return 'rpg-athlete-female';
+  return 'footballer';
+}
 let animationData: Int16Array;
 let library: Promise<void> | undefined;
 export function loadAnimations() {
@@ -61,6 +75,8 @@ export class Character {
   private modelInverse=new THREE.Quaternion(); private driverInverse=new THREE.Quaternion();
   private poseQ: THREE.Quaternion[] = [];
   private hip?: Joint;
+  private hipHeight=0;
+  private hipUp=new THREE.Vector3(0,1,0);
   private mappings=new Map<string,Map<string,number>>();
   private golfSocket?: THREE.Group;
   private golfClub?: THREE.Object3D;
@@ -68,9 +84,10 @@ export class Character {
   private golfGrips=new Map<string,{rotation:THREE.Quaternion;length:number}>();
   private phone?: THREE.Mesh;
   private ankleHeight=0;
+  private soles: { mesh:THREE.SkinnedMesh; indices:number[] }[]=[];
 
   static async create(actor: Actor, driver: Athlete) {
-    const name = actor.look === 'mascot' ? FANTASY[(actor.appearance ?? actor.id) % FANTASY.length] : 'footballer';
+    const name = modelForActor(actor);
     const [template] = await Promise.all([characterTemplate(name),loadAnimations()]);
     return new Character(template,name,actor,driver);
   }
@@ -105,9 +122,19 @@ export class Character {
       for(const joint of this.joints.filter(j=>[`${side}Arm`,`${side}ForeArm`,`${side}Hand`].includes(j.name))) joint.procedural.premultiply(correction);
     }
     this.poseQ=this.joints.map(()=>new THREE.Quaternion());
+    if(this.hip){
+      this.hipHeight=this.hip.bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(this.model.matrixWorld.clone().invert()).y;
+      this.hipUp.applyQuaternion(this.hip.parent);
+    }
     const ankle=this.joints.find(j=>j.name==='LeftFoot');
     if(ankle)this.ankleHeight=ankle.bone.getWorldPosition(new THREE.Vector3()).y;
     this.style(actor);
+    if(name.startsWith('rpg-'))this.model.traverse(o=>{
+      if(!(o as THREE.SkinnedMesh).isSkinnedMesh||!/Shoes/.test(o.name))return;
+      const mesh=o as THREE.SkinnedMesh,positions=mesh.geometry.getAttribute('position');let lowest=Infinity;
+      for(let i=0;i<positions.count;i++)lowest=Math.min(lowest,positions.getY(i));
+      this.soles.push({mesh,indices:Array.from({length:positions.count},(_,i)=>i).filter(i=>positions.getY(i)<lowest+.04)});
+    });
     this.socket('LeftHand',driver.wristR.children.slice());
     this.socket('RightHand',driver.wristL.children.slice());
     this.socket('Head',driver.head.children.slice());
@@ -129,7 +156,7 @@ export class Character {
   }
 
   private style(a: Actor) {
-    if(this.name!=='footballer')return;
+    if(!isHumanModel(this.name))return;
     const kit=CONFIG.teams[a.team], id=a.id;
     const costume=a.role==='spectator'&&a.look?({banana:0xffd83a,dino:0x3fa34d,clown:0xff3b3b,astronaut:0xeef0f2} as Record<string,number>)[a.look]:undefined;
     const shirt=a.role==='ref'?CONFIG.visuals.referee.shirt:a.role==='steward'?CONFIG.visuals.steward.shirt
@@ -144,6 +171,7 @@ export class Character {
       else if(/Socks/i.test(mesh.name))mat.color.setHex(a.role==='ref'?CONFIG.visuals.referee.socks:kit.socks);
       else if(/Shoes/i.test(mesh.name))mat.color.setHex(SHOES[id%SHOES.length]);
       else if(/Body/i.test(mesh.name))mat.color.setHex(SKIN[id%SKIN.length]);
+      else if(/Brow/i.test(mesh.name))mat.color.setHex(HAIR[id%HAIR.length]);
       else if(/Hair/i.test(mesh.name)) {
         mat.color.setHex(HAIR[id%HAIR.length]);mat.alphaTest=.45;mat.transparent=false;mesh.visible=id%6!==5;
         const style=id%4,key=`${mesh.geometry.uuid}:${style}`;let geometry=hairGeometries.get(key);
@@ -155,6 +183,10 @@ export class Character {
           geometry.computeVertexNormals();hairGeometries.set(key,geometry);
         }
         mesh.geometry=geometry;
+        if(this.name.startsWith('rpg-')){
+          const chosen=this.name==='rpg-boxer'?(id%2?'SimpleParted':'Buzzed'):(id%2?'Buns':'Long');
+          mesh.visible=mesh.name.includes(chosen)&&id%6!==5;
+        }
       }
       if(/Eyelashes/i.test(mesh.name)){mat.alphaTest=.4;mat.transparent=false;}
       // A bounding box from the bind pose is invalid for a dive or a knockdown.
@@ -202,8 +234,7 @@ export class Character {
   }
 
   private sample(m: AssetMotion | null, target: THREE.Quaternion[], weight=1): number | null {
-    if(!m)return null;const pool=pools.get(m.group);if(!pool?.length)return null;
-    const clip=pool[((m.variant%pool.length)+pool.length)%pool.length];
+    const clip=resolveAssetClip(m);if(!m||!clip)return null;
     const mirror=!!m.side&&!!clip.direction&&m.side!==clip.direction&&/keeper(Dive|Block)/.test(m.group);
     let u=m.loop?m.time%1:Math.min(1,Math.max(0,m.time/Math.max(.001,m.duration)));
     if(!m.loop&&['boxingJab','boxingHook','footballShot','footballPass','golfDrive','golfChip','golfPutt'].includes(m.group)) {
@@ -229,12 +260,11 @@ export class Character {
 
   private calibrateGolf(m: AssetMotion, actor: Actor, time: number, actorRoot: THREE.Group) {
     if(!this.golfSocket||!this.golfClub||!this.hip)return;
-    const pool=pools.get(m.group);if(!pool?.length)return;
-    const clip=pool[((m.variant%pool.length)+pool.length)%pool.length];
+    const clip=resolveAssetClip(m);if(!clip)return;
     let grip=this.golfGrips.get(clip.id);
     if(!grip){
-      const contact=this.joints.map(j=>j.rest.clone()), y=this.sample({...m,time:m.duration*m.contact},contact), liveY=this.hip.bone.position.y;
-      this.joints.forEach((j,i)=>j.bone.quaternion.copy(contact[i]));this.hip.bone.position.y=this.hip.position.y*(1+(y??0));
+      const contact=this.joints.map(j=>j.rest.clone()), y=this.sample({...m,time:m.duration*m.contact},contact), liveHip=this.hip.bone.position.clone();
+      this.joints.forEach((j,i)=>j.bone.quaternion.copy(contact[i]));this.hip.bone.position.copy(this.hip.position).addScaledVector(this.hipUp,(y??0)*this.hipHeight);
       this.model.updateWorldMatrix(true,true);
       const hand=this.golfSocket.getWorldPosition(new THREE.Vector3());
       const target=netContactPoint(actor,time,m.duration*m.contact), direction=target.sub(hand);
@@ -242,7 +272,7 @@ export class Character {
       const desired=new THREE.Quaternion().setFromUnitVectors(down,direction.normalize());
       const rotation=this.golfSocket.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(desired);
       grip={rotation,length};this.golfGrips.set(clip.id,grip);
-      this.joints.forEach((j,i)=>j.bone.quaternion.copy(this.poseQ[i]));this.hip.bone.position.y=liveY;
+      this.joints.forEach((j,i)=>j.bone.quaternion.copy(this.poseQ[i]));this.hip.bone.position.copy(liveHip);
     }
     this.golfSocket.quaternion.copy(grip.rotation);this.golfClub.scale.y=grip.length;
   }
@@ -290,15 +320,20 @@ export class Character {
     const current=assetMotion(actor,time,carrying), previous=assetMotion(actor,time,carrying,true);
     const blend=THREE.MathUtils.smoothstep(actor.poseBlendTime,0,CONFIG.visuals.poseBlendSec);
     let hipOffset=(driver.body.position.y-.94)/this.norm;
-    if(blend<1){const y=this.sample(previous,this.poseQ);if(y!==null&&this.hip)hipOffset=y*this.hip.position.y;}
+    if(blend<1){const y=this.sample(previous,this.poseQ);if(y!==null&&this.hip)hipOffset=y*this.hipHeight;}
     const y=this.sample(current,this.poseQ,blend);
-    if(y!==null&&this.hip)hipOffset=THREE.MathUtils.lerp(hipOffset,y*this.hip.position.y,blend);
+    if(y!==null&&this.hip)hipOffset=THREE.MathUtils.lerp(hipOffset,y*this.hipHeight,blend);
     for(let i=0;i<this.joints.length;i++)this.joints[i].bone.quaternion.copy(this.poseQ[i]);
-    if(this.hip)this.hip.bone.position.y=this.hip.position.y+hipOffset;
-    if(current&&/^(golfDrive|golfChip|golfPutt|idle|footballIdle|footballPass|footballShot|boxingJab|boxingHook|boxingCombo|boxingRecoil|boxingBlock|walk|backward|stepLeft|stepRight|keeperIdle|keeperStep)$/.test(current.group)){
+    if(this.hip)this.hip.bone.position.copy(this.hip.position).addScaledVector(this.hipUp,hipOffset);
+    if(current&&/^(golfDrive|golfChip|golfPutt|idle|sidelineIdle|talk|officialYes|shove|footballIdle|footballPass|footballShot|boxingJab|boxingHook|boxingCombo|boxingRecoil|boxingBlock|walk|backward|stepLeft|stepRight|keeperIdle|keeperStep|keeperCarry)$/.test(current.group)){
       const feet=this.joints.filter(j=>j.name==='LeftFoot'||j.name==='RightFoot');
       const lowest=Math.min(...feet.map(j=>j.bone.getWorldPosition(new THREE.Vector3()).y));
       if(Number.isFinite(lowest))this.root.position.y=-(lowest-actorRoot.position.y-this.ankleHeight*actorRoot.scale.y)/actorRoot.scale.y;
+      if(this.soles.length){
+        this.root.position.y=0;this.model.updateWorldMatrix(true,true);let floor=Infinity;const point=new THREE.Vector3();
+        for(const {mesh,indices}of this.soles){mesh.skeleton.update();for(const i of indices){mesh.getVertexPosition(i,point);point.applyMatrix4(mesh.matrixWorld);floor=Math.min(floor,point.y);}}
+        if(Number.isFinite(floor))this.root.position.y=-(floor-actorRoot.position.y)/actorRoot.scale.y;
+      }
       this.root.updateWorldMatrix(true,true);
     }
     if(!current){
@@ -314,18 +349,32 @@ export class Character {
     else if(!current&&this.golfSocket&&this.defaultGrip){this.golfSocket.quaternion.copy(this.defaultGrip);this.golfClub!.scale.y=1;}
     if(this.phone)this.phone.visible=actor.gesture==='phone';
     this.root.userData.motion=current?.group??'procedural';
+    this.root.userData.clip=resolveAssetClip(current)?.id;
     this.root.userData.variant=actor.gestureVariant??0;
   }
 }
 
 export const animationStats = () => ({ clips:manifest.clips.length, groups:Object.fromEntries([...pools].map(([k,v])=>[k,v.length])) });
 
-/** Bake three poses of the supplied human once. Thousands of spectators share these GPU buffers. */
+/** Bake six poses of the supplied human once. Thousands of spectators share these GPU buffers. */
 export async function createCrowdHumans(count: number, shirts: number[]) {
-  const model=clone(await characterTemplate('crowd')) as THREE.Group;
+  const [template]=await Promise.all([characterTemplate('crowd'),loadAnimations()]);
+  const model=clone(template) as THREE.Group;
   const bones=new Map<string,THREE.Bone>();model.traverse(o=>{if((o as THREE.Bone).isBone)bones.set(o.name,o as THREE.Bone);});
   model.updateMatrixWorld(true);
   const rest=new Map([...bones].map(([n,b])=>[n,b.quaternion.clone()]));
+  const importedRest=new Map([...bones].map(([name,bone])=>[name,{world:bone.getWorldQuaternion(new THREE.Quaternion()),parent:bone.parent!.getWorldQuaternion(new THREE.Quaternion()).invert(),position:bone.position.clone()}]));
+  function importedPose(group: string, phase: number) {
+    const clip=pools.get(group)?.[0];if(!clip)return false;
+    const frame=Math.min(clip.frames-1,Math.round(phase*(clip.frames-1))),q=new THREE.Quaternion();
+    clip.bones.forEach((name,i)=>{
+      const bone=bones.get(name),r=importedRest.get(name);if(!bone||!r)return;
+      q.fromArray(animationData,clip.offset+frame*clip.stride+i*4).normalize();bone.quaternion.copy(q.premultiply(r.parent).multiply(r.world));
+    });
+    const hip=bones.get('Hips'),p=importedRest.get('Hips')?.position;
+    if(hip&&p)hip.position.copy(p).setY(p.y*(1+animationData[clip.offset+frame*clip.stride+clip.stride-1]/manifest.hipScale));
+    return true;
+  }
   function turn(name: string, axis: THREE.Vector3, angle: number) {
     const b=bones.get(name);if(!b)return;
     const parent=b.parent!.getWorldQuaternion(new THREE.Quaternion()).invert();
@@ -334,16 +383,21 @@ export async function createCrowdHumans(count: number, shirts: number[]) {
   }
   const z=new THREE.Vector3(0,0,1), x=new THREE.Vector3(1,0,0);
   function pose(state: number) {
-    for(const [name,b] of bones)b.quaternion.copy(rest.get(name)!);
+    for(const [name,b] of bones){b.quaternion.copy(rest.get(name)!);b.position.copy(importedRest.get(name)!.position);}
     model.updateMatrixWorld(true);
-    turn('LeftArm',z,state===2?.9:-1.4);turn('RightArm',z,state===2?-.9:1.4);
-    if(state===0){turn('LeftUpLeg',x,-1.35);turn('RightUpLeg',x,-1.35);turn('LeftLeg',x,1.5);turn('RightLeg',x,1.5);}
+    const motion=state===0?['crowdSit',.35]:state===1?['sidelineIdle',.1]:state===3?['crowdSitTalk',.5]:state===4?['crowdSitIn',.5]:state===5?['crowdSitOut',.5]:null;
+    const captured=motion?importedPose(motion[0] as string,motion[1] as number):false;
+    if(!captured){
+      turn('LeftArm',z,state===2?.9:-1.4);turn('RightArm',z,state===2?-.9:1.4);
+      if(state===0){turn('LeftUpLeg',x,-1.35);turn('RightUpLeg',x,-1.35);turn('LeftLeg',x,1.5);turn('RightLeg',x,1.5);}
+    }
+    model.updateMatrixWorld(true);
     model.traverse(o=>{if((o as THREE.SkinnedMesh).isSkinnedMesh)(o as THREE.SkinnedMesh).skeleton.update();});
   }
   const skinned: THREE.SkinnedMesh[]=[];model.traverse(o=>{if((o as THREE.SkinnedMesh).isSkinnedMesh)skinned.push(o as THREE.SkinnedMesh);});
   const positions=skinned.map(()=>[] as Float32Array[]);
   const box=new THREE.Box3().setFromObject(model), scale=.85/(box.max.y-box.min.y), v=new THREE.Vector3();
-  for(const state of [0,1,2]) {
+  for(const state of [0,1,2,3,4,5]) {
     pose(state);
     skinned.forEach((mesh,i)=>{
       const attr=mesh.geometry.getAttribute('position'), points=new Float32Array(attr.count*3);
@@ -353,19 +407,22 @@ export async function createCrowdHumans(count: number, shirts: number[]) {
       positions[i][state]=points;
     });
   }
-  const fanState=new THREE.InstancedBufferAttribute(new Float32Array(count*2),2);
+  const fanState=new THREE.InstancedBufferAttribute(new Float32Array(count*4),4);
   const meshes=skinned.map((source,i)=>{
     const geo=source.geometry.clone();geo.deleteAttribute('skinIndex');geo.deleteAttribute('skinWeight');
     geo.setAttribute('position',new THREE.BufferAttribute(positions[i][1],3));geo.computeVertexNormals();
     geo.setAttribute('seatedPosition',new THREE.BufferAttribute(positions[i][0],3));
     geo.setAttribute('cheeringPosition',new THREE.BufferAttribute(positions[i][2],3));geo.setAttribute('fanState',fanState);
+    geo.setAttribute('talkingPosition',new THREE.BufferAttribute(positions[i][3],3));
+    geo.setAttribute('enterPosition',new THREE.BufferAttribute(positions[i][4],3));
+    geo.setAttribute('exitPosition',new THREE.BufferAttribute(positions[i][5],3));
     const mat=(source.material as THREE.MeshStandardMaterial).clone();
     mat.onBeforeCompile=shader=>{
-      shader.vertexShader='attribute vec3 seatedPosition; attribute vec3 cheeringPosition; attribute vec2 fanState;\n'+shader.vertexShader;
+      shader.vertexShader='attribute vec3 seatedPosition; attribute vec3 cheeringPosition; attribute vec3 talkingPosition; attribute vec3 enterPosition; attribute vec3 exitPosition; attribute vec4 fanState;\n'+shader.vertexShader;
       shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',
-        'vec3 transformed = mix(seatedPosition, position, fanState.x); transformed = mix(transformed, cheeringPosition, fanState.y);');
+        'vec3 seated = mix(seatedPosition,talkingPosition,fanState.z); vec3 middle = fanState.w > 0.0 ? exitPosition : enterPosition; vec3 transformed = fanState.x < 0.5 ? mix(seated,middle,fanState.x*2.0) : mix(middle,position,(fanState.x-0.5)*2.0); transformed = mix(transformed, cheeringPosition, fanState.y);');
     };
-    mat.customProgramCacheKey=()=> 'human-crowd-poses-v1';
+    mat.customProgramCacheKey=()=> 'human-crowd-poses-v2';
     if(/Hair|Eyelash/.test(source.name)){mat.alphaTest=.45;mat.transparent=false;}
     const mesh=new THREE.InstancedMesh(geo,mat,count);mesh.frustumCulled=false;
     const color=new THREE.Color();

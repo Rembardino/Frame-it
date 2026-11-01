@@ -95,6 +95,8 @@ export interface Actor {
   previousGesture?: string;
   previousGestureVariant?: number;
   appearance?: number;
+  /** Version of the animation pools used when this actor was recorded. */
+  animationCatalog?: number;
   previousPose: Pose;
   previousPoseTime: number;
   previousPoseDur: number;
@@ -225,7 +227,7 @@ export function clampToPitch(v: THREE.Vector3, margin: number) {
 
 function makeActor(id: number, team: TeamId, role: Role, base = { x: 0, z: 0 }): Actor {
   return {
-    id, team, role, base, appearance: Math.floor(Math.random() * 14),
+    id, team, role, base, appearance: Math.floor(Math.random() * 14), animationCatalog:3,
     active: true,
     scripted: false,
     pos: new THREE.Vector3(),

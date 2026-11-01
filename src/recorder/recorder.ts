@@ -13,6 +13,7 @@ export interface ActorFrame {
   heading: number; runPhase: number;
   pose: Pose; poseTime: number; poseDur: number; poseDir: number;
   gesture?: string; gestureVariant?: number; previousGesture?: string; previousGestureVariant?: number; appearance?: number;
+  animationCatalog?: number;
   previousPose: Pose; previousPoseTime: number; previousPoseDur: number; poseBlendTime: number;
   poseFrom: MotionPose | null;
   active: boolean;
@@ -78,6 +79,7 @@ export class Recorder {
         pose: a.pose, poseTime: a.poseTime, poseDur: a.poseDur, poseDir: a.poseDir,
         gesture: a.gesture, gestureVariant: a.gestureVariant, previousGesture: a.previousGesture,
         previousGestureVariant: a.previousGestureVariant, appearance: a.appearance,
+        animationCatalog:a.animationCatalog??3,
         previousPose: a.previousPose, previousPoseTime: a.previousPoseTime,
         previousPoseDur: a.previousPoseDur, poseBlendTime: a.poseBlendTime,
         poseFrom: a.poseFrom,
@@ -119,6 +121,7 @@ export class Recorder {
       actor.previousGesture = f.previousGesture;
       actor.previousGestureVariant = f.previousGestureVariant;
       actor.appearance = f.appearance ?? actor.appearance;
+      actor.animationCatalog=f.animationCatalog??2;
       actor.poseTime = samePose ? lerp(fa.poseTime, fb.poseTime, u) : f.poseTime;
       actor.previousPose = f.previousPose;
       actor.previousPoseTime = f.previousPoseTime;

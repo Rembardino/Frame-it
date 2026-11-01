@@ -1,7 +1,7 @@
 import { CONFIG, SPORT } from '../config';
 import type { Actor, Pose } from '../sim/match';
 
-export interface AssetMotion { group: string; variant: number; time: number; duration: number; contact: number; loop: boolean; side?: number }
+export interface AssetMotion { group: string; variant: number; time: number; duration: number; contact: number; loop: boolean; side?: number; catalog?:number }
 
 /** Pure selection: no renderer clock or random calls, including when seeking through a saved replay. */
 export function assetMotion(a: Actor, time: number, carrying: boolean, previous = false): AssetMotion | null {
@@ -13,8 +13,14 @@ export function assetMotion(a: Actor, time: number, carrying: boolean, previous 
   let group = previous ? a.previousGesture : a.gesture;
   const speed = Math.hypot(a.vel.x, a.vel.z);
   const athlete = !['ref','coach','steward','fan','spectator'].includes(a.role);
+  const modern = (a.animationCatalog ?? 3) >= 3;
   if (!group) {
-    if (pose === 'dance' || pose === 'celebrate') group = SPORT === 'golf' && athlete ? 'golfVictory' : 'celebration';
+    if(modern&&a.look==='mascot'&&pose==='normal')group=speed>.3?'mascotWalk':'mascotIdle';
+    else if(modern&&a.look==='mascot'&&['argue','wave'].includes(pose))group='mascotReact';
+    else if(modern&&(pose==='argue'||pose==='protest'))group=a.role==='ref'?'officialYes':'talk';
+    else if(modern&&pose==='shove')group='shove';
+    else if(modern&&pose==='normal'&&!athlete&&speed<.3)group='sidelineIdle';
+    else if (pose === 'dance' || pose === 'celebrate') group = SPORT === 'golf' && athlete ? 'golfVictory' : 'celebration';
     else if (pose === 'dejected') group = SPORT === 'golf' && athlete ? 'golfBad' : 'dejected';
     else if (pose === 'getUp') group = 'getUp';
     else if (pose === 'count') group = 'refCount';
@@ -49,17 +55,17 @@ export function assetMotion(a: Actor, time: number, carrying: boolean, previous 
         if(forward>.15&&forward<.4&&speed>CONFIG.match.walkSpeed)group='turn';
         if (a.role === 'gk' && SPORT === 'calcio') group = 'keeperStep';
         if (carrying && SPORT === 'calcio' && a.role !== 'gk') group = 'footballDribble';
-      } else group = a.role === 'gk' && SPORT === 'calcio' ? 'keeperIdle' : SPORT === 'calcio' && athlete ? 'footballIdle' : SPORT === 'boxe' && athlete ? 'idle' : undefined;
+      } else group = a.role === 'gk' && SPORT === 'calcio' ? modern&&carrying&&a.previousGesture==='keeperCatch'?'keeperCarry':'keeperIdle' : SPORT === 'calcio' && athlete ? 'footballIdle' : SPORT === 'boxe' && athlete ? 'idle' : undefined;
     }
   }
   if (!group) return null;
   if(pose==='fall'&&Number.isFinite(duration)&&pt>duration*.62){
     const recover=SPORT!=='boxe'&&pt>duration*.8;
     return{group:recover?'getUp':a.role==='fan'?'crawl':'fallenIdle',variant:variation,
-      time:recover?pt-duration*.8:pt-duration*.62,duration:duration*(recover?.2:.18),contact:.32,loop:!recover};
+      time:recover?pt-duration*.8:pt-duration*.62,duration:duration*(recover?.2:.18),contact:.32,loop:!recover,catalog:a.animationCatalog??3};
   }
   const looping = ['normal','guard','sprint','dance','celebrate'].includes(pose) && !a.gesture;
   return { group, variant: variation, time: looping ? (speed > .3 ? a.runPhase / (Math.PI * 2) : time * .3 + a.id * .17) : Math.max(0,pt),
     duration, contact: SPORT === 'golf' ? (pose === 'putt' ? CONFIG.golf.puttImpact : CONFIG.golf.impact) / duration : .32, loop: looping,
-    side:pose==='dive'?Math.sign(a.poseDir*Math.cos(a.heading)):0 };
+    side:pose==='dive'?Math.sign(a.poseDir*Math.cos(a.heading)):0,catalog:a.animationCatalog??3 };
 }
