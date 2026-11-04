@@ -14,6 +14,7 @@ import type { TeamKit } from '../teams';
 import { styleSkin } from './skin';
 import {CarolAppearance} from './carolAppearance';
 import { riderKit } from './cyclingKit';
+import { PlayerAppearance, playerLook } from './playerAppearance';
 
 const urls = import.meta.glob('../assets/characters/*.glb', { eager: true, query: '?url', import: 'default' }) as Record<string,string>;
 const loader = new GLTFLoader();
@@ -82,7 +83,6 @@ const FANTASY = Array.from({length:14},(_,i)=>`human-${i}`);
 const facing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI/2);
 const inverseFacing = facing.clone().invert();
 const down = new THREE.Vector3(0,-1,0);
-const hairGeometries=new Map<string,THREE.BufferGeometry>();
 const physiques=new Map<string,THREE.BufferGeometry>();
 
 interface Joint { bone: THREE.Bone; name: string; rest: THREE.Quaternion; world: THREE.Quaternion; parent: THREE.Quaternion;
@@ -115,6 +115,7 @@ export class Character {
   private wardrobe: Promise<void>[]=[];
   private scale=1;
   private carol?: CarolAppearance;
+  private appearance?: PlayerAppearance;
 
   static async create(actor: Actor, driver: Athlete) {
     const name = modelForActor(actor);
@@ -129,7 +130,7 @@ export class Character {
     this.model.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(this.model);
     const player=!['ref','coach','fan','steward','spectator'].includes(actor.role);
-    const height=player&&['basket','pallavolo'].includes(SPORT)?[.96,1.035,1,1.065,.985,1.015][actor.id%6]:1;
+    const height=player&&['basket','pallavolo'].includes(SPORT)?[.94,1.015,1.065,.98,1.045,.96,1.025,1.085,.99,1.055,.97,1.035,1,1.075][actor.id%14]:1;
     this.norm=1.92*height/(box.max.y-box.min.y);
     // Bone rotations remain in the source's +Z-forward space; only this outer group changes basis.
     this.root.quaternion.copy(facing);this.root.add(this.model);
@@ -165,6 +166,8 @@ export class Character {
     const ankle=this.joints.find(j=>j.name==='LeftFoot');
     if(ankle)this.ankleHeight=ankle.bone.getWorldPosition(new THREE.Vector3()).y;
     this.style(actor);
+    if(isHumanModel(name)&&name!=='athlete-carol')this.appearance=new PlayerAppearance(this.model,this.norm,actor,
+      player&&SPORT==='ciclismo'?riderKit(actor,CONFIG.teams[actor.team]).shirt:undefined);
     if(name.startsWith('rpg-'))this.model.traverse(o=>{
       if(!(o as THREE.SkinnedMesh).isSkinnedMesh||!o.visible||!/Shoes/.test(o.name))return;
       const mesh=o as THREE.SkinnedMesh,positions=mesh.geometry.getAttribute('position');let lowest=Infinity;
@@ -205,17 +208,21 @@ export class Character {
 
   private physique(mesh: THREE.Mesh, id: number) {
     if(!/Body|Shirt|Shorts|Hair|Brow|Eyes|Eyelash/.test(mesh.name))return;
-    const key=`${mesh.geometry.uuid}:${id%12}`;let geometry=physiques.get(key);
+    const key=`${mesh.geometry.uuid}:${id%14}`;let geometry=physiques.get(key);
     if(!geometry){
       geometry=mesh.geometry.clone();
       const frame=new THREE.Matrix4().copy(this.model.matrixWorld).invert().multiply(mesh.matrixWorld),inverse=frame.clone().invert();
       const positions=geometry.getAttribute('position'),point=new THREE.Vector3();
-      const breadth=[.90,1.08,.97,1.13,1.02,.94][id%6],face=[.91,1.07,1,.96,1.1,1.03][id%6];
+      const breadth=[.90,1.08,.97,1.13,1.02,.94,1.06,.98,1.11,.92,1.04,1.15,.96,1.01][id%14];
+      const face=[.91,1.07,1,.96,1.1,1.03,.95,1.12,1.02,.93,1.08,.98,1.05,.90][id%14];
+      const jaw=[1.08,.93,1.02,1.13,.94,1.06,1.12,.96,1.05,.97,1.1,.92,1.04,1.14][id%14];
+      const depth=[1.04,.94,1.08,.98,1.03,.92,1.1,.96,1.01,1.07,.95,1.05,.93,1.09][id%14];
       for(let i=0;i<positions.count;i++){
         point.fromBufferAttribute(positions,i).applyMatrix4(frame);
         const y=point.y*this.norm,head=THREE.MathUtils.smoothstep(y,1.48,1.66),torso=1-THREE.MathUtils.smoothstep(Math.abs(point.x*this.norm),.22,.48);
-        point.x*=THREE.MathUtils.lerp(1+(breadth-1)*torso,face,head);
-        point.z*=1+(breadth-1)*.32*(1-head);
+        const lowerFace=1-THREE.MathUtils.smoothstep(y,1.74,1.84);
+        point.x*=THREE.MathUtils.lerp(1+(breadth-1)*torso,face*(1+(jaw-1)*lowerFace),head);
+        point.z*=1+(breadth-1)*.32*(1-head)+(depth-1)*head;
         point.applyMatrix4(inverse);positions.setXYZ(i,point.x,point.y,point.z);
       }
       geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();physiques.set(key,geometry);
@@ -230,6 +237,7 @@ export class Character {
       if(!(o as THREE.Mesh).isMesh)return;const mesh=o as THREE.Mesh,mat=mesh.material as THREE.MeshStandardMaterial;
       if(mat.userData.club)updates.push(changeUniform(mat,kit));
       if(mesh.name==='team-glove')mat.color.setHex(kit.shirt);
+      if(mesh.name==='cycling-helmet-shell')mat.color.setHex(kit.shirt);
       if(/Socks/.test(mesh.name)&&actor.role!=='ref')mat.color.setHex(kit.socks);
     });
     await Promise.all(updates);
@@ -238,6 +246,7 @@ export class Character {
   private style(a: Actor) {
     if(!isHumanModel(this.name))return;
     const kit=riderKit(a,CONFIG.teams[a.team]), id=a.id;
+    const look=playerLook(a);
     const player=!['ref','coach','fan','steward','spectator'].includes(a.role);
     const costume=a.role==='spectator'&&a.look?({banana:0xffd83a,dino:0x3fa34d,clown:0xff3b3b,astronaut:0xeef0f2} as Record<string,number>)[a.look]:undefined;
     const shirt=a.role==='ref'?CONFIG.visuals.referee.shirt:a.role==='steward'?CONFIG.visuals.steward.shirt
@@ -247,33 +256,20 @@ export class Character {
       if(!(o as THREE.Mesh).isMesh)return;const mesh=o as THREE.Mesh;
       const original=mesh.material as THREE.MeshStandardMaterial;const mat=original.clone();mesh.material=mat;
       mat.roughness=.85;mat.metalness=0;mesh.castShadow=true;
-      if(player&&['basket','pallavolo'].includes(SPORT))this.physique(mesh,id);
+      if(player&&this.name!=='athlete-carol')this.physique(mesh,id);
       if(/Shirt/i.test(mesh.name))mat.color.setHex(shirt);
       else if(/Shorts|Pants|Skirt/i.test(mesh.name))mat.color.setHex(a.role==='ref'?CONFIG.visuals.referee.shorts:a.role==='coach'?0x202938:costume??kit.shorts);
       else if(/Socks/i.test(mesh.name))mat.color.setHex(a.role==='ref'?CONFIG.visuals.referee.socks:kit.socks);
       else if(/Shoes/i.test(mesh.name)){mat.color.setHex(SHOES[id%SHOES.length]);if(player&&SPORT==='boxe')mesh.visible=false;}
-      else if(/Body/i.test(mesh.name))mat.color.setHex(['basket','pallavolo'].includes(SPORT)&&id%SKIN.length===0?0xe2b48e:SKIN[id%SKIN.length]);
-      else if(/Brow/i.test(mesh.name))mat.color.setHex(HAIR[id%HAIR.length]);
-      else if(/Beard/.test(mesh.name)){mat.color.setHex(HAIR[id%HAIR.length]);mat.alphaTest=.45;mat.transparent=false;mesh.visible=id%2===0;}
+      else if(/Body/i.test(mesh.name))mat.color.setHex(look.skin);
+      else if(/Brow/i.test(mesh.name))mat.color.setHex(look.hair);
+      else if(/Beard/.test(mesh.name)){mat.color.setHex(look.hair);mat.alphaTest=.45;mat.transparent=false;mesh.visible=false;}
       else if(/Hair/i.test(mesh.name)) {
-        mat.color.setHex(HAIR[id%HAIR.length]);mat.alphaTest=.45;mat.transparent=false;
-        const varied=this.name==='footballer'||this.name==='athlete-tee';
-        const style=varied?id%4:0,key=`${mesh.geometry.uuid}:${style}`;let geometry=hairGeometries.get(key);
-        mesh.visible=!varied||id%6!==5;
-        if(!geometry){
-          geometry=mesh.geometry.clone();geometry.computeBoundingBox();const box=geometry.boundingBox!,center=box.getCenter(new THREE.Vector3());
-          const vertices=geometry.getAttribute('position');
-          for(let n=0;n<vertices.count;n++)vertices.setXYZ(n,center.x+(vertices.getX(n)-center.x)*(style===2?.62:1),
-            box.min.y+(vertices.getY(n)-box.min.y)*[1,.7,1.08,1.18][style],center.z+(vertices.getZ(n)-center.z)*(style===3?1.08:1));
-          geometry.computeVertexNormals();hairGeometries.set(key,geometry);
-        }
-        mesh.geometry=geometry;
-        if(this.name.startsWith('rpg-')){
-          mesh.visible=mesh.name.includes(id%2?'SimpleParted':'Buzzed');
-        }
+        mat.color.setHex(look.hair);mat.alphaTest=.45;mat.transparent=false;
+        mesh.visible=this.name==='athlete-carol';
       }
       if(/Eyelashes/i.test(mesh.name)){mat.alphaTest=.4;mat.transparent=false;}
-      if(player&&['basket','pallavolo'].includes(SPORT)&&/Body|Hair/.test(mesh.name))styleSkin(mat,mesh,this.model,this.norm,id,HAIR[id%HAIR.length]);
+      if(this.name!=='athlete-carol'&&/Body/.test(mesh.name))styleSkin(mat,mesh,this.model,this.norm,id,look.hair,look.style===9);
       if(player&&/Shirt/.test(mesh.name))this.wardrobe.push(dressUniform(mesh,this.model,kit,
         ['calcio','basket','pallavolo','ciclismo'].includes(SPORT)?id%99+1:0,['basket','pallavolo'].includes(SPORT),a.role==='gk'));
       if(player&&/Shorts/.test(mesh.name))this.wardrobe.push(dressUniform(mesh,this.model,kit,0,false,false,true));
@@ -305,11 +301,6 @@ export class Character {
     }
     const visor=this.model.getObjectByName('Cap');
     if(visor)visor.visible=player||a.role==='spectator';
-    // The flat golf cap fits only the footballer's skull; on the other heads it became a ring pierced by the hair.
-    if(player&&!visor&&(SPORT==='ciclismo'||SPORT==='vela'||(SPORT==='golf'&&this.name==='footballer'))){
-      const hat=new THREE.Mesh(new THREE.SphereGeometry(.126,12,7,0,Math.PI*2,0,Math.PI*.56),new THREE.MeshStandardMaterial({color:SPORT==='vela'?0xf6f2ea:kit.shirt,roughness:.7,side:THREE.DoubleSide}));
-      hat.position.y=.13;hat.scale.set(1.05,SPORT==='golf'?.5:.85,1.1);this.accessory('Head',hat);
-    }
     if((SPORT==='boxe'&&!['ref','coach','fan','steward','spectator'].includes(a.role))||a.role==='gk') {
       const boxing=SPORT==='boxe';
       const mat=new THREE.MeshStandardMaterial({color:boxing?kit.shirt:0xe4f349,roughness:.7});
@@ -436,6 +427,7 @@ export class Character {
 
   update(actor: Actor, time: number, carrying: boolean, driver: Athlete, actorRoot: THREE.Group) {
     this.carol?.apply(actor.appearance??actor.id);
+    this.appearance?.apply(actor);
     this.root.position.y=0;this.scale=actorRoot.scale.y;
     actorRoot.updateWorldMatrix(true,true);
     actorRoot.getWorldQuaternion(this.driverInverse).invert();

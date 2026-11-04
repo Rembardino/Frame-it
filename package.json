@@ -16,6 +16,7 @@
     "check:cycling-routes": "node scripts/check-cycling-routes.mjs",
     "check:characters": "node scripts/check-character-assets.mjs",
     "check:appearance": "node scripts/check-appearance.mjs",
+    "check:player-variety": "node scripts/check-player-variety.mjs",
     "check:animals": "node scripts/check-animal-models.mjs",
     "check:tennis-looks": "node scripts/check-tennis-looks.mjs",
     "check:characters:offline": "node scripts/bundle-mobile.mjs && node scripts/check-offline-characters.mjs",

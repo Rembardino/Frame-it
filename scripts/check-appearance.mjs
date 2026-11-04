@@ -34,6 +34,7 @@ try{
         return{id:v.actor.id,team:v.actor.team,height:v.character.root.scale.y,
           body:meshes.find(m=>m.name==='Body')?.geometry.uuid,
           complexion:meshes.find(m=>m.name==='Body')?.material.color.getHex(),
+          hairstyle:v.character.model.userData.hairstyle,
           hair:meshes.filter(m=>/Hair/.test(m.name)).map(m=>[m.visible,m.material.color.getHex()]),
           shirt:shirt?.material.color.getHex(),legacyPrint:!!shirt?.material.map,
           markings:shirt?.material.userData.club?{number:shirt.material.userData.club.uniforms.clubNumber.value,front:shirt.material.userData.club.uniforms.clubFrontNumber.value}:null,
@@ -67,7 +68,7 @@ try{
       const players=result.players.filter(p=>p.team===team);
       assert(new Set(players.map(p=>p.body)).size>=5,`${sport}: repeated body proportions`);
       assert(new Set(players.map(p=>p.height)).size>=5,`${sport}: repeated height`);
-      assert(new Set(players.map(p=>JSON.stringify(p.hair))).size>=4,`${sport}: repeated haircut`);
+      assert.equal(new Set(players.map(p=>p.hairstyle)).size,players.length,`${sport}: repeated haircut in a roster`);
     }
     if(sport==='calcio')assert(result.players.every(p=>!p.legacyPrint&&p.markings?.number&&!p.markings.front),'Football needs a single back number with no baked number or floating plane');
     if(sport==='boxe')assert(result.players.every(p=>p.cleats===0&&p.boxingBoots===2),'Boxers still have football boots');
@@ -79,10 +80,12 @@ try{
       await page.evaluate(async()=>{
         const {views,match,stage}=frameit;
         document.querySelectorAll('.overlay,#hud,.debug-canvas,.debug-panel').forEach(e=>e.style.display='none');
-        const row=match.actors.filter(a=>a.team===0);
-        [...match.actors,...match.extras].forEach(a=>a.active=row.includes(a));
-        row.forEach((a,i)=>{a.pos.set((i-(row.length-1)/2)*1.3,0,0);a.heading=Math.PI/2;a.vel.set(0,0,0);a.gaitVel?.set(0,0,0);match.setPose(a,'normal',Infinity);a.poseBlendTime=1;});
-        views.update(0);stage.camera.position.set(0,2.4,8.8);stage.camera.lookAt(0,1.05,0);stage.camera.fov=39;stage.camera.updateProjectionMatrix();stage.renderer.render(stage.scene,stage.camera);
+        [...match.actors,...match.extras].forEach(a=>a.active=match.actors.includes(a));
+        for(const team of [0,1]){
+          const row=match.actors.filter(a=>a.team===team);
+          row.forEach((a,i)=>{a.pos.set((i-(row.length-1)/2)*1.35,0,team===0?1.1:-1.1);a.heading=Math.PI/2;a.vel.set(0,0,0);a.gaitVel?.set(0,0,0);match.setPose(a,'normal',Infinity);a.poseBlendTime=1;});
+        }
+        views.update(0);stage.camera.position.set(0,4.7,12.8);stage.camera.lookAt(0,1.2,0);stage.camera.fov=42;stage.camera.updateProjectionMatrix();stage.renderer.render(stage.scene,stage.camera);
       });
       await page.screenshot({path:`${out}/${sport}-roster.png`});
     }
