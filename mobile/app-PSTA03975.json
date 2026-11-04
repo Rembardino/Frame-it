@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Frame It: Live Sports TV",
+    "slug": "frame-it",
+    "owner": "rembardino",
+    "version": "1.0.10",
+    "orientation": "landscape",
+    "platforms": [
+      "android"
+    ],
+    "icon": "../public/icons/frame-it-icon-concept-v3-action.png",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.frameitnow",
+      "versionCode": 3,
+      "blockedPermissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE",
+        "android.permission.ACTIVITY_RECOGNITION"
+      ]
+    },
+    "extra": {
+      "frameit": {
+        "ads": {
+          "enabled": true,
+          "testAds": false,
+          "appId": "ca-app-pub-6724714927747840~8863376926",
+          "bannerId": "ca-app-pub-6724714927747840/6045641890",
+          "interstitialId": "ca-app-pub-6724714927747840/1585406726"
+        }
+      },
+      "eas": {
+        "projectId": "f7b9a919-96e9-48db-86db-bb866c41ff62"
+      }
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}
