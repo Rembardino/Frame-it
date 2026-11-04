@@ -127,9 +127,17 @@ async function checkGolf(server) {
     const m = new Match(), d = new Director(m, all, { forceRare: k === 0 }), voice = new DirectorVoice(m, d, all), golf = m.sportSimulation;
     const recorder = new Recorder(m);
     const view = { pos: { x: 0, y: 12, z: 0 }, yaw: 0, pitch: -10, fov: CONFIG.camera.startFov, aspect: 16 / 9 };
-    let ended = false, replayChecked = false;
+    let ended = false, replayChecked = false, wasBusy = false;
     for (let t = 0; t < CONFIG.match.durationSec + 60 && !ended; t += dt) {
       m.update(dt);
+      // Stroke play: ognuno parte dal tee col suo primo colpo, poi tira sempre chi è più lontano dalla bandiera.
+      if (golf.busy && !wasBusy) {
+        const me = golf.players[golf.shooter], other = golf.players[1 - golf.shooter], far = (p) => Math.hypot(p.x - golf.pin.x, p.z - golf.pin.z);
+        if (!me.teed) assert(me.strokes === 1, 'golf: il primo colpo della buca non parte dal tee');
+        else if (other.teed && !other.holed) assert(far(m.ball.pos) >= far(other.ball) - 0.01, 'golf: tira chi è più vicino alla bandiera');
+        else assert(other.holed || other.teed, 'golf: un giocatore non è partito dal tee');
+      }
+      wasBusy = golf.busy;
       // Il drone robot vola a 30 m dalla palla, un po' in alto.
       const b = m.ball.pos;
       view.pos.x += (b.x - 22 - view.pos.x) * 0.05; view.pos.z += (b.z + 22 - view.pos.z) * 0.05; view.pos.y = 14;
@@ -163,7 +171,7 @@ async function checkGolf(server) {
       }
     }
     assert(ended && golf.finished, `golf: giro non finito in tempo (buca ${golf.holeIdx + 1}, ${m.time.toFixed(0)} s)`);
-    assert(golf.results.length === CONFIG.golf.holesPerRound && d.aborted === 0, 'golf: buche mancanti o copioni bloccati');
+    assert(golf.results.length === 2 * CONFIG.golf.holesPerRound && d.aborted === 0, 'golf: buche mancanti o copioni bloccati');
     if (k === 0) assert(seen.has('g-ace'), 'golf: la buca in uno forzata (?rare) non è arrivata');
     console.log(`  giro ${k + 1}: buche ${golf.round.map((h) => h.n).join('-')}, ${golf.scoreText()} (${golf.results.map((x) => (x > 0 ? '+' : '') + x).join(' ')}), ${m.time.toFixed(0)} s`);
   }

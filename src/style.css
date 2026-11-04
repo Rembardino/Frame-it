@@ -227,6 +227,17 @@ body.practicing #dronepad, body.replaying #dronepad { display: none; }
 .bug .live { padding: 0 8px; background: linear-gradient(180deg, #f0383d, #c41c21); font-size: 11px; letter-spacing: 0.12em; }
 .bug .team { display: flex; align-items: center; gap: 6px; padding: 0 8px; }
 .bug .team i { width: 5px; height: 16px; border-radius: 1px; }
+.bug .team-crest { width: 20px; height: 22px; object-fit: contain; }
+.race-route { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.race-route select { color: #f5f8ff; background: #17283b; border: 1px solid #748696; border-radius: 7px; padding: 8px 12px; font: inherit; max-width: 100%; }
+.race-profile { display: grid; width: 120px; gap: 1px; }
+.race-profile svg { width: 120px; height: 30px; }
+.race-profile small { font-size: 10px; color: #dae3e9; text-align: center; white-space: nowrap; }
+.match-preview { display: flex; align-items: center; justify-content: center; gap: 16px; width: min(580px, 92vw); margin-top: 12px; }
+.match-preview .club { display: flex; align-items: center; justify-content: center; gap: 10px; flex: 1; min-width: 0; font: 800 12px/1.2 system-ui, sans-serif; letter-spacing: .04em; }
+.match-preview img { width: 38px; height: 42px; object-fit: contain; flex-shrink: 0; }
+.match-preview .versus { font: 700 11px/1 system-ui, sans-serif; color: #9aacc5; }
+@media (max-height: 520px) { .match-preview { margin-top: 7px; gap: 10px; } .match-preview img { width: 25px; height: 28px; } .match-preview .club { font-size: 10px; gap: 6px; } }
 .bug .score { padding: 0 10px; background: #fff; color: #0b1230; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .bug .clock { padding: 0 9px; background: rgba(255, 255, 255, 0.12); font-family: ui-monospace, Menlo, Consolas, monospace; min-width: 44px; text-align: center; }
 

@@ -31,6 +31,8 @@ interface Fan {
   stand: number;
   /** Indice della bandiera che tiene, o -1. */
   flag: number;
+  /** Moltiplica SCALE: chi sta in piedi a bordo strada ha la statura dei corridori. */
+  size: number;
 }
 
 export interface CrowdState {
@@ -48,6 +50,8 @@ const HAIR = [0x30241e, 0x8c613c, 0x111111, 0xd9b26a, 0x4a2a1a, 0x9a9a9a];
 const FLASHES = 48;
 /** Scala del tifoso: il modello è alto ~0,85 m, moltiplicato arriva a una persona vera; da seduto si abbassa. */
 const SCALE = 1.5;
+/** Pubblico in piedi visto da vicino (bordo strada): circa 1,85 m, accanto ad atleti e spettatori veri di ~2 m. */
+const STANDING = 1.45;
 
 export class Crowd {
   readonly ready: Promise<void>;
@@ -82,7 +86,7 @@ export class Crowd {
     const flagColors: number[] = [];
     for (const row of rows) {
       const len = row.from.distanceTo(row.to);
-      const n = Math.max(1, Math.floor(len / CONFIG.crowd.spacing));
+      const n = Math.max(1, Math.floor(len / (CONFIG.crowd.spacing * (row.standing ? 1.3 : 1))));
       const rot = new THREE.Quaternion().setFromAxisAngle(up, row.facing);
       // I vuoti si raggruppano: qualche posto libero vicino a un altro, non un rumore uniforme.
       let empty = 0;
@@ -99,8 +103,8 @@ export class Crowd {
           phase: Math.random() * 10, energy: 0.5 + Math.random() * 0.5, pointer: Math.random() < 0.75,
           wide: 0.86 + Math.random() * 0.3, tall: 0.9 + Math.random() * 0.2,
           // Nelle curve si sta in piedi quasi sempre; in tribuna ci si alza solo per le occasioni.
-          standAt: curve ? Math.random() * 0.35 : 0.2 + Math.random() * 0.75,
-          stand: 0, flag: flag ? this.flagFans.length : -1,
+          standAt: row.standing ? -1 : curve ? Math.random() * 0.35 : 0.2 + Math.random() * 0.75,
+          stand: 0, flag: flag ? this.flagFans.length : -1, size: row.standing ? STANDING : 1,
         });
         if (flag) { this.flagFans.push(this.fans.length - 1); flagColors.push(team >= 0 ? CONFIG.teams[team].shirt : 0xffffff); }
         shirts.push(team >= 0 && Math.random() < 0.7 ? CONFIG.teams[team].shirt : NEUTRAL[Math.floor(Math.random() * NEUTRAL.length)]);
@@ -211,7 +215,7 @@ export class Crowd {
       this.q.multiplyQuaternions(f.rot, this.lean).multiply(this.tilt);
       const gap = gaps.length > 0 && gaps.some((g) => Math.abs(g.y - f.y) < 0.3 && Math.hypot(g.x - f.x, g.z - f.z) < 0.6);
       if (gap) this.m.compose(this.p, this.q, this.zero);
-      else { this.s.set(f.wide * SCALE, f.tall * SCALE * (this.fanState?1:0.8+0.2*stand), f.wide * SCALE); this.m.compose(this.p, this.q, this.s); }
+      else { this.s.set(f.wide * SCALE * f.size, f.tall * SCALE * f.size * (this.fanState?1:0.8+0.2*stand), f.wide * SCALE * f.size); this.m.compose(this.p, this.q, this.s); }
       this.body.setMatrixAt(i, this.m);
       if (showArms) {
         // Braccia su: chi indica il cielo, una parte di chi esulta (a turno, con la propria energia), la cresta dell'ola.

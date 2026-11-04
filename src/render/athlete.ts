@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { CONFIG, SPORT } from '../config';
 import type { Actor } from '../sim/match';
-import { bicycle, golfBag, golfClub, jerseyNumber, quietSign, racket, ringBox } from './equipment';
+import { bicycle, golfBag, golfClub, quietSign, racket, ringBox } from './equipment';
+import { riderKit } from './cyclingKit';
 
 export interface Athlete {
   body: THREE.Group; torso: THREE.Group; head: THREE.Group;
@@ -30,12 +31,11 @@ export function createAthlete(actor: Actor): Athlete {
     const wrist=new THREE.Group();wrist.position.y=-.27;elbow.add(wrist);return{root,elbow,wrist};
   };
   const left=leg(1),right=leg(-1),armL=arm(1),armR=arm(-1);
-  const player=!['ref','coach','fan','steward','spectator'].includes(actor.role),team=CONFIG.teams[actor.team];
+  const player=!['ref','coach','fan','steward','spectator'].includes(actor.role),team=riderKit(actor,CONFIG.teams[actor.team]);
   if(SPORT==='tennis'&&player)armR.wrist.add(racket(team.shirt));
   if(SPORT==='golf'&&player){const club=golfClub();club.name='golf-club';armR.wrist.add(club);}
   if(SPORT==='golf'&&actor.role==='ref')armR.wrist.add(quietSign());
   if(SPORT==='golf'&&actor.role==='coach')torso.add(golfBag(team.shirt));
-  if(player&&SPORT!=='boxe'&&SPORT!=='golf')torso.add(jerseyNumber(actor.id%99+1));
   const ring=actor.role==='spectator'&&actor.look==='plain'?ringBox():undefined;
   if(ring)armR.wrist.add(ring.group);
   return{body,torso,head,legL:left.root,legR:right.root,kneeL:left.knee,kneeR:right.knee,

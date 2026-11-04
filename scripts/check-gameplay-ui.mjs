@@ -32,7 +32,7 @@ try {
       document.querySelectorAll('.debug-canvas, .debug-panel').forEach(element => { element.style.display = 'none'; });
       const { match, director, voice, cam, stage, views, hud } = window.frameit;
       const view = cam.view();
-      const strikes = new Set(['kick', 'shoot', 'racket', 'backhand', 'serve', 'spike', 'jab', 'hook', 'uppercut']);
+      const strikes = new Set(['kick', 'shoot', 'dunk', 'racket', 'backhand', 'serve', 'spike', 'jab', 'hook', 'uppercut']);
       let action;
       for (let i = 0; i < 1800; i++) {
         match.update(1 / 60); director.update(1 / 60, view); voice.update(1 / 60, view);

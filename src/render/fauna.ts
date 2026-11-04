@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BODY, type Species } from '../sim/fauna';
 import type { Match } from '../sim/match';
+import {importedAnimal,loadAnimalModels,type AnimalModel} from './animalModels';
 
 type Part = [THREE.BufferGeometry, number];
 const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
@@ -27,7 +28,49 @@ function mesh(parts: Part[]) {
   return m;
 }
 
-interface View { root: THREE.Group; legs: THREE.Object3D[]; wings: THREE.Object3D[] }
+interface View { root: THREE.Group; legs: THREE.Object3D[]; wings: THREE.Object3D[]; knees?: THREE.Object3D[]; tail?: THREE.Object3D; ears?: THREE.Object3D[]; asset?: AnimalModel }
+
+/** A small tricolour trail dog, with a muzzle, floppy ears, paws and a jointed trot rather than four straight sticks. */
+function dog(): View {
+  const root=new THREE.Group();root.name='trail-dog';
+  const tan=0xb8793d,cream=0xf4e9d4,dark=0x302c2c;
+  root.add(mesh([
+    [ball(.30,.145,.12,-.07,.38,0),tan],
+    [ball(.23,.10,.125,-.10,.43,0),dark],
+    [ball(.155,.13,.107,.14,.385,0),cream],
+    [ball(.10,.15,.095,.235,.47,0),tan],
+    [ball(.115,.105,.09,.31,.555,0),tan],
+    [ball(.075,.075,.091,.35,.53,0),cream],
+    [ball(.095,.055,.061,.43,.517,0),cream],
+    [ball(.027,.024,.045,.516,.53,0),dark],
+    [ball(.063,.018,.045,.43,.485,0),0x46302a],
+    [ball(.027,.012,.018,.459,.472,0),0xda8d86],
+    [ball(.029,.012,.012,.35,.604,.072),dark],
+    [ball(.029,.012,.012,.35,.604,-.072),dark],
+    [ball(.012,.014,.011,.365,.575,.081),0x1b1818],
+    [ball(.012,.014,.011,.365,.575,-.081),0x1b1818],
+    [ball(.0035,.004,.003,.369,.580,.09),0xffffff],
+    [ball(.0035,.004,.003,.369,.580,-.09),0xffffff],
+    [new THREE.CylinderGeometry(.092,.085,.035,12).rotateZ(-.28).translate(.235,.465,0),0x287b93],
+    [ball(.012,.019,.014,.285,.442,.071),0xe8bb4f],
+  ]));
+  const ears: THREE.Object3D[]=[];
+  for(const s of [-1,1]){
+    const ear=new THREE.Group();ear.position.set(.285,.604,s*.077);ear.rotation.x=s*.14;
+    ear.add(mesh([[ball(.058,.095,.027,-.015,-.065,s*.012),0x77472f]]));root.add(ear);ears.push(ear);
+  }
+  const legs: THREE.Object3D[]=[],knees: THREE.Object3D[]=[];
+  for(const [x,z] of [[.13,.087],[.13,-.087],[-.26,.087],[-.26,-.087]]){
+    const leg=new THREE.Group();leg.position.set(x,.31,z);
+    leg.add(mesh([[ball(.047,.091,.044,0,-.052,0),x<0?tan:cream]]));
+    const knee=new THREE.Group();knee.position.y=-.14;
+    knee.add(mesh([[stick(.025,.14,0,0,0),cream],[ball(.053,.027,.037,.021,-.143,0),cream]]));
+    leg.add(knee);root.add(leg);legs.push(leg);knees.push(knee);
+  }
+  const tail=new THREE.Group();tail.position.set(-.35,.43,0);tail.rotation.z=-.65;
+  tail.add(mesh([[ball(.12,.035,.037,-.085,.02,0),tan],[ball(.052,.029,.031,-.185,.022,0),cream]]));root.add(tail);
+  return {root,legs,knees,ears,tail,wings:[]};
+}
 
 /** Quadrupede: corpo, collo e testa, quattro zampe che oscillano. */
 function quadruped(species: Species): View {
@@ -113,6 +156,7 @@ function swimmer(species: Species): View {
 
 export class FaunaViews {
   private pools = new Map<Species, View[]>();
+  readonly ready=loadAnimalModels();
 
   constructor(private scene: THREE.Scene) {}
 
@@ -121,9 +165,14 @@ export class FaunaViews {
     this.pools.set(species, pool);
     const k = used.get(species) ?? 0;
     used.set(species, k + 1);
-    if (!pool[k]) {
+    const asset=(!pool[k]||!pool[k].asset)?importedAnimal(species):undefined;
+    if (!pool[k]||asset) {
       const b = BODY[species];
-      const v = b.fly ? bird(species) : b.swim ? swimmer(species) : quadruped(species);
+      if(pool[k]){
+        this.scene.remove(pool[k].root);
+        pool[k].root.traverse(o=>{if((o as THREE.Mesh).isMesh)(o as THREE.Mesh).geometry.dispose();});
+      }
+      const v: View = asset?{root:asset.root,legs:[],wings:[],asset}:species==='dog'?dog():b.fly ? bird(species) : b.swim ? swimmer(species) : quadruped(species);
       v.root.rotation.order = 'YXZ';
       this.scene.add(v.root);
       pool[k] = v;
@@ -143,10 +192,16 @@ export class FaunaViews {
       const q = fauna.at(a, i, time + 0.08).pos, moving = q.distanceTo(p.pos) > 0.01;
       const pitch = b.fly || b.swim ? Math.atan2(q.y - p.pos.y, Math.max(0.01, Math.hypot(q.x - p.pos.x, q.z - p.pos.z))) : 0;
       v.root.rotation.set(0, -p.heading, THREE.MathUtils.clamp(pitch, -1.2, 1.2));
+      if(v.asset){v.asset.sample(time-a.t0+i*.37,p.gait,moving);continue;}
       const phase = p.gait * Math.PI * 2;
       const hop = a.species === 'rabbit';
       // Zampe: oscillano solo quando l'animale cammina (da fermo stanno dritte).
       v.legs.forEach((leg, k) => { leg.rotation.z = moving ? Math.sin(phase + (hop ? (k < 2 ? 0 : 1) : [0, Math.PI, Math.PI, 0][k])) * 0.5 : 0; });
+      if(v.knees){
+        v.knees.forEach((knee,k)=>{knee.rotation.z=moving?Math.max(0,Math.sin(phase+[0,Math.PI,Math.PI,0][k]))*.85:0;});
+        v.tail!.rotation.y=Math.sin(time*(moving?9:5)+i)*.28;
+        v.ears!.forEach((ear,k)=>{ear.rotation.z=moving?Math.sin(phase+k*.2)*.11:0;});
+      }
       if (hop || (!b.fly && !b.swim && a.species !== 'cow')) v.root.position.y += Math.abs(Math.sin(phase)) * b.h * (hop ? 0.25 : 0.04);
       // Ali: battono in volo (l'aquila plana), chiuse sull'acqua.
       const flying = p.pos.y > 0.4 && moving; // posato (sulla testa di uno spettatore): ali chiuse

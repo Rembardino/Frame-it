@@ -61,7 +61,8 @@ function shot(id: string, label: string, kind: GolfKind, action: SportAction, en
     roles: { golfer: { label: 'Golfista', pick: 'holder' }, marshal: { label: 'Marshal', pick: 'referee' } },
     steps: [
       { t: 0.15, do: 'pose', who: 'marshal', pose: 'card', dur: swing + 1.4 },
-      { t: 0.45, do: 'pose', who: 'golfer', pose: 'practice', dur: putt ? 0.9 : 1.1 },
+      // Prova senza palla: mezzo swing (o un putt) alla sua velocità, non il drive intero compresso.
+      { t: 0.45, do: 'pose', who: 'golfer', pose: 'practice', dur: putt ? 0.9 : 1.1, gesture: putt ? 'golfPutt' : 'golfChip' },
       { t: swing, do: 'sport', action, who: 'golfer' },
     ],
     cues: [], decisive, duration: (putt || end === 'cup' ? decisive : land + after) + 1.6, shots,

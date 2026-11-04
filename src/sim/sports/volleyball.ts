@@ -3,13 +3,14 @@ import type { Actor, Match, TeamId } from '../match';
 import type { SportAction, SportSimulation } from './types';
 import { NetBall } from './netBall';
 import { CONFIG } from '../../config';
+import { netContactPoint } from '../../animation/motion';
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 export class VolleyballSimulation implements SportSimulation {
   private ball: NetBall;
-  private wait = 1;
   private touch = 0;
+  private rally = 0;
   private server: TeamId = 0;
   private blockedFlight: THREE.Vector3 | null = null;
   /** Secondi dalla fine dell'ultimo punto (-1 = si gioca): festa in cerchio, tutti ai posti, battuta. */
@@ -30,7 +31,7 @@ export class VolleyballSimulation implements SportSimulation {
     if (this.match.isStopped) return;
     const winner = this.ball.update(dt);
     if (winner !== null) {
-      this.match.score[winner]++; this.server = winner; this.touch = 0;
+      this.match.score[winner]++; this.server = winner; this.touch = 0; this.rally = 0;
       this.match.sound('point', this.match.ball.pos);
       this.match.actors.forEach((a) => this.match.setPose(a, a.team === winner ? 'celebrate' : 'dejected', CONFIG.match.celebrateSec * 0.6));
       this.ball.hold(this.servingPlayer);
@@ -47,7 +48,11 @@ export class VolleyballSimulation implements SportSimulation {
         const focusZ = this.ball.landing?.z ?? this.match.ball.pos.z;
         const supportX = side * (a.role === 'fwd' ? defending ? 1.05 : 1.65 : a.role === 'mid' ? 2.8 : 6);
         const supportZ = a.base.z * (defending ? 0.68 : 0.82) + focusZ * (defending ? 0.32 : 0.18);
-        a.target.set(incoming?.x ?? supportX, 0, incoming?.z ?? supportZ);
+        // Leave room for the hands in front of the body instead of running under the ball.
+        const pose = this.touch === 0 ? 'receive' : this.touch === 1 ? 'set' : 'spike';
+        const offset = incoming ? netContactPoint(a, this.match.time, 0.24, pose, 0.75).sub(a.pos) : null;
+        a.target.set(incoming ? incoming.x - offset!.x : supportX, 0, incoming ? incoming.z - offset!.z : supportZ);
+        if (this.match.ball.holder === a) a.target.copy(a.pos);
         a.speedLimit = incoming ? CONFIG.match.runSpeed : CONFIG.match.jogSpeed;
       }
       a.target.x = a.team === 0 ? THREE.MathUtils.clamp(a.target.x, -8.5, -0.7) : THREE.MathUtils.clamp(a.target.x, 0.7, 8.5);
@@ -60,16 +65,17 @@ export class VolleyballSimulation implements SportSimulation {
       const blocker = this.match.nearest(hitter.pos, a => a.team !== hitter.team && a.role === 'fwd' && !a.scripted && a.pose === 'normal');
       if (blocker && Math.abs(blocker.pos.x) < 1.8) this.match.setPose(blocker, 'block', 0.65, hitter);
     }
-    if (this.match.ballScripted || this.ball.flying || (this.wait -= dt) > 0) return;
+    if (this.match.ballScripted || this.ball.flying) return;
     const a = this.match.ball.holder ?? this.match.actors[this.server * 6 + 3];
-    const kind = ['receive', 'set', 'spike'][this.touch++ % 3] as SportAction;
+    const kind = ['receive', 'set', 'spike'][this.touch] as SportAction;
     const team = kind === 'spike' ? 1 - a.team : a.team;
     const role = kind === 'receive' ? 'mid' : kind === 'set' ? 'fwd' : 'def';
-    const next = this.match.actors.find((p) => p.team === team && p.role === role && p !== a)!;
-    this.wait = 0.08;
+    const candidates = this.match.actors.filter((p) => p.team === team && p.role === role && p !== a);
+    // Use the attacker/defender already covering this lane, rather than always the first in the roster.
+    const next = candidates.sort((p, q) => Math.abs(p.pos.z - a.pos.z) - Math.abs(q.pos.z - a.pos.z))[0];
     // Errori di gioco: attacco fuori o a rete, ricezione sbagliata. Chiudono lo scambio senza copione.
     if (kind === 'spike' && Math.random() < 0.14) return this.attackError(a);
-    if (kind === 'receive' && this.touch > 1 && Math.random() < 0.07) return this.digError(a);
+    if (kind === 'receive' && this.rally > 0 && Math.random() < 0.07) return this.digError(a);
     // Lo scambio di sottofondo resta in gioco; il punto decisivo viene dal copione.
     this.action(kind === 'spike' ? 'rallySpike' : kind, a, next);
   }
@@ -79,7 +85,7 @@ export class VolleyballSimulation implements SportSimulation {
     const side = actor.team === 0 ? -1 : 1, radius = CONFIG.visuals.ballRadius * CONFIG.visuals.ballScale;
     const long = Math.random() < 0.6;
     const to = long ? new THREE.Vector3(-side * rand(9.6, 10.6), radius, rand(-4.2, 4.2)) : new THREE.Vector3(side * 0.35, 1.7, THREE.MathUtils.clamp(actor.pos.z + rand(-1, 1), -3.5, 3.5));
-    this.match.setPose(actor, 'spike', 0.75, this.match.actors.find((p) => p.team !== actor.team));
+    this.strikePose(actor, 'spike', this.match.actors.find((p) => p.team !== actor.team));
     this.ball.launch(actor, to, long ? 0.75 : 0.45, long ? 0.4 : 0.2, false, null, (1 - actor.team) as TeamId);
     this.match.excitement = 0.6;
   }
@@ -88,7 +94,7 @@ export class VolleyballSimulation implements SportSimulation {
   private digError(actor: Actor) {
     const side = actor.team === 0 ? -1 : 1, radius = CONFIG.visuals.ballRadius * CONFIG.visuals.ballScale;
     const to = new THREE.Vector3(side * rand(2, 7.5), radius, THREE.MathUtils.clamp(actor.pos.z + rand(-4, 4), -4.6, 4.6));
-    this.match.setPose(actor, 'receive', 0.75, null);
+    this.strikePose(actor, 'receive');
     this.ball.launch(actor, to, 0.7, 1.1, false, null, (1 - actor.team) as TeamId);
     this.match.excitement = 0.55;
   }
@@ -129,18 +135,41 @@ export class VolleyballSimulation implements SportSimulation {
     const finish = kind === 'spike' || kind === 'block' || kind === 'ace';
     const next = target ?? this.match.actors.find((a) => a.team !== actor.team && a.role === 'def')!;
     const side = actor.team === 0 ? 1 : -1;
-    const to = finish ? new THREE.Vector3(side * (kind === 'block' ? 2 : 5.5), 0.2, actor.pos.z * 0.5) : next.pos.clone().setY(kind === 'set' ? 3.1 : 1.2);
+    const nextPose = kind === 'set' ? 'spike' : kind === 'receive' ? 'set'
+      : kind === 'rallySpike' && this.match.ballScripted && next.role === 'fwd' ? 'block' : 'receive';
+    const radius = CONFIG.visuals.ballRadius * CONFIG.visuals.ballScale;
+    const to = finish ? new THREE.Vector3(side * (kind === 'block' ? 2 : 5.5), radius, actor.pos.z * 0.5)
+      : next.pos.clone().setY(nextPose === 'spike' || nextPose === 'block' ? 3.15 : nextPose === 'set' ? 2.4 : 1.05);
     if (!finish && !this.match.ballScripted) {
       to.x = (next.team === 0 ? -1 : 1) * (next.role === 'fwd' ? 1.4 : next.role === 'mid' ? 3.8 : 6.2);
       // Le schiacciate dello scambio cambiano direzione: diagonale, parallela, al centro.
       to.z = THREE.MathUtils.clamp(next.base.z * 0.65 + Math.sin(this.match.time * 0.7) * 1.2 + (kind === 'rallySpike' ? rand(-2, 2) : 0), -3.6, 3.6);
     }
-    this.match.setPose(actor, kind === 'receive' ? 'receive' : kind === 'set' ? 'set' : kind === 'block' ? 'block'
-      : kind === 'serve' || kind === 'ace' ? 'serve' : 'spike', 0.75, next);
-    this.ball.launch(actor, to, kind === 'set' || kind === 'ace' ? 1.15 : 0.95,
-      kind === 'set' || kind === 'ace' ? 1.5 : kind === 'block' ? 0.85 : finish || kind === 'rallySpike' ? 0.6 : 2,
-      false, finish ? null : next, finish ? actor.team : null);
+    this.strikePose(actor, kind === 'receive' ? 'receive' : kind === 'set' ? 'set' : kind === 'block' ? 'block'
+      : kind === 'serve' || kind === 'ace' ? 'serve' : 'spike', next);
+    let duration = this.match.ballScripted
+      ? kind === 'serve' ? 1.05 : kind === 'receive' ? 1.25 : kind === 'set' ? 1.4 : kind === 'rallySpike' ? 0.32 : 0.7
+      : kind === 'serve' ? 1.05 : kind === 'receive' ? 0.85 : kind === 'set' ? 0.8 : 0.72;
+    if (!finish) {
+      const distance = Math.hypot(to.x - next.pos.x, to.z - next.pos.z);
+      // Give the receiver time to get there and plant before the contact animation starts.
+      duration = Math.max(duration, distance / CONFIG.match.runSpeed + 0.34);
+    }
+    this.ball.launch(actor, to, duration,
+      kind === 'set' ? 0.9 : kind === 'receive' ? 1.3 : kind === 'serve' || kind === 'ace' ? 1.8 : 0.45,
+      false, finish ? null : next, finish ? actor.team : null, finish ? null : nextPose);
+    this.touch = kind === 'receive' ? 1 : kind === 'set' ? 2 : 0;
+    if (kind === 'rallySpike') this.rally++;
+    this.between = -1;
+    this.match.phase = 'play';
     this.match.excitement = finish ? 1 : 0.5;
+  }
+
+  private strikePose(actor: Actor, pose: 'receive' | 'set' | 'spike' | 'block' | 'serve', target?: Actor) {
+    // NetBall has already started this gesture during the incoming flight.
+    if (actor.pose !== pose || actor.poseTime > 0.45) this.match.setPose(actor, pose, 0.75, target);
+    else actor.faceTarget = target ?? null;
+    actor.target.copy(actor.pos);
   }
 
   scoreText() { return `${this.match.score[0]} - ${this.match.score[1]}`; }

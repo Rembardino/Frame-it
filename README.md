@@ -11,7 +11,7 @@ npm run dev
 
 Scegli lo sport nella schermata iniziale: Calcio, Basket, Boxe, Tennis o Pallavolo. Puoi anche aprire direttamente `?sport=boxe`, `?sport=tennis` o `?sport=pallavolo`.
 
-La lingua iniziale è l'inglese. Il menu Language permette di scegliere English, Italiano, Español, Français o Deutsch e salva la scelta sul dispositivo, senza cambiare record e clip. Puoi forzarla con `?lang=it` (combinabile con `sport`). Interfaccia, regia, voti e riepilogo sono tradotti; i nomi propri delle squadre rimangono invariati.
+La lingua iniziale è l'inglese. Il menu Language permette di scegliere English, Italiano, Español, Français o Deutsch e salva la scelta sul dispositivo, senza cambiare record e clip. Puoi forzarla con `?lang=it` (combinabile con `sport`). Interfaccia, regia, voti, riepilogo, nomi e sigle dei club sono tradotti; i nomi personali degli atleti mantengono la loro grafia originale.
 
 ## Controlli
 
@@ -31,6 +31,10 @@ I pannelli dei voti e il tabellone sono più piccoli e semitrasparenti su telefo
 ## Sport
 
 - Calcio e basket: azioni, distrazioni, esultanze e punteggio dedicati.
+- Basket: falli di tiro con due o tre liberi da un punto, sfondamento con rimessa agli avversari, rimessa da fuori campo dopo canestro e schiacciate con salto e contatto sopra il ferro. Il cronometro si ferma durante liberi e rimesse; solo l'ultimo libero sbagliato apre un rimbalzo vivo.
+- Ciclismo: gara individuale con 14 corridori, maglie personali e classifica senza squadre. Nel menu scegli Colline e curve a S, Salite e discese o Circuito a S; quota del terreno, pendenza della bici e velocità del gruppo seguono il percorso. Accesso diretto: `?sport=ciclismo&route=montagna`.
+- Le tappe hanno partenze e città diverse: Valdoro con borgo e campanile, Passo Alto con tornanti, chalet e quota massima di circa 130 m, Porto Azzurro con case bianche, porto e faro. Il menu mostra il profilo altimetrico. Fiume e sponde usano circa 1.200 triangoli, con acqua leggera senza riflessi costosi.
+- Le scene speciali del pubblico si svolgono sulle file delle tribune, con spettatori in scala ridotta. Il voto considera copertura e zoom durante tutto l'istante decisivo: una scena appena intravista vale pochi punti; replay e cattura virale richiedono almeno 70/100. La palla da basket è proporzionata ai giocatori.
 - Boxe: due pugili, ring e guantoni, jab, ganci, montanti, contrattacchi e knockdown. La sessione arcade dura tre riprese; il tabellone conta i colpi puliti, con due punti per il knockdown.
 - Tennis: singolare con racchette, servizio, dritto, rovescio, volée e smash. Il tabellone mostra game e punti 0/15/30/40, parità e vantaggio. La sessione termina dopo tre minuti di gioco.
 - Pallavolo: sei contro sei, servizio, ricezione, alzata, schiacciata, primo tempo e muro. Ogni scambio decisivo assegna un punto; la sessione arcade dura tre minuti.
@@ -52,6 +56,12 @@ Dopo `npm ci` nella radice, entra in `mobile/`, esegui `npm ci`, quindi `npm run
 ```sh
 npm run check
 npm run check:motion
+npm run check:courts
+npm run check:basket-rules
+npm run check:cycling-routes
+npm run check:race-ui
+npm run check:secrets
+npm run check:stands
 npm run check:gameplay
 npm run check:lessons
 npm run check:practice

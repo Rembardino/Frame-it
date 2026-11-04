@@ -9,7 +9,9 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
 /** Tre riprese arcade: colpi puliti, difesa, combinazioni e knockdown recuperabili. */
 export class BoxingSimulation implements SportSimulation {
   private next = 2;
-  private hits: { actor: Actor; opponent: Actor; kind: SportAction; delay: number }[] = [];
+  private hits: { actor: Actor; opponent: Actor; kind: SportAction; delay: number; body?: boolean }[] = [];
+  /** Every third jab goes to the body: counted, not drawn from Math.random, so the rest of the bout is unchanged. */
+  private jabs = 0;
   /** Combinazione automatica in corso: chi attacca e i colpi che restano. */
   private attacker: Actor | null = null;
   private combo: SportAction[] = [];
@@ -45,7 +47,8 @@ export class BoxingSimulation implements SportSimulation {
         this.match.excitement = Math.max(this.match.excitement, 0.45);
         continue;
       }
-      this.match.setPose(hit.opponent, hit.kind === 'knockdown' ? 'fall' : 'recoil', hit.kind === 'knockdown' ? 2.5 : 0.55, hit.actor);
+      this.match.setPose(hit.opponent, hit.kind === 'knockdown' ? 'fall' : 'recoil', hit.kind === 'knockdown' ? 2.5 : 0.55, hit.actor,
+        hit.kind === 'knockdown' ? undefined : hit.body ? 'boxingRecoilBody' : 'boxingRecoilHead');
       // Contano solo i colpi all'avversario, non quelli a chi invade il ring.
       if (this.match.actors.includes(hit.opponent)) this.match.score[hit.actor.team] += hit.kind === 'knockdown' ? 2 : 1;
       this.match.sound(hit.kind === 'knockdown' ? 'knockdown' : 'punch', hit.opponent.pos, hit.kind === 'jab' ? 0.6 : 1);
@@ -72,7 +75,8 @@ export class BoxingSimulation implements SportSimulation {
     // Il centro del combattimento gira per tutto il ring, non solo al centro.
     const cx = Math.sin(t * 0.31) * 1.3 + Math.sin(t * 0.13 + 2) * 0.4;
     const cz = Math.sin(t * 0.27 + 1) * 1.1;
-    const radius = 1 - this.engage * 0.38 + Math.sin(t * 1.3) * 0.07;
+    // Engaged, centres ~1.04 m apart: the imported punches reach the face only from there.
+    const radius = 1 - this.engage * 0.48 + Math.sin(t * 1.3) * 0.07;
     const angle = Math.sin(t * 0.42) * 0.9 + Math.sin(t * 0.87) * 0.2;
     for (const a of this.match.actors) {
       const opponent = this.match.actors[1 - a.team];
@@ -157,8 +161,9 @@ export class BoxingSimulation implements SportSimulation {
     const opponent = target ?? this.match.actors[1 - actor.team];
     actor.target.copy(actor.pos);
     const pose = kind === 'knockdown' ? 'uppercut' : kind === 'counter' ? 'hook' : kind;
-    this.match.setPose(actor, pose === 'jab' || pose === 'hook' || pose === 'uppercut' ? pose : 'jab', 0.65, opponent);
-    this.hits.push({ actor, opponent, kind, delay: 0.65 * 0.32 });
+    const body = pose === 'jab' && this.jabs++ % 3 === 2;
+    this.match.setPose(actor, pose === 'jab' || pose === 'hook' || pose === 'uppercut' ? pose : 'jab', 0.65, opponent, body ? 'boxingBodyJab' : undefined);
+    this.hits.push({ actor, opponent, kind, delay: 0.65 * 0.32, body });
   }
 
   scoreText() { return `${this.match.score[0]} - ${this.match.score[1]}`; }

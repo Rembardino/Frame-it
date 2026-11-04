@@ -1,0 +1,14 @@
+"Carol Tennis Player Girl | Animated 3D Character" by agra_aoe (AoG.01)
+https://sketchfab.com/3d-models/carol-tennis-player-girl-animated-3d-character-7e3c54909e834196aaed1661e2581413
+
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Changes made for Frame It: rigged with Adobe Mixamo's auto-rigger, retextured garments as plain
+recolourable fabric, simplified geometry and textures, renamed parts
+(scripts/prepare-mixamo-athletes.mjs). Used as the female tennis player and golfer, and for some
+coaches, stewards and spectators.
+
+Additional Frame It modifications: six fitted hair variants (long hair/visor, bob, cropped,
+bun, ponytail and side part), alternate hair/skin colours and small facial/body proportion
+changes. The original skeleton is retained (src/render/carolAppearance.ts).

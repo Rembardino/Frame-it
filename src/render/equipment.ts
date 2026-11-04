@@ -46,17 +46,6 @@ export function ringBox() {
   return { group, sparkle };
 }
 
-export function jerseyNumber(number: number) {
-  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 128;
-  const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#fffaf0'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = 'bold 90px Arial'; ctx.fillText(String(number), 64, 65);
-  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
-  const front = new THREE.PlaneGeometry(0.13, 0.17).rotateY(Math.PI / 2).translate(0.136, 0.28, 0);
-  const back = new THREE.PlaneGeometry(0.16, 0.2).rotateY(-Math.PI / 2).translate(-0.136, 0.3, 0);
-  const result = new THREE.Mesh(mergeGeometries([front, back])!, new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false }));
-  front.dispose(); back.dispose(); return result;
-}
-
 export function racket(color: number) {
   const group = new THREE.Group(); group.rotation.y = Math.PI / 2;
   const frame = new THREE.TorusGeometry(0.205, 0.014, 5, 28);

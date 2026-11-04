@@ -18,9 +18,11 @@ import { BoxingSimulation } from './sports/boxing';
 import { GolfSimulation } from './sports/golf';
 import { CyclingSimulation } from './sports/cycling';
 import { SailingSimulation } from './sports/sailing';
+import { BasketballRules } from './sports/basketball';
 import type { SportSimulation } from './sports/types';
 import { Fauna } from './fauna';
-import { actorMotion, type MotionPose } from '../animation/motion';
+import { actorMotion, netContactPoint, type MotionPose } from '../animation/motion';
+import { ANIMATION_CATALOG } from '../animation/assetMotion';
 import { steerActor, separateActors } from './locomotion';
 import type { Speech } from '../audio/speech';
 import type { Shout } from '../audio/lines';
@@ -34,7 +36,7 @@ export type Pose =
   | 'normal' | 'dive' | 'celebrate' | 'dejected' | 'fall' | 'tackle' | 'stumble'
   | 'protest' | 'argue' | 'shove' | 'card' | 'windUp' | 'kick' | 'crouch' | 'wave'
   /** Basket: tiro in sospensione e passaggio a due mani. */
-  | 'shoot' | 'throw' | 'racket' | 'backhand' | 'serve' | 'receive' | 'set' | 'spike' | 'block'
+  | 'shoot' | 'dunk' | 'throw' | 'racket' | 'backhand' | 'serve' | 'receive' | 'set' | 'spike' | 'block'
   | 'guard' | 'jab' | 'hook' | 'uppercut' | 'recoil' | 'combo' | 'count' | 'getUp'
   /** Spettatori dei momenti segreti. */
   | 'hug' | 'hide' | 'kiss' | 'dance' | 'sleep' | 'kneel'
@@ -44,7 +46,7 @@ export type Pose =
   | 'address' | 'swing' | 'practice' | 'putt'
   /** Ciclismo: in piedi sui pedali. Vela: alle manovelle. */
   | 'sprint' | 'grind';
-export type MatchPhase = 'play' | 'goal' | 'reset' | 'dead' | 'setPiece';
+export type MatchPhase = 'play' | 'goal' | 'reset' | 'dead' | 'setPiece' | 'inbound' | 'freeThrow';
 export type ShotOutcome = 'goal' | 'save' | 'wide';
 /** Calci piazzati del calcio: rigore, punizione diretta, calcio d'angolo. */
 export type SetPieceKind = 'penalty' | 'freeKick' | 'corner';
@@ -68,6 +70,8 @@ export type MatchEvent =
   | { type: 'setPiece'; kind: SetPieceKind; taker: Actor; at: number };
 
 export interface Actor {
+  outOfBounds?: 'endline' | 'sideline';
+  terrainPitch?: number;
   id: number;
   team: TeamId;
   role: Role;
@@ -79,6 +83,8 @@ export interface Actor {
   base: { x: number; z: number };
   pos: THREE.Vector3;
   vel: THREE.Vector3;
+  /** Velocità smorzata (~0,25 s) che sceglie l'andatura animata: i cambi passo/corsa/lato durano una dissolvenza. */
+  gaitVel?: THREE.Vector3;
   target: THREE.Vector3;
   /** Direzione in cui guarda (radianti, 0 = +x). */
   heading: number;
@@ -117,7 +123,7 @@ export interface Actor {
 export type SpectatorLook = 'plain' | 'banana' | 'dino' | 'clown' | 'astronaut' | 'mascot';
 export const COSTUMES: SpectatorLook[] = ['banana', 'dino', 'clown', 'astronaut'];
 
-interface Flight {
+export interface Flight {
   from: THREE.Vector3;
   to: THREE.Vector3;
   t: number;
@@ -130,6 +136,11 @@ interface Flight {
   receiver: Actor | null;
   shot: ShotOutcome | null;
   control?: 'footballHeader' | 'footballKnee';
+  /** Basketball gathers the ball into the hands before the pass/shot leaves them. */
+  release?: { from: THREE.Vector3; elapsed: number; duration: number };
+  arrival?: THREE.Vector3;
+  prepared?: boolean;
+  freeThrow?: boolean;
 }
 
 export interface Ball {
@@ -185,7 +196,7 @@ const LOCKED: Pose[] = ['dive', 'fall', 'tackle'];
 const FORMATION: { role: Role; x: number; z: number }[] = SPORT === 'tennis' || SPORT === 'boxe' || GOLF
   ? [{ role: 'fwd', x: 0, z: 0 }]
   // Ciclismo: capitano (velocista), due uomini di fiducia, gregari. Vela: due barche, timoniere e tailer.
-  : SPORT === 'ciclismo' ? Array.from({ length: CONFIG.cycling.ridersPerTeam }, (_, i): { role: Role; x: number; z: number } => ({ role: i ? i < 3 ? 'mid' : 'def' : 'fwd', x: 0, z: 0 }))
+  : SPORT === 'ciclismo' ? Array.from({ length: CONFIG.cycling.riders }, (_, i): { role: Role; x: number; z: number } => ({ role: i % 4 === 0 ? 'fwd' : i % 2 ? 'mid' : 'def', x: 0, z: 0 }))
   : SPORT === 'vela' ? [{ role: 'fwd', x: 0, z: 0 }, { role: 'mid', x: 0, z: 0 }, { role: 'fwd', x: 0, z: 0 }, { role: 'mid', x: 0, z: 0 }]
   : SPORT === 'pallavolo'
   ? [{ role: 'fwd', x: 0, z: 0 }, { role: 'mid', x: 0, z: 0 }, { role: 'fwd', x: 0, z: 0 },
@@ -227,7 +238,7 @@ export function clampToPitch(v: THREE.Vector3, margin: number) {
 
 function makeActor(id: number, team: TeamId, role: Role, base = { x: 0, z: 0 }): Actor {
   return {
-    id, team, role, base, appearance: Math.floor(Math.random() * 14), animationCatalog:3,
+    id, team, role, base, appearance: Math.floor(Math.random() * 14), animationCatalog:ANIMATION_CATALOG,
     active: true,
     scripted: false,
     pos: new THREE.Vector3(),
@@ -252,6 +263,7 @@ function makeActor(id: number, team: TeamId, role: Role, base = { x: 0, z: 0 }):
 export class Match {
   private gestureCounts = new Map<string, number>();
   readonly sportSimulation: SportSimulation | null;
+  readonly basketball: BasketballRules | null;
   /** I 14 giocatori. */
   readonly actors: Actor[] = [];
   /** Arbitro, allenatori, tifoso, steward. */
@@ -307,6 +319,7 @@ export class Match {
   /** Palla appena ricevuta: scarto dal piede che si annulla in fretta, così non "salta" tra i piedi. */
   private catchOffset = new THREE.Vector3();
   private catchFrom: THREE.Vector3 | null = null;
+  private heldPose: Pose | null = null;
   /** Basket: quanto vale il tiro in volo (2 o 3). */
   private shotPoints = 2;
   /** Calcio: calcio piazzato in corso (rigore, punizione, angolo). */
@@ -324,7 +337,7 @@ export class Match {
     let id = 0;
     const sx = BASKET ? 1 : L / 60;
     const sz = BASKET ? 1 : W / 40;
-    for (const team of [0, 1] as TeamId[]) {
+    for (const team of (SPORT === 'ciclismo' ? [0] : [0, 1]) as TeamId[]) {
       for (const f of FORMATION) this.actors.push(makeActor(id++, team, f.role, { x: f.x * sx, z: f.z * sz }));
     }
     for (const a of this.actors) a.pos.copy(this.kickoffSpot(a, 0));
@@ -361,6 +374,11 @@ export class Match {
       : GOLF ? new GolfSimulation(this)
       : SPORT === 'ciclismo' ? new CyclingSimulation(this)
       : SPORT === 'vela' ? new SailingSimulation(this) : null;
+    this.basketball = BASKET ? new BasketballRules(this, {
+      phase: phase => this.setPhase(phase), hold: (a, hold, hands) => this.giveBall(a, hold, hands),
+      shot: (a, outcome) => this.shootHoop(a, outcome), goal: (a, points) => this.onGoal(a, points),
+      rest: to => this.launch(to, 0.45, 0, 'rest', null),
+    }) : null;
     if (!this.sportSimulation) this.kickoff(0);
     else if (!DRONE_ONLY) {
       this.referee.pos.set(0, 0, -(W / 2 + 1));
@@ -377,7 +395,7 @@ export class Match {
     this.time += dt;
     this.phaseTime += dt;
     this.excitement = Math.max(0, this.excitement - dt * 0.2);
-    this.clock += dt;
+    if (!BASKET || this.phase === 'play') this.clock += dt;
 
     if (this.sportSimulation) {
       this.sportSimulation.update(dt);
@@ -396,15 +414,14 @@ export class Match {
         if (BASKET) {
           // Niente festa lunga: tutti tornano in difesa/attacco, poi rimessa dal fondo.
           this.updateFormation();
-          if (this.phaseTime > M.celebrateSec) {
-            this.setPhase('dead');
-            this.deadDelay = Infinity;
-            this.restartTaker = this.nearest(this.ball.pos, (a) => a.team === this.kickoffTeam);
-          }
+          if (this.phaseTime > 0.7) this.basketball!.startInbound(this.kickoffTeam, this.ball.pos, true);
           break;
         }
         this.updateCelebration();
         if (this.phaseTime > M.celebrateSec) this.startReset();
+        break;
+      case 'inbound': case 'freeThrow':
+        this.basketball!.update(dt);
         break;
       case 'reset': {
         // Si riparte solo con tutti nella propria metà campo, ai loro posti.
@@ -473,6 +490,7 @@ export class Match {
     const dist = xzDist(target, b.pos);
     this.launch(target, dist / speed, dist > 22 ? dist * 0.12 : BASKET ? 0.3 + dist * 0.06 : 0.15, 'pass', from, to);
     to.target.copy(target).setY(0);
+    if (BASKET) to.target.sub(netContactPoint(to, this.time, 0.12, 'receive', 0.4).sub(to.pos)).setY(0);
     return true;
   }
 
@@ -541,7 +559,7 @@ export class Match {
       if (!this.extras.some((e) => e.role === 'fan' && e.active)) this.say(this.referee, 'foul');
     }
     const b = this.ball;
-    if (!DRONE_ONLY) b.pos.y = BALL_RADIUS; // golf: la palla può essere in buca; ciclismo e vela: non c'è
+    if (!DRONE_ONLY && !BASKET) b.pos.y = BALL_RADIUS;
     b.state = 'dead';
     b.holder = null;
     b.flight = null;
@@ -553,6 +571,7 @@ export class Match {
   /** Riprende il gioco: nel calcio, vicino alla porta, con un rigore o una punizione; altrimenti il più vicino va sul pallone. */
   restartPlay(team: TeamId) {
     if (this.phase !== 'dead' || this.deadDelay !== Infinity) return;
+    if (BASKET) return this.basketball!.startInbound(team);
     const kind = this.setPieceFor(team);
     if (kind) return this.startSetPiece(kind, team);
     this.restartTaker =
@@ -631,6 +650,8 @@ export class Match {
       a.faceTarget = null;
     }
     this.setPiece = { kind, team, taker, spot, t: 0, cut: false, whistled: false, receiver, targets };
+    // L'arbitro si ferma e indica il punto di battuta (guarda il pallone, appena messo sul punto).
+    if (!this.referee.scripted) this.setPose(this.referee, 'count', 1.8, null, 'officialPoint');
     this.setPhase('setPiece');
     this.events.push({ type: 'setPiece', kind, taker, at: this.time });
   }
@@ -667,6 +688,8 @@ export class Match {
       if (xzDist(taker.pos, sp.spot) < 0.8 || sp.t > ready + 2.5) {
         // Da qui il Director può chiamare shoot(); se nessuno lo fa entro mezzo secondo batte la partita.
         this.giveBall(taker, 0.5);
+        // A dead ball is struck, not received: load the kicking leg until the strike (the hold above).
+        this.setPose(taker, 'windUp', 0.6);
         this.lastTouch = sp.team;
       }
     } else if ((this.holdTimer -= dt) <= 0) this.kickSetPiece();
@@ -753,6 +776,7 @@ export class Match {
 
   /** Triplice fischio: gioco fermo per sempre. */
   endMatch() {
+    this.basketball?.stop();
     this.over = true;
     this.stopPlay();
     this.restartTaker = null;
@@ -809,22 +833,31 @@ export class Match {
   }
 
   /** Basket: goal = canestro, save = sul ferro, wide = sul tabellone. Il rimbalzo lo prende chi è vicino. */
+  prepareDunk(actor: Actor) {
+    const hoop = new THREE.Vector3(hoopX(dirOf(actor.team)), 0, 0);
+    if (xzDist(actor.pos, hoop) <= 1.1) return true;
+    actor.scripted = true; actor.target.copy(hoop); actor.target.x -= dirOf(actor.team) * 0.45;
+    actor.speedLimit = M.sprintSpeed;
+    if (actor.pose === 'windUp' || actor.pose === 'receive') this.setPose(actor, 'normal');
+    return false;
+  }
+
   private shootHoop(h: Actor, outcome: ShotOutcome) {
     const d = dirOf(h.team);
     const b = this.ball;
     const hoop = new THREE.Vector3(hoopX(d), P.rimHeight, 0);
     const dist = xzDist(h.pos, hoop);
-    this.shotPoints = dist > P.threePoint - 0.15 ? 3 : 2;
+    this.shotPoints = this.basketball?.freeThrows ? 1 : dist > P.threePoint - 0.15 ? 3 : 2;
     const side = Math.random() < 0.5 ? -1 : 1;
     const to = hoop.clone().setY(P.rimHeight + 0.1);
     if (outcome === 'save') to.set(hoop.x - d * 0.22, P.rimHeight + 0.05, side * 0.12);
     else if (outcome === 'wide') to.set(d * (L / 2 - 1.25), P.rimHeight + 0.5, side * 0.45);
-    // La palla parte dalle mani, sopra la testa.
-    const s = CONFIG.visuals.playerScale;
-    b.pos.set(h.pos.x + Math.cos(h.heading) * 0.25, 2.25 * s, h.pos.z + Math.sin(h.heading) * 0.25);
-    const arc = dist < 2 ? 0.35 : 1.2 + dist * 0.16;
-    this.launch(to, Math.max(0.45, dist / M.shotSpeed), arc, 'shot', h, null);
+    // launch gathers the dribble into the hands before releasing the shot.
+    const dunk = !this.basketball?.freeThrows && dist <= 1.2;
+    const arc = dunk ? 0.05 : dist < 2 ? 0.35 : 1.2 + dist * 0.16;
+    this.launch(to, dunk ? 0.24 : Math.max(0.45, dist / M.shotSpeed), arc, 'shot', h, null);
     b.flight!.shot = outcome;
+    b.flight!.freeThrow = !!this.basketball?.freeThrows;
     this.excitement = Math.max(this.excitement, 0.6);
   }
 
@@ -907,6 +940,9 @@ export class Match {
     this.setPose(scorer, 'celebrate');
     // Spesso va a esultare verso la bandierina dal lato della camera.
     this.celebrateSpot.set(dirOf(scorer.team) * (L / 2 - 1.5), 0, (Math.random() < 0.7 ? 1 : -1) * (W / 2 - 1.5));
+    // Al massimo 8 m di corsa verso la bandierina: deve restare il tempo di ballare prima della ripresa.
+    const run = this.celebrateSpot.clone().sub(scorer.pos).setY(0);
+    if (run.length() > 8) this.celebrateSpot.copy(scorer.pos).setY(0).add(run.setLength(8));
   }
 
   private updateCelebration() {
@@ -916,12 +952,15 @@ export class Match {
       if (a === s) {
         a.target.copy(this.celebrateSpot);
         a.speedLimit = M.runSpeed;
+        // Corre fino alla bandierina, poi balla.
+        if (a.pose === 'celebrate' && xzDist(a.pos, this.celebrateSpot) < 1.2) this.setPose(a, 'dance');
       } else if (a.team === s.team && a.role !== 'gk') {
-        // I compagni raggiungono il marcatore.
+        // I compagni raggiungono il marcatore; fermi accanto a lui, ballano anche loro.
         const ang = a.id * 2.4;
         a.target.set(s.pos.x + Math.cos(ang) * 1.3, 0, s.pos.z + Math.sin(ang) * 1.3);
         a.speedLimit = M.runSpeed;
-        if (a.pose !== 'celebrate' && xzDist(a.pos, s.pos) < 3) this.setPose(a, 'celebrate');
+        if (a.pose !== 'celebrate' && a.pose !== 'dance' && xzDist(a.pos, s.pos) < 3) this.setPose(a, 'celebrate');
+        if (a.pose === 'celebrate' && s.pose === 'dance' && a.poseTime > 1 && xzDist(a.pos, a.target) < .6) this.setPose(a, 'dance');
       } else {
         a.target.copy(this.kickoffSpot(a, this.kickoffTeam));
         a.speedLimit = M.walkSpeed;
@@ -974,6 +1013,10 @@ export class Match {
       }
     } else if (b.state === 'flight' && b.flight?.receiver && !b.flight.receiver.scripted) {
       b.flight.receiver.target.copy(b.flight.to).setY(0);
+      if (BASKET) {
+        const receiver = b.flight.receiver;
+        receiver.target.sub(netContactPoint(receiver, this.time, 0.12, 'receive', 0.4).sub(receiver.pos)).setY(0);
+      }
     }
   }
 
@@ -1097,10 +1140,19 @@ export class Match {
   private launch(to: THREE.Vector3, dur: number, arc: number, kind: Flight['kind'], kicker: Actor | null, receiver: Actor | null = null) {
     const b = this.ball;
     const fromHands = b.inHands;
+    if (BASKET && kicker && kind !== 'rest') {
+      const dunk = kind === 'shot' && !this.basketball?.freeThrows && xzDist(kicker.pos, to) <= 1.2;
+      this.setPose(kicker, dunk ? 'dunk' : kind === 'shot' ? 'shoot' : 'throw', dunk ? 0.9 : kind === 'shot' ? 0.6 : 0.42, receiver);
+      if (kind === 'shot') kicker.target.copy(kicker.pos);
+    }
     b.state = 'flight';
     b.holder = null;
     b.inHands = false;
     b.flight = { from: b.pos.clone(), to: to.clone(), t: 0, dur: Math.max(dur, 0.25), arc, kind, kicker, receiver, shot: null };
+    if (BASKET) {
+      b.flight.arrival = to.clone();
+      if (kicker && kind !== 'rest') b.flight.release = { from: b.pos.clone(), elapsed: 0, duration: kicker.poseDur * (kicker.pose === 'dunk' ? 0.55 : 0.32) };
+    }
     if (kicker && !BASKET) this.sound(kind === 'shot' ? 'shot' : 'kick', b.pos, Math.min(1, 0.4 + xzDist(b.pos, to) / 30));
     if (kicker && (kicker.pose === 'normal' || kicker.pose === 'windUp')) {
       if (!BASKET) this.setPose(kicker, fromHands ? 'throw' : 'kick', fromHands ? .7 : .45, null,
@@ -1118,6 +1170,7 @@ export class Match {
     b.flight = null;
     b.vel.set(0, 0, 0);
     this.catchFrom = b.pos.clone();
+    this.heldPose = null;
     this.possession = a.team;
     this.lastTouch = a.team;
     this.holdTimer = hold;
@@ -1134,11 +1187,11 @@ export class Match {
   private looseBall(speed: number, angle: number) {
     const b = this.ball;
     b.state = 'loose';
-    b.pos.y = BALL_RADIUS; // nel basket poteva essere a mezz'aria (palleggio)
+    if (!BASKET) b.pos.y = BALL_RADIUS;
     b.holder = null;
     b.inHands = false;
     b.flight = null;
-    b.vel.set(Math.cos(angle) * speed, 0, Math.sin(angle) * speed);
+    b.vel.set(Math.cos(angle) * speed, BASKET ? 0.6 : 0, Math.sin(angle) * speed);
   }
 
   private onFlightEnd(f: Flight) {
@@ -1150,6 +1203,7 @@ export class Match {
       return;
     }
     if (f.kind === 'shot' && BASKET) {
+      if (this.basketball!.finish(f)) return;
       const d = Math.sign(f.to.x);
       this.sound(f.shot === 'goal' ? 'swish' : 'rim', f.to, f.shot === 'wide' ? 0.6 : 1);
       if (f.shot === 'goal') {
@@ -1200,7 +1254,7 @@ export class Match {
       this.firstTimeShooter = null;
       const dir = tmp.subVectors(f.to, f.from).setY(0).normalize();
       this.looseBall(5, Math.atan2(dir.z, dir.x));
-      b.pos.y = BALL_RADIUS;
+      if (!BASKET) b.pos.y = BALL_RADIUS;
     }
   }
 
@@ -1211,9 +1265,14 @@ export class Match {
 
     if (b.state === 'held' && b.holder) {
       const h = b.holder;
+      if (BASKET && this.heldPose !== h.pose) {
+        this.catchFrom = b.pos.clone();
+        this.heldPose = h.pose;
+      }
       const cos = Math.cos(h.heading);
       const sin = Math.sin(h.heading);
-      if (b.inHands || (BASKET && (h.pose === 'windUp' || h.pose === 'crouch'))) {
+      if (BASKET && h.pose === 'receive') b.pos.copy(netContactPoint(h, this.time));
+      else if (b.inHands || (BASKET && (h.pose === 'windUp' || h.pose === 'crouch'))) {
         // In mano (portiere, o nel basket chi si prepara al tiro/passaggio): al petto.
         b.pos.set(h.pos.x + cos * 0.3, (BASKET ? 1.3 : 1.05) * CONFIG.visuals.playerScale, h.pos.z + sin * 0.3);
       } else if (BASKET) {
@@ -1234,9 +1293,33 @@ export class Match {
       b.pos.add(this.catchOffset);
     } else if (b.state === 'flight' && b.flight) {
       const f = b.flight;
-      f.t += dt;
+      let flightDt = dt;
+      if (f.release && f.kicker) {
+        const release = f.release;
+        release.elapsed += dt;
+        const remaining = Math.max(0, release.duration - release.elapsed);
+        const contact = netContactPoint(f.kicker, this.time + remaining, release.duration);
+        const u = Math.min(1, release.elapsed / release.duration);
+        b.pos.lerpVectors(release.from, contact, u * u * (3 - 2 * u));
+        if (u < 1) return;
+        f.from.copy(contact);
+        flightDt = Math.max(0, release.elapsed - release.duration);
+        f.release = undefined;
+      }
+      f.t += flightDt;
       const u = Math.min(1, f.t / f.dur);
-      b.pos.lerpVectors(f.from, f.to, u);
+      if (BASKET && f.kind === 'pass' && f.receiver && f.arrival) {
+        const remaining = f.dur * (1 - u), receiver = f.receiver;
+        if (!f.prepared && remaining < 0.16) {
+          f.prepared = true;
+          if (receiver.pose === 'normal') this.setPose(receiver, 'receive', 0.4, f.kicker);
+        }
+        const pose = receiver.pose === 'windUp' ? 'windUp' : 'receive';
+        const contact = netContactPoint(receiver, this.time + remaining,
+          pose === 'windUp' ? receiver.poseTime + remaining : 0.12, pose, 0.4);
+        f.arrival.lerpVectors(f.to, contact, THREE.MathUtils.smoothstep(u, 0.55, 1));
+      }
+      b.pos.lerpVectors(f.from, f.arrival ?? f.to, u);
       b.pos.y = Math.max(BALL_RADIUS, b.pos.y + 4 * f.arc * u * (1 - u));
       if (u >= 1) {
         this.onFlightEnd(f);
@@ -1246,7 +1329,13 @@ export class Match {
         if (cut && xzDist(cut.pos, b.pos) < 0.9) this.giveBall(cut);
       }
     } else if (b.state === 'loose') {
+      if (BASKET) b.vel.y -= 9.8 * dt;
       b.pos.addScaledVector(b.vel, dt);
+      if (BASKET && b.pos.y < BALL_RADIUS) {
+        b.pos.y = BALL_RADIUS;
+        if (b.vel.y < -0.9) { b.vel.y *= -0.55; this.sound('bounce', b.pos, 0.45); }
+        else b.vel.y = 0;
+      }
       b.vel.multiplyScalar(Math.exp(-1.2 * dt));
       const football = !BASKET && !this.sportSimulation && this.phase === 'play' && !this.ballScripted && !this.over;
       if (football && Math.abs(b.pos.z) > W / 2 + 0.2) return this.ballOut('side');
@@ -1300,6 +1389,7 @@ export class Match {
     // Ciclisti ed equipaggi li muove la loro simulazione: qui passano solo le pose.
     const driven = (a: Actor) => !!this.sportSimulation?.drives?.(a);
     for (const a of all) {
+      (a.gaitVel ??= a.vel.clone()).lerp(a.vel, 1 - Math.exp(-dt / 0.25));
       a.poseBlendTime = Math.min(CONFIG.visuals.poseBlendSec, a.poseBlendTime + dt);
       a.poseTime += dt;
       if (a.poseTime > a.poseDur) {
@@ -1322,9 +1412,11 @@ export class Match {
       steerActor(a, all, dt);
 
       const sp = Math.hypot(a.vel.x, a.vel.z);
-      const look = a.faceTarget?.pos ?? this.ball.pos;
+      const basketballRelease = BASKET && this.ball.flight?.kicker === a && (a.pose === 'shoot' || a.pose === 'dunk' || a.pose === 'throw');
+      const freeThrowShooter = this.basketball?.freeThrows?.shooter === a;
+      const look = basketballRelease ? this.ball.flight!.to : freeThrowShooter ? new THREE.Vector3(hoopX(dirOf(a.team)), P.rimHeight, 0) : a.faceTarget?.pos ?? this.ball.pos;
       const netPlayer = (SPORT === 'tennis' || SPORT === 'pallavolo') && this.actors.includes(a);
-      const facingAction = (SPORT === 'boxe' && a.role === 'fwd') || (netPlayer && sp < 3.5) || !!a.faceTarget;
+      const facingAction = freeThrowShooter || basketballRelease || (SPORT === 'boxe' && a.role === 'fwd') || (netPlayer && sp < 3.5) || !!a.faceTarget;
       const ownsBall = this.ball.holder === a;
       const want = sp > 0.6 && !facingAction ? Math.atan2(a.vel.z, a.vel.x)
         : netPlayer && ownsBall && !a.faceTarget ? (a.team === 0 ? 0 : Math.PI)
@@ -1334,6 +1426,7 @@ export class Match {
       // Shorter steps for shuffles and ring footwork, longer strides at a sprint.
       const cadence = SPORT === 'boxe' ? 5 : 2.6 - clamp(sp / M.sprintSpeed, 0, 1) * 0.55;
       a.runPhase += sp * dt * cadence;
+      if (BASKET && a.outOfBounds && this.basketball?.inbound?.taker !== a && Math.abs(a.pos.x) < L / 2 - 0.1 && Math.abs(a.pos.z) < W / 2 - 0.1) a.outOfBounds = undefined;
     }
     separateActors(all.filter((a) => !driven(a)), dt);
   }

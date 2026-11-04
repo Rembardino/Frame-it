@@ -9,7 +9,7 @@ I corpi `Superhero_Male_FullBody` e `Superhero_Female_FullBody` del kit Quaterni
 | Modello nel gioco | Impiego | Triangoli | Dimensione |
 | --- | --- | ---: | ---: |
 | `rpg-boxer` | Pugili a torso scoperto con pantaloncini e guantoni | 5.117 | 258 kB |
-| `rpg-athlete-female` | Atlete della seconda squadra in basket, tennis, pallavolo e golf; parte di allenatori, steward e spettatori | 6.560 | 380 kB |
+| `rpg-athlete-female` | Non più usato: la divisa ricavata dal corpo sembrava un top a spalle scoperte; le donne usano Carol (`athlete-carol`) | 6.560 | — |
 
 Il calciatore di `new_asset` resta disponibile per gli altri ruoli umani. I personaggi fantasy restano esclusivamente mascotte.
 
@@ -19,7 +19,7 @@ Le superfici dei corpi vengono tagliate lungo piani precisi, interpolando anche 
 
 Le due Universal Animation Library contengono **43 clip ciascuna**. L'audit registra tutte le **86 animazioni**, le dimensioni e gli hash delle librerie, dei modelli e delle loro dipendenze. Gli export Unity e le versioni `_RM` rappresentano gli stessi movimenti; il gioco usa le versioni senza spostamento della radice, perché la posizione è controllata dalla simulazione.
 
-Sono aggiunte **32 clip compilate**, portando la libreria da 166 a **198**:
+Sono aggiunte **32 clip compilate**, portando la libreria da 166 a **198**; la seconda revisione ([animation-review-2.md](animation-review-2.md)) aggiunge `Interact` come gesto dell'arbitro (**199**, catalogo 4):
 
 | Contesto | Movimenti aggiunti |
 | --- | --- |

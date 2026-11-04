@@ -1,6 +1,6 @@
 # Passaggio di consegne: modelli, animazioni e revisione visiva
 
-Documento per una seconda AI che deve cercare altro materiale utile nelle sorgenti locali e migliorare l'integrazione esistente. Commit di riferimento dell'implementazione: `ea6e71b`, preceduto da `9d3a7ab`, sul branch `nuovi-modelli`.
+Documento per una seconda AI che deve cercare altro materiale utile nelle sorgenti locali e migliorare l'integrazione esistente. **Aggiornamento:** la seconda revisione è in [animation-review-2.md](animation-review-2.md) (inventario ricorsivo, catalogo 4, correzioni e misure); dove questo documento differisce, vale quella. Commit di riferimento dell'implementazione: `ea6e71b`, preceduto da `9d3a7ab`, sul branch `nuovi-modelli`.
 
 ## 1. Richiesta e vincoli dell'utente
 
@@ -151,7 +151,7 @@ Per l'aspetto ci sono anche `Hair_Beard.gltf`, `Hair_BuzzedFemale.gltf` ed eyebr
 | --- | --- | --- |
 | `footballer.glb` | `new_asset/human/giocatore.fbx`; calciatori e numerosi altri ruoli umani | 5.952 triangoli, 541 kB |
 | `rpg-boxer.glb` | `Superhero_Male_FullBody.gltf`; pugili a torso scoperto | 5.117 triangoli, 258 kB |
-| `rpg-athlete-female.glb` | `Superhero_Female_FullBody.gltf`; squadra 1 in basket/tennis/pallavolo/golf e alcuni ruoli coach/steward/spectator | 6.560 triangoli, 380 kB |
+| `rpg-athlete-female.glb` | Rimosso: sostituito da `athlete-carol.glb` (vedi [animation-review-2.md](animation-review-2.md#35-bis-abbigliamento-sportivo-modelli-forniti-dallutente)) | — |
 | `crowd.glb` | Versione molto semplificata del calciatore | 666 triangoli per persona |
 | `human-0.glb` ... `human-13.glb` | Creature di `new_asset` | Solo mascotte |
 

@@ -11,7 +11,7 @@ import { SkyEffects } from './render/skyEffects';
 import { Effects } from './render/effects';
 import { Match } from './sim/match';
 import { Director, type DirectorResult } from './events/director';
-import { SecretMoments } from './events/secrets';
+import { SecretMoments, isSecretCaptured } from './events/secrets';
 import { DirectorVoice } from './director/voice';
 import { CameraController } from './camera/cameraController';
 import { Recorder, type CameraFrame, type Clip, type Frame, type WorldFrame } from './recorder/recorder';
@@ -37,6 +37,9 @@ import { GyroscopeController } from './camera/gyroscope';
 import { Tutorial, tutorialSeen } from './ui/tutorial';
 import { CameraPractice } from './ui/cameraPractice';
 import { LANGUAGE, LANGUAGES, isLanguage, localizePage, numberText, saveLanguage, t } from './i18n';
+import { teamCatalog, type TeamKit } from './teams';
+import { terrainHeight } from './sim/sports/cyclingRoute';
+import { loadAnimalModels } from './render/animalModels';
 
 const params = new URLSearchParams(location.search);
 const debug = CONFIG.debug.enabled || params.has('debug');
@@ -88,6 +91,15 @@ if (DRONE_ONLY) {
 cam.bindZoomButton($('zin'), -1);
 cam.bindZoomButton($('zout'), 1);
 $('zreset').addEventListener('click', () => cam.resetZoom());
+/** Torna subito sulla palla (nella boxe sui due pugili, nelle gare sul gruppo): camera girata, drone riportato vicino. */
+function backToBall() {
+  const p = cam.autoTarget?.()?.clone();
+  if (!p || !cam.inputsEnabled) return;
+  if (p.y < 0) p.y = SPORT === 'ciclismo' ? terrainHeight(p.x, p.z) + 1 : 1;
+  if (drone.airborne) drone.recall(p); else cam.snapTo(p);
+}
+$('zball').addEventListener('click', backToBall);
+addEventListener('keydown', (e) => { if (e.code === 'KeyB' && !e.repeat) backToBall(); });
 cam.setEnabled(false);
 const gyro = new GyroscopeController(cam);
 const drone = new Drone(cam, stage.camera, stage.scene);
@@ -134,7 +146,7 @@ for (const [id, on] of [['mode-assist', true], ['mode-expert', false]] as const)
 }
 let seenCuts = 0;
 // In debug gli oggetti di gioco sono raggiungibili dalla console del browser (e dai test automatici).
-if (debug) Promise.all([views.ready,crowd.ready]).then(()=>Object.assign(window, { frameit: { match, director, voice, cam, gyro, recorder, replay, stage, views, hud, practice, drone, audio, secrets, crowd } })).catch(()=>{});
+if (debug) Promise.all([views.ready,crowd.ready,loadAnimalModels()]).then(()=>Object.assign(window, { frameit: { match, director, voice, cam, gyro, recorder, replay, stage, views, hud, practice, drone, audio, secrets, crowd } })).catch(()=>{});
 
 function resize() {
   stage.renderer.setSize(innerWidth, innerHeight);
@@ -175,6 +187,7 @@ let pendingReplay: DirectorResult | null = null;
 let liveSnapshot: Frame | null = null;
 let archivedReplay = false;
 let liveSeeds: number[] = [];
+let liveTeams: TeamKit[] | null = null;
 
 // ---------------------------------------------------------------- highlights per FrameTube
 
@@ -183,7 +196,8 @@ let waitingHighlights: DirectorResult[] = [];
 const highlights: { r: DirectorResult; clip: Clip }[] = [];
 function wantsHighlight(r: DirectorResult) {
   if (!r.result || r.category === 'order') return false;
-  if (r.category === 'rare' || r.category === 'secret') return r.result.stars >= CONFIG.rare.captureStars;
+  if (r.category === 'secret') return isSecretCaptured(r.result);
+  if (r.category === 'rare') return r.result.stars >= CONFIG.rare.captureStars;
   return r.result.stars >= CONFIG.highlights.minStars;
 }
 /** Chiamato a ogni passo: la clip si prende quando i secondi dopo l'istante decisivo sono registrati. */
@@ -213,7 +227,8 @@ function wantsReplay(r: DirectorResult) {
   const R = CONFIG.replay;
   if (!R.enabled || !r.result || ended || r.category === 'order') return false;
   // Le clip rare e i momenti virali si rivedono sempre.
-  if (r.category === 'rare' || r.category === 'secret') return r.result.stars >= CONFIG.rare.captureStars;
+  if (r.category === 'secret') return isSecretCaptured(r.result);
+  if (r.category === 'rare') return r.result.stars >= CONFIG.rare.captureStars;
   return r.result.stars >= R.minStars && match.time - lastReplay > R.cooldown;
 }
 
@@ -254,7 +269,7 @@ function startReplay(r: DirectorResult) {
   const R = CONFIG.replay;
   const [home, away] = CONFIG.teams;
   setTicker([
-    `${home.short} ${match.sportSimulation?.scoreText() ?? `${match.score[0]} - ${match.score[1]}`} ${away.short}`,
+    SPORT === 'ciclismo' ? match.sportSimulation!.scoreText() : `${t(home.short)} ${match.sportSimulation?.scoreText() ?? `${match.score[0]} - ${match.score[1]}`} ${t(away.short)}`,
     `${t(r.label)} ${'★'.repeat(r.result?.stars ?? 0)} ${r.result?.score ?? ''}`,
     ...(r.points ? [`+${numberText(r.points)} PT`] : []),
   ]);
@@ -297,6 +312,7 @@ function endReplay() {
   if (archivedReplay) {
     archivedReplay = false;
     [...match.actors, ...match.extras].forEach((actor, i) => { actor.seed = liveSeeds[i]; });
+    if(liveTeams){CONFIG.teams=liveTeams;void views.setTeams(liveTeams);hud.setTeams();liveTeams=null;}
     views.update(0);
     startScreen.classList.remove('hidden');
     careerHub.openChannel();
@@ -446,6 +462,12 @@ async function watchVideo(video: Video) {
   if (!recording || recording.clip.frames.length < 2 || recording.clip.frames[0].actors.length !== match.actors.length + match.extras.length) throw new Error('Invalid recording');
   liveSnapshot = recorder.capture(camNow(), worldNow());
   liveSeeds = [...match.actors, ...match.extras].map(a => a.seed);
+  if(recording.clip.teams?.length===2){
+    liveTeams=CONFIG.teams;
+    const catalog=teamCatalog(SPORT);
+    const teams=recording.clip.teams.map(team=>({...team,logo:catalog.find(club=>club.id===team.id)?.logo??team.logo}));
+    await views.setTeams(teams);CONFIG.teams=teams;hud.setTeams();
+  }
   [...match.actors, ...match.extras].forEach((actor, i) => { actor.seed = recording.seeds[i]; });
   archivedReplay = true;
   setTicker([`${t(video.label)} ${'★'.repeat(video.stars)}`, 'FrameTube']);
@@ -480,7 +502,7 @@ const failedText={en:'Characters could not load. Please retry.',it:'Impossibile 
 assetStatus.textContent=loadingText[LANGUAGE];$('start-btn').insertAdjacentElement('afterend',assetStatus);
 const modelButtons=['start-btn','tutorial-btn','practice-btn'].map(id=>$(id) as HTMLButtonElement);
 modelButtons.forEach(b=>b.disabled=true);
-Promise.all([views.ready,crowd.ready]).then(()=>{
+Promise.all([views.ready,crowd.ready,loadAnimalModels()]).then(()=>{
   modelsReady=true;assetStatus.remove();modelButtons.forEach(b=>b.disabled=false);
   if(pendingStart)start();
 }).catch(error=>{
@@ -546,7 +568,7 @@ function announceHole(g: GolfSimulation) {
   if (g.results.length > announcedResults) {
     announcedResults = g.results.length;
     const diff = g.results[announcedResults - 1];
-    voice.say(g.strokes === 1 ? 'Buca in uno!' : RESULT[THREE.MathUtils.clamp(diff + 3, 0, 5)]);
+    voice.say(g.lastStrokes === 1 ? 'Buca in uno!' : RESULT[THREE.MathUtils.clamp(diff + 3, 0, 5)]);
   }
   if (g.holeIdx !== announcedHole && g.holeIdx < g.round.length) {
     announcedHole = g.holeIdx;

@@ -24,7 +24,8 @@ async function dependencies(path){
  const refs=[...new Set([...(json.buffers??[]),...(json.images??[])].map(r=>r.uri).filter(uri=>uri&&!uri.startsWith('data:')))];
  return Promise.all(refs.map(uri=>fingerprint(resolve(dirname(path),decodeURIComponent(uri)))));
 }
-for(const sex of ['Male','Female']){
+// The female body is no longer used: women wear Carol's tennis outfit (prepare-mixamo-athletes.mjs).
+for(const sex of ['Male']){
  const input=resolve(people,`Superhero_${sex}_FullBody.gltf`),doc=await io.read(input),root=doc.getRoot(),buffer=root.listBuffers()[0];
  const bodyNode=root.listNodes().find(n=>n.getMesh()?.listPrimitives().some(p=>/Superhero/.test(p.getMaterial()?.getName()??'')));
  const bodyMesh=bodyNode.getMesh(),body=bodyMesh.listPrimitives()[0],skin=bodyNode.getSkin(),baseMat=body.getMaterial();
@@ -67,7 +68,7 @@ for(const sex of ['Male','Female']){
   .setMaterial(doc.createMaterial('Shoes').setBaseColorFactor([1,1,1,1]).setRoughnessFactor(.8));
  bodyNode.getParentNode().addChild(doc.createNode('Shoes').setMesh(doc.createMesh('Shoes').addPrimitive(boots)).setSkin(skin));
  // Hair uses the target's existing Head joint, without importing duplicate skeletons.
- const hairNames=sex==='Male'?['Hair_Buzzed','Hair_SimpleParted']:['Hair_Long','Hair_Buns'];
+ const hairNames=sex==='Male'?['Hair_Buzzed','Hair_SimpleParted','Hair_Beard']:['Hair_Long','Hair_Buns','Hair_BuzzedFemale'];
  for(const hairName of hairNames){
   const hairDoc=await io.read(resolve(people,hairName+'.gltf'));
   const hairNode=hairDoc.getRoot().listNodes().find(n=>n.getMesh()),hp=hairNode.getMesh().listPrimitives()[0];

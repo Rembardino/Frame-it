@@ -9,7 +9,15 @@
     "preview": "vite preview",
     "check": "node scripts/check.mjs",
     "check:motion": "node scripts/check-motion.mjs",
+    "check:volleyball": "node scripts/check-volleyball-flow.mjs",
+    "check:courts": "node scripts/check-court-flow.mjs",
+    "check:basket-rules": "node scripts/check-basket-rules.mjs",
+    "check:race-ui": "node scripts/check-race-ui.mjs",
+    "check:cycling-routes": "node scripts/check-cycling-routes.mjs",
     "check:characters": "node scripts/check-character-assets.mjs",
+    "check:appearance": "node scripts/check-appearance.mjs",
+    "check:animals": "node scripts/check-animal-models.mjs",
+    "check:tennis-looks": "node scripts/check-tennis-looks.mjs",
     "check:characters:offline": "node scripts/bundle-mobile.mjs && node scripts/check-offline-characters.mjs",
     "review:animations": "node scripts/preview-animations.mjs",
     "check:gameplay": "node scripts/check-gameplay-ui.mjs",
@@ -24,6 +32,7 @@
     "sim:career": "node scripts/sim-career.mjs",
     "check:audio": "node scripts/check-audio.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
+    "check:stands": "node scripts/check-stands-ui.mjs",
     "check:difficulty": "node scripts/check-difficulty.mjs"
   },
   "dependencies": {

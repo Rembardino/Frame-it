@@ -89,6 +89,16 @@ export class CameraController {
     this.hasInteracted = true;
   }
 
+  /** Pulsante "palla": inquadra subito il punto, senza inerzia né inseguimento morbido. */
+  snapTo(p: THREE.Vector3) {
+    if (!this.enabled) return;
+    const a = this.anglesTo(p);
+    this.tYaw = a.yaw; this.tPitch = a.pitch; this.vYaw = this.vPitch = 0;
+    this.clampTargets();
+    this.yaw = this.tYaw; this.pitch = this.tPitch;
+    this.hasInteracted = true;
+  }
+
   /** Sospende gli input durante il replay e scarta eventuali pressioni rimaste attive. */
   setEnabled(enabled: boolean) {
     this.enabled = enabled;

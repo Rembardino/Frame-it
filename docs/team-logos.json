@@ -1,0 +1,78 @@
+{
+  "generator": "Built-in image_gen via imagegen skill",
+  "created": "2026-11-04",
+  "assets": [
+    {
+      "id": "aurora",
+      "original": "artifacts/team-logos/originals/aurora.png",
+      "runtime": "src/assets/teams/aurora.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG sports club crest for a 3D arcade sports game. Primary request: original professional club emblem for AURORA, a rising sun and two sweeping polar-light ribbons inside a crisp modern shield. Palette: royal blue #275bd8, icy white and light cyan. Style: premium flat illustrated sports heraldry, bold simple silhouettes, clean edges, restrained details readable at 32 pixels. Centered square composition, emblem occupies 85% of image, genuinely transparent outside the shield. No lettering, no words, no numbers, no watermark, no mockup or shadows outside the crest. Must be an original fictional club, no existing brands."
+    },
+    {
+      "id": "vulcani",
+      "original": "artifacts/team-logos/originals/vulcani.png",
+      "runtime": "src/assets/teams/vulcani.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished VULCANI club emblem, an erupting angular volcano, three sparks and flowing lava. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: scarlet red #da363e, charcoal black and warm ivory. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "lupi",
+      "original": "artifacts/team-logos/originals/lupi.png",
+      "runtime": "src/assets/teams/lupi.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished LUPI club emblem, a noble wolf head in three-quarter view with a crescent moon. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: deep violet #7542be, silver and white. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "delfini",
+      "original": "artifacts/team-logos/originals/delfini.png",
+      "runtime": "src/assets/teams/delfini.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished DELFINI club emblem, a leaping dolphin above two ocean waves inside a round shield. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: turquoise #089caa, deep navy and white. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "falchi",
+      "original": "artifacts/team-logos/originals/falchi.png",
+      "runtime": "src/assets/teams/falchi.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished FALCHI club emblem, a fierce falcon head and a sweeping feather wing. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: golden yellow #edb821, dark navy and ivory. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "aquile",
+      "original": "artifacts/team-logos/originals/aquile.png",
+      "runtime": "src/assets/teams/aquile.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished AQUILE club emblem, a proud eagle with angular spread wings and a small mountain peak. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: raspberry pink #d92f72, deep midnight blue and white. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "leoni",
+      "original": "artifacts/team-logos/originals/leoni.png",
+      "runtime": "src/assets/teams/leoni.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished LEONI club emblem, a confident lion head with a geometric sunburst mane. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: burnt orange #e76823, espresso brown and cream. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "draghi",
+      "original": "artifacts/team-logos/originals/draghi.png",
+      "runtime": "src/assets/teams/draghi.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished DRAGHI club emblem, a coiled eastern dragon head curling around a small flame. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: emerald green #18834c, pale gold and ivory. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "tigri",
+      "original": "artifacts/team-logos/originals/tigri.png",
+      "runtime": "src/assets/teams/tigri.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished TIGRI club emblem, a striped tiger face with sharp clear eye shapes. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: warm ivory #f3ead5, near-black and orange. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "saette",
+      "original": "artifacts/team-logos/originals/saette.png",
+      "runtime": "src/assets/teams/saette.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished SAETTE club emblem, a large striking lightning bolt crossing a compact star. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: electric cyan #55dce2, slate navy and white. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "orsi",
+      "original": "artifacts/team-logos/originals/orsi.png",
+      "runtime": "src/assets/teams/orsi.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished ORSI club emblem, a sturdy bear head above three stylized pine trees. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: wine burgundy #7f2144, pale sand and silver. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    },
+    {
+      "id": "fenici",
+      "original": "artifacts/team-logos/originals/fenici.png",
+      "runtime": "src/assets/teams/fenici.webp",
+      "prompt": "Use case: logo-brand. Asset type: transparent PNG fictional sports club crest for an arcade sports game. Primary request: original polished FENICI club emblem, a phoenix rising from three flame-shaped feathers. Style: professional flat illustrated sports heraldry, bold simple silhouettes, crisp edges, restrained detail readable at 32px. Palette: deep indigo #30276f, coral red and gold. Centered square composition, cohesive shield-shaped emblem occupies 85% of frame, genuinely transparent outside the crest. No letters, no text, no numbers, no watermark, no mockup, no shadows outside the crest, no existing brands."
+    }
+  ]
+}

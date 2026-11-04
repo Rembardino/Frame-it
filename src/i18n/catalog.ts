@@ -4,9 +4,25 @@ import { PRACTICE_ROWS } from './practice';
 import { CAREER_ROWS } from './career';
 import { GOLF_ROWS } from './golf';
 import { DRONE_ROWS } from './drone';
+import { TEAM_ROWS } from './teams';
 
 /** Stable source keys; every supported language has an explicit translation. */
 export const ROWS: [string, string, string, string, string][] = [
+  ['Pubblico: {label}', 'Crowd: {label}', 'Público: {label}', 'Public : {label}', 'Publikum: {label}'],
+  ['Fallo di tiro: due liberi', 'Shooting foul: two free throws', 'Falta de tiro: dos tiros libres', 'Faute de tir : deux lancers francs', 'Wurffoul: zwei Freiwürfe'],
+  ['Fallo sulla tripla: tre liberi', 'Three-point shooting foul: three free throws', 'Falta en el triple: tres tiros libres', 'Faute sur un tir à trois points : trois lancers francs', 'Foul beim Dreier: drei Freiwürfe'],
+  ['Contatto sul tiro: segui il tiratore in lunetta!', 'Contact on the shot: follow the shooter to the line!', '¡Contacto en el tiro: sigue al lanzador a la línea!', 'Contact sur le tir : suivez le tireur sur la ligne !', 'Kontakt beim Wurf: Folge dem Schützen zur Linie!'],
+  ['Schiacciata!', 'Slam dunk!', '¡Mate!', 'Dunk !', 'Dunk!'],
+  ['Attacca il ferro: tieni mani e canestro!', 'Attacking the rim: keep the hands and hoop in frame!', '¡Ataca el aro: encuadra las manos y la canasta!', 'Il attaque le cercle : cadrez les mains et le panier !', 'Er zieht zum Korb: Hände und Korb im Bild halten!'],
+  ['LIBERO {current}/{total}', 'FREE THROW {current}/{total}', 'TIRO LIBRE {current}/{total}', 'LANCER FRANC {current}/{total}', 'FREIWURF {current}/{total}'],
+  ['RIMESSA', 'THROW-IN', 'SAQUE', 'REMISE EN JEU', 'EINWURF'],
+  ['Gara individuale', 'Individual race', 'Carrera individual', 'Course individuelle', 'Einzelrennen'],
+  ['Percorso', 'Route', 'Recorrido', 'Parcours', 'Strecke'],
+  ['Colline e curve a S', 'Hills and S-bends', 'Colinas y curvas en S', 'Collines et virages en S', 'Hügel und S-Kurven'],
+  ['Salite e discese', 'Climbs and descents', 'Subidas y bajadas', 'Montées et descentes', 'Anstiege und Abfahrten'],
+  ['Circuito a S', 'S-bend circuit', 'Circuito en S', 'Circuit en S', 'S-Kurven-Rundkurs'],
+  ['SALITA {grade}%', 'CLIMB {grade}%', 'SUBIDA {grade}%', 'MONTÉE {grade}%', 'ANSTIEG {grade}%'],
+  ['DISCESA {grade}%', 'DESCENT {grade}%', 'BAJADA {grade}%', 'DESCENTE {grade}%', 'ABFAHRT {grade}%'],
   ["Lingua", "Language", "Idioma", "Langue", "Sprache"],
   ["Scegli fino a {n} clip per FrameTube", "Pick up to {n} clips for FrameTube", "Elige hasta {n} clips para FrameTube", "Choisissez jusqu’à {n} clips pour FrameTube", "Wähle bis zu {n} Clips für FrameTube"],
   ["Pubblica su FrameTube", "Publish on FrameTube", "Publicar en FrameTube", "Publier sur FrameTube", "Auf FrameTube veröffentlichen"],
@@ -28,6 +44,8 @@ export const ROWS: [string, string, string, string, string][] = [
   ["Avvicina (E o +)", "Zoom in (E or +)", "Acercar (E o +)", "Zoom avant (E ou +)", "Heranzoomen (E oder +)"],
   ["Allontana (Q o −)", "Zoom out (Q or −)", "Alejar (Q o −)", "Zoom arrière (Q ou −)", "Herauszoomen (Q oder −)"],
   ["Allontana al massimo", "Zoom all the way out", "Alejar al máximo", "Dézoomer au maximum", "Ganz herauszoomen"],
+  ["Torna sulla palla: B", "Back to the ball: B", "Volver al balón: B", "Revenir au ballon : B", "Zurück zum Ball: B"],
+  ["Torna sulla palla (B)", "Back to the ball (B)", "Volver al balón (B)", "Revenir au ballon (B)", "Zurück zum Ball (B)"],
   ["Tocca per saltare", "Tap to skip", "Toca para saltar", "Touchez pour passer", "Tippen zum Überspringen"],
   ["Ruota il telefono in orizzontale", "Rotate your phone to landscape", "Gira el teléfono en horizontal", "Tournez le téléphone à l’horizontale", "Drehe dein Handy ins Querformat"],
   ["FINE", "END", "FIN", "FIN", "ENDE"],
@@ -122,4 +140,5 @@ export const ROWS: [string, string, string, string, string][] = [
   ...CAREER_ROWS,
   ...GOLF_ROWS,
   ...DRONE_ROWS,
+  ...TEAM_ROWS,
 ];

@@ -8,7 +8,7 @@ for (const sport of ['calcio', 'tennis', 'boxe']) {
   const server = await createServer({ configFile: false, server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' });
   try {
     const { Match } = await server.ssrLoadModule('/src/sim/match.ts');
-    const { SecretMoments, PLANS } = await server.ssrLoadModule('/src/events/secrets.ts');
+    const { SecretMoments, PLANS, isSecretCaptured } = await server.ssrLoadModule('/src/events/secrets.ts');
     const { CONFIG } = await server.ssrLoadModule('/src/config.ts');
     const Sc = await server.ssrLoadModule('/src/scoring/scoring.ts');
     const ALL = ['coverage', 'size', 'composition', 'smoothness', 'timing'];
@@ -35,17 +35,37 @@ for (const sport of ['calcio', 'tennis', 'boxe']) {
       for (let t = 0; t < 60 && !s.finished.length; t += dt) {
         m.update(dt); s.update(view);
         const live = s.active[0];
-        // Basta averli tutti in quadro: inquadratura ideale ma due volte più larga.
-        if (live?.tracker.last) Object.assign(view, live.tracker.last.ideal, { pos: view.pos, aspect: view.aspect, fov: live.tracker.last.ideal.fov * 2 });
+        // A close, readable view throughout the decisive moment earns the full capture.
+        if (live?.tracker.last) Object.assign(view, live.tracker.last.ideal, { pos: view.pos, aspect: view.aspect, fov: live.tracker.last.ideal.fov * 1.08 });
         if (live?.triggerAt !== null && live) reacted = true;
-        for (const a of m.extras.filter((e) => e.role === 'spectator' && e.active)) assert(Number.isFinite(a.pos.x + a.pos.y + a.pos.z), 'spectator position');
+        for (const a of m.extras.filter((e) => e.role === 'spectator' && e.active)) {
+          assert(Number.isFinite(a.pos.x + a.pos.y + a.pos.z), 'spectator position');
+          assert(a.pos.y >= 0.59, `${sport}/${plan.id}: spectator is not on the stands`);
+        }
       }
       assert(reacted, `${sport}/${plan.id}: never reacted to the camera`);
       const r = s.finished[0];
       assert(r && r.category === 'secret' && r.result && r.points > 0, `${sport}/${plan.id}: filmed secret gives no bonus`);
       assert(r.label.startsWith('Virale: '), 'viral label');
-      assert.equal(r.result.score, 100, `${sport}/${plan.id}: fully framed secret should give the full bonus`);
+      assert(r.result.score >= 95, `${sport}/${plan.id}: a clear close view should earn a high score (${r.result.score})`);
+      assert(isSecretCaptured(r.result), 'Close view was not registered as captured');
       console.log(`  ${sport} ${plan.id}: ${'★'.repeat(r.result.stars)} ${r.points} pt`);
+    }
+    for (const mode of ['wide', 'glimpse']) {
+      const m = new Match(), secrets = new SecretMoments(m, rows, 's-dancer'), view = { ...away, pos: { ...C.position } };
+      for (let i = 0; i < 60 * 30 && !secrets.finished.length; i++) {
+        m.update(dt); secrets.update(view);
+        const live = secrets.active[0];
+        if (live?.tracker.last) {
+          const decisive = live.tracker.moment.decisive;
+          const tight = mode === 'glimpse' && Math.abs(m.time - decisive) < dt * 0.75;
+          Object.assign(view, live.tracker.last.ideal, { pos: view.pos, aspect: view.aspect, fov: live.tracker.last.ideal.fov * (tight ? 1.08 : 4) });
+        }
+      }
+      const result = secrets.finished[0]?.result;
+      assert(result && result.score <= 15, `${sport}/${mode}: a distant or one-frame glimpse gets too many points (${result?.score})`);
+      assert(!isSecretCaptured(result), `${sport}/${mode}: a glimpse is incorrectly saved as a viral capture`);
+      assert(secrets.finished[0].label.startsWith('Pubblico:'), 'A glimpse is incorrectly labelled viral');
     }
   } finally { await server.close(); }
 }

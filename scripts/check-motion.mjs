@@ -86,6 +86,7 @@ try {
         });
       }
       assert(maxActorStep < 0.18, `${sport}: actor jumps ${maxActorStep.toFixed(3)} m per frame`);
+      if (sport === 'basket') assert(maxBallStep < 0.65, `basket: ball jumps ${maxBallStep.toFixed(3)} m per frame`);
       if (sport === 'tennis' || sport === 'pallavolo') {
         assert(maxBallStep < 0.85, `${sport}: catch/launch ball discontinuity ${maxBallStep.toFixed(3)} m per frame`);
         assert(maxTurn < 0.45, `${sport}: abrupt turn ${maxTurn.toFixed(3)} rad per frame`);

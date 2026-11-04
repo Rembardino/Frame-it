@@ -8,25 +8,47 @@ import type { Actor } from '../sim/match';
 import type { Athlete } from './athlete';
 import { assetMotion, type AssetMotion } from '../animation/assetMotion';
 import { netContactPoint } from '../animation/motion';
+import { dressUniform, changeUniform } from './uniforms';
+import { boxingBoot } from './boxingBoots';
+import type { TeamKit } from '../teams';
+import { styleSkin } from './skin';
+import {CarolAppearance} from './carolAppearance';
+import { riderKit } from './cyclingKit';
 
 const urls = import.meta.glob('../assets/characters/*.glb', { eager: true, query: '?url', import: 'default' }) as Record<string,string>;
 const loader = new GLTFLoader();
 const templates = new Map<string,Promise<THREE.Group>>();
-type Clip = typeof manifest.clips[number];
+/** Written by scripts/annotate-clips.mjs: loop ground travel, striking hand, catalog where a clip enters or leaves a group. */
+type Clip = typeof manifest.clips[number] & { cycle?: number; travel?: number[]; hand?: string; since?: number; retired?: Record<string,number>; added?: Record<string,number> };
 const pools = new Map<string,Clip[]>();
-for (const clip of manifest.clips) for (const group of clip.groups) pools.set(group,[...(pools.get(group) ?? []),clip]);
+for (const clip of manifest.clips as Clip[]) for (const group of clip.groups) pools.set(group,[...(pools.get(group) ?? []),clip]);
 export function resolveAssetClip(m: AssetMotion | null) {
   if(!m)return undefined;
-  const all=pools.get(m.group)??[],pool=(m.catalog??3)<3?all.filter(c=>!c.id.startsWith('quaternius_')):all;
+  // A saved replay keeps the pool of its own catalog, so the modulo below picks the same clip it did when recorded.
+  const catalog=m.catalog??3,pool=(pools.get(m.group)??[]).filter(c=>Math.max(c.since??2,c.added?.[m.group]??0)<=catalog&&!((c.retired?.[m.group]??Infinity)<=catalog));
   return pool.length?pool[((m.variant%pool.length)+pool.length)%pool.length]:undefined;
 }
-export const isHumanModel=(name: string)=>['footballer','rpg-boxer','rpg-athlete-female'].includes(name);
+/** Played at their own speed around the contact instead of squeezing the whole clip into the gesture. */
+const STRIKES=['boxingJab','boxingHook','boxingBodyJab','footballShot','footballPass'];
+const REACTIONS=['boxingRecoil','boxingRecoilHead','boxingRecoilBody','boxingBlock'];
+/** Expressive gestures keep close to their own pace (at most 1.4× faster or 0.6× slower) instead of filling the pose exactly. */
+const NATURAL=/^(celebration|golfVictory|dejected|golfBad|keeperDirect|officialYes|officialPoint|talk|phone|shove|refCount|trip|mascotReact|boxingEntry|entry|footballEntry|footballReceive|footballTrick|footballTurn)$/;
+/** Groups whose feet stay on the floor: the root follows the lowest sole. */
+const PLANTED=/^(golfDrive|golfChip|golfPutt|idle|sidelineIdle|talk|officialYes|shove|footballIdle|footballPass|footballShot|boxingJab|boxingBodyJab|boxingHook|boxingCombo|boxingRecoil|boxingRecoilHead|boxingRecoilBody|boxingBlock|walk|backward|stepLeft|stepRight|backwardSlow|stepLeftSlow|stepRightSlow|keeperIdle|keeperStep|keeperCarry)$/;
+const live=new WeakMap<Actor,Character>();
+export const isHumanModel=(name: string)=>['footballer','rpg-boxer','athlete-tee','athlete-polo','athlete-carol'].includes(name);
 function modelForActor(a: Actor) {
   if(a.look==='mascot')return FANTASY[(a.appearance??a.id)%FANTASY.length];
   const athlete=!['ref','coach','fan','steward','spectator'].includes(a.role);
   if(athlete&&SPORT==='boxe')return 'rpg-boxer';
-  if(athlete&&a.team===1&&['basket','tennis','pallavolo','golf'].includes(SPORT))return 'rpg-athlete-female';
-  if(!athlete&&['coach','steward','spectator'].includes(a.role)&&a.id%2===1)return 'rpg-athlete-female';
+  // Women play tennis and golf (polo and skirt); basket and volleyball teams are men.
+  if(athlete&&a.team===1&&['tennis','golf'].includes(SPORT))return 'athlete-carol';
+  // Football kit only for football: T-shirt and shorts elsewhere, polo and trousers for golfers and officials.
+  if(athlete&&SPORT==='golf')return 'athlete-polo';
+  if(athlete&&SPORT!=='calcio')return 'athlete-tee';
+  if(!athlete&&['coach','steward','spectator'].includes(a.role)&&a.id%2===1)return 'athlete-carol';
+  if(a.role==='spectator'||a.role==='fan')return a.id%4===0?'athlete-polo':'athlete-tee';
+  if(a.role==='coach'||a.role==='steward'||(a.role==='ref'&&SPORT!=='calcio'))return 'athlete-polo';
   return 'footballer';
 }
 let animationData: Int16Array;
@@ -61,6 +83,7 @@ const facing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),
 const inverseFacing = facing.clone().invert();
 const down = new THREE.Vector3(0,-1,0);
 const hairGeometries=new Map<string,THREE.BufferGeometry>();
+const physiques=new Map<string,THREE.BufferGeometry>();
 
 interface Joint { bone: THREE.Bone; name: string; rest: THREE.Quaternion; world: THREE.Quaternion; parent: THREE.Quaternion;
   procedural: THREE.Quaternion; source?: THREE.Object3D; position: THREE.Vector3 }
@@ -74,6 +97,9 @@ export class Character {
   private q0=new THREE.Quaternion(); private q1=new THREE.Quaternion();
   private modelInverse=new THREE.Quaternion(); private driverInverse=new THREE.Quaternion();
   private poseQ: THREE.Quaternion[] = [];
+  /** Procedural pose (with limbs fitted to its contact points) and the previous gesture, for cross-fades. */
+  private procQ: THREE.Quaternion[] = [];
+  private prevQ: THREE.Quaternion[] = [];
   private hip?: Joint;
   private hipHeight=0;
   private hipUp=new THREE.Vector3(0,1,0);
@@ -85,18 +111,26 @@ export class Character {
   private phone?: THREE.Mesh;
   private ankleHeight=0;
   private soles: { mesh:THREE.SkinnedMesh; indices:number[] }[]=[];
+  private bootSoles: THREE.Mesh[]=[];
+  private wardrobe: Promise<void>[]=[];
+  private scale=1;
+  private carol?: CarolAppearance;
 
   static async create(actor: Actor, driver: Athlete) {
     const name = modelForActor(actor);
     const [template] = await Promise.all([characterTemplate(name),loadAnimations()]);
-    return new Character(template,name,actor,driver);
+    const character=new Character(template,name,actor,driver);
+    await Promise.all(character.wardrobe);
+    return character;
   }
 
   private constructor(template: THREE.Group, name: string, actor: Actor, driver: Athlete) {
     this.name=name; this.model=clone(template) as THREE.Group;
     this.model.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(this.model);
-    this.norm=1.92/(box.max.y-box.min.y);
+    const player=!['ref','coach','fan','steward','spectator'].includes(actor.role);
+    const height=player&&['basket','pallavolo'].includes(SPORT)?[.96,1.035,1,1.065,.985,1.015][actor.id%6]:1;
+    this.norm=1.92*height/(box.max.y-box.min.y);
     // Bone rotations remain in the source's +Z-forward space; only this outer group changes basis.
     this.root.quaternion.copy(facing);this.root.add(this.model);
     this.root.scale.setScalar(this.norm);this.model.position.y=-box.min.y;
@@ -122,6 +156,8 @@ export class Character {
       for(const joint of this.joints.filter(j=>[`${side}Arm`,`${side}ForeArm`,`${side}Hand`].includes(j.name))) joint.procedural.premultiply(correction);
     }
     this.poseQ=this.joints.map(()=>new THREE.Quaternion());
+    this.procQ=this.joints.map(()=>new THREE.Quaternion());
+    this.prevQ=this.joints.map(()=>new THREE.Quaternion());
     if(this.hip){
       this.hipHeight=this.hip.bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(this.model.matrixWorld.clone().invert()).y;
       this.hipUp.applyQuaternion(this.hip.parent);
@@ -130,7 +166,7 @@ export class Character {
     if(ankle)this.ankleHeight=ankle.bone.getWorldPosition(new THREE.Vector3()).y;
     this.style(actor);
     if(name.startsWith('rpg-'))this.model.traverse(o=>{
-      if(!(o as THREE.SkinnedMesh).isSkinnedMesh||!/Shoes/.test(o.name))return;
+      if(!(o as THREE.SkinnedMesh).isSkinnedMesh||!o.visible||!/Shoes/.test(o.name))return;
       const mesh=o as THREE.SkinnedMesh,positions=mesh.geometry.getAttribute('position');let lowest=Infinity;
       for(let i=0;i<positions.count;i++)lowest=Math.min(lowest,positions.getY(i));
       this.soles.push({mesh,indices:Array.from({length:positions.count},(_,i)=>i).filter(i=>positions.getY(i)<lowest+.04)});
@@ -141,8 +177,12 @@ export class Character {
     const torsoProps=driver.torso.children.filter(o=>!(o instanceof THREE.Group));
     for(const prop of torsoProps)prop.position.y-=.25;
     this.socket('Spine2',torsoProps);
+    if(name==='athlete-carol'){
+      this.carol=new CarolAppearance(this.model,this.norm);this.carol.apply(actor.appearance??actor.id);
+    }
     driver.body.visible=false;
     this.root.userData.character=name;
+    live.set(actor,this);
   }
 
   private socket(name: string, props: THREE.Object3D[]) {
@@ -155,9 +195,50 @@ export class Character {
     if(club){this.golfSocket=socket;this.golfClub=club;this.defaultGrip=socket.quaternion.clone();}
   }
 
+  /** Accessories are authored in metres; source skeletons can be in metres, centimetres or hundredths of a metre. */
+  private accessory(name: string, object: THREE.Object3D, align=false) {
+    const joint=this.joints.find(j=>j.name===name);if(!joint)return;
+    const frame=new THREE.Group();frame.name='metre-accessory';frame.scale.setScalar(1/this.norm);
+    if(align)frame.quaternion.copy(joint.world).invert();
+    joint.bone.add(frame);frame.add(object);
+  }
+
+  private physique(mesh: THREE.Mesh, id: number) {
+    if(!/Body|Shirt|Shorts|Hair|Brow|Eyes|Eyelash/.test(mesh.name))return;
+    const key=`${mesh.geometry.uuid}:${id%12}`;let geometry=physiques.get(key);
+    if(!geometry){
+      geometry=mesh.geometry.clone();
+      const frame=new THREE.Matrix4().copy(this.model.matrixWorld).invert().multiply(mesh.matrixWorld),inverse=frame.clone().invert();
+      const positions=geometry.getAttribute('position'),point=new THREE.Vector3();
+      const breadth=[.90,1.08,.97,1.13,1.02,.94][id%6],face=[.91,1.07,1,.96,1.1,1.03][id%6];
+      for(let i=0;i<positions.count;i++){
+        point.fromBufferAttribute(positions,i).applyMatrix4(frame);
+        const y=point.y*this.norm,head=THREE.MathUtils.smoothstep(y,1.48,1.66),torso=1-THREE.MathUtils.smoothstep(Math.abs(point.x*this.norm),.22,.48);
+        point.x*=THREE.MathUtils.lerp(1+(breadth-1)*torso,face,head);
+        point.z*=1+(breadth-1)*.32*(1-head);
+        point.applyMatrix4(inverse);positions.setXYZ(i,point.x,point.y,point.z);
+      }
+      geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();physiques.set(key,geometry);
+    }
+    mesh.geometry=geometry;
+  }
+
+  async setKit(kit: TeamKit, actor: Actor) {
+    kit=riderKit(actor,kit);
+    const updates: Promise<void>[]=[];
+    this.model.traverse(o=>{
+      if(!(o as THREE.Mesh).isMesh)return;const mesh=o as THREE.Mesh,mat=mesh.material as THREE.MeshStandardMaterial;
+      if(mat.userData.club)updates.push(changeUniform(mat,kit));
+      if(mesh.name==='team-glove')mat.color.setHex(kit.shirt);
+      if(/Socks/.test(mesh.name)&&actor.role!=='ref')mat.color.setHex(kit.socks);
+    });
+    await Promise.all(updates);
+  }
+
   private style(a: Actor) {
     if(!isHumanModel(this.name))return;
-    const kit=CONFIG.teams[a.team], id=a.id;
+    const kit=riderKit(a,CONFIG.teams[a.team]), id=a.id;
+    const player=!['ref','coach','fan','steward','spectator'].includes(a.role);
     const costume=a.role==='spectator'&&a.look?({banana:0xffd83a,dino:0x3fa34d,clown:0xff3b3b,astronaut:0xeef0f2} as Record<string,number>)[a.look]:undefined;
     const shirt=a.role==='ref'?CONFIG.visuals.referee.shirt:a.role==='steward'?CONFIG.visuals.steward.shirt
       :a.role==='fan'?CONFIG.visuals.fan.shirt:a.role==='gk'?kit.keeper:a.role==='coach'?kit.socks
@@ -166,15 +247,19 @@ export class Character {
       if(!(o as THREE.Mesh).isMesh)return;const mesh=o as THREE.Mesh;
       const original=mesh.material as THREE.MeshStandardMaterial;const mat=original.clone();mesh.material=mat;
       mat.roughness=.85;mat.metalness=0;mesh.castShadow=true;
+      if(player&&['basket','pallavolo'].includes(SPORT))this.physique(mesh,id);
       if(/Shirt/i.test(mesh.name))mat.color.setHex(shirt);
-      else if(/Shorts/i.test(mesh.name))mat.color.setHex(a.role==='ref'?CONFIG.visuals.referee.shorts:a.role==='coach'?0x202938:costume??kit.shorts);
+      else if(/Shorts|Pants|Skirt/i.test(mesh.name))mat.color.setHex(a.role==='ref'?CONFIG.visuals.referee.shorts:a.role==='coach'?0x202938:costume??kit.shorts);
       else if(/Socks/i.test(mesh.name))mat.color.setHex(a.role==='ref'?CONFIG.visuals.referee.socks:kit.socks);
-      else if(/Shoes/i.test(mesh.name))mat.color.setHex(SHOES[id%SHOES.length]);
-      else if(/Body/i.test(mesh.name))mat.color.setHex(SKIN[id%SKIN.length]);
+      else if(/Shoes/i.test(mesh.name)){mat.color.setHex(SHOES[id%SHOES.length]);if(player&&SPORT==='boxe')mesh.visible=false;}
+      else if(/Body/i.test(mesh.name))mat.color.setHex(['basket','pallavolo'].includes(SPORT)&&id%SKIN.length===0?0xe2b48e:SKIN[id%SKIN.length]);
       else if(/Brow/i.test(mesh.name))mat.color.setHex(HAIR[id%HAIR.length]);
+      else if(/Beard/.test(mesh.name)){mat.color.setHex(HAIR[id%HAIR.length]);mat.alphaTest=.45;mat.transparent=false;mesh.visible=id%2===0;}
       else if(/Hair/i.test(mesh.name)) {
-        mat.color.setHex(HAIR[id%HAIR.length]);mat.alphaTest=.45;mat.transparent=false;mesh.visible=id%6!==5;
-        const style=id%4,key=`${mesh.geometry.uuid}:${style}`;let geometry=hairGeometries.get(key);
+        mat.color.setHex(HAIR[id%HAIR.length]);mat.alphaTest=.45;mat.transparent=false;
+        const varied=this.name==='footballer'||this.name==='athlete-tee';
+        const style=varied?id%4:0,key=`${mesh.geometry.uuid}:${style}`;let geometry=hairGeometries.get(key);
+        mesh.visible=!varied||id%6!==5;
         if(!geometry){
           geometry=mesh.geometry.clone();geometry.computeBoundingBox();const box=geometry.boundingBox!,center=box.getCenter(new THREE.Vector3());
           const vertices=geometry.getAttribute('position');
@@ -184,17 +269,20 @@ export class Character {
         }
         mesh.geometry=geometry;
         if(this.name.startsWith('rpg-')){
-          const chosen=this.name==='rpg-boxer'?(id%2?'SimpleParted':'Buzzed'):(id%2?'Buns':'Long');
-          mesh.visible=mesh.name.includes(chosen)&&id%6!==5;
+          mesh.visible=mesh.name.includes(id%2?'SimpleParted':'Buzzed');
         }
       }
       if(/Eyelashes/i.test(mesh.name)){mat.alphaTest=.4;mat.transparent=false;}
+      if(player&&['basket','pallavolo'].includes(SPORT)&&/Body|Hair/.test(mesh.name))styleSkin(mat,mesh,this.model,this.norm,id,HAIR[id%HAIR.length]);
+      if(player&&/Shirt/.test(mesh.name))this.wardrobe.push(dressUniform(mesh,this.model,kit,
+        ['calcio','basket','pallavolo','ciclismo'].includes(SPORT)?id%99+1:0,['basket','pallavolo'].includes(SPORT),a.role==='gk'));
+      if(player&&/Shorts/.test(mesh.name))this.wardrobe.push(dressUniform(mesh,this.model,kit,0,false,false,true));
       // A bounding box from the bind pose is invalid for a dive or a knockdown.
       mesh.frustumCulled=false;
     });
     const head=this.joints.find(j=>j.name==='Head')?.bone;
     if(head&&costume!==undefined){
-      const hat=new THREE.Group();head.add(hat);
+      const hat=new THREE.Group();this.accessory('Head',hat);
       const part=(geometry:THREE.BufferGeometry,color:number,x:number,y:number,z:number)=>{
         const mesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color,roughness:.85}));mesh.position.set(x,y,z);hat.add(mesh);
       };
@@ -213,12 +301,14 @@ export class Character {
     }
     if(a.role==='coach'){
       this.phone=new THREE.Mesh(new THREE.BoxGeometry(.065,.12,.012),new THREE.MeshStandardMaterial({color:0x101827,roughness:.35}));
-      this.phone.position.set(0,.07,.02);this.phone.visible=false;this.joints.find(j=>j.name==='LeftHand')?.bone.add(this.phone);
+      this.phone.position.set(0,.07,.02);this.phone.visible=false;this.accessory('LeftHand',this.phone);
     }
-    const player=!['ref','coach','fan','steward','spectator'].includes(a.role);
-    if(player&&(SPORT==='ciclismo'||SPORT==='vela'||SPORT==='golf')){
-      const hat=new THREE.Mesh(new THREE.SphereGeometry(.126,12,7,0,Math.PI*2,0,Math.PI*.56),new THREE.MeshStandardMaterial({color:SPORT==='vela'?0xf6f2ea:kit.shirt,roughness:.7}));
-      hat.position.y=.13;hat.scale.set(1.05,SPORT==='golf'?.5:.85,1.1);this.joints.find(j=>j.name==='Head')?.bone.add(hat);
+    const visor=this.model.getObjectByName('Cap');
+    if(visor)visor.visible=player||a.role==='spectator';
+    // The flat golf cap fits only the footballer's skull; on the other heads it became a ring pierced by the hair.
+    if(player&&!visor&&(SPORT==='ciclismo'||SPORT==='vela'||(SPORT==='golf'&&this.name==='footballer'))){
+      const hat=new THREE.Mesh(new THREE.SphereGeometry(.126,12,7,0,Math.PI*2,0,Math.PI*.56),new THREE.MeshStandardMaterial({color:SPORT==='vela'?0xf6f2ea:kit.shirt,roughness:.7,side:THREE.DoubleSide}));
+      hat.position.y=.13;hat.scale.set(1.05,SPORT==='golf'?.5:.85,1.1);this.accessory('Head',hat);
     }
     if((SPORT==='boxe'&&!['ref','coach','fan','steward','spectator'].includes(a.role))||a.role==='gk') {
       const boxing=SPORT==='boxe';
@@ -227,17 +317,31 @@ export class Character {
       for(const name of ['LeftHand','RightHand']) {
         const hand=this.joints.find(j=>j.name===name)?.bone;if(!hand)continue;
         const glove=new THREE.Mesh(new THREE.SphereGeometry(1,10,8).scale(boxing?.09:.065,boxing?.145:.11,boxing?.08:.04),mat);
-        glove.position.y=.08;glove.castShadow=true;hand.add(glove);
-        const cuff=new THREE.Mesh(new THREE.CylinderGeometry(.045,.04,.05,10),wrap);cuff.position.y=-.015;hand.add(cuff);
+        glove.name='team-glove';glove.position.y=.08;glove.castShadow=true;this.accessory(name,glove);
+        const cuff=new THREE.Mesh(new THREE.CylinderGeometry(.045,.04,.05,10),wrap);cuff.position.y=-.015;this.accessory(name,cuff);
       }
+    }
+    if(player&&SPORT==='boxe')for(const side of ['Left','Right']){
+      const boot=boxingBoot(id%2?0x252c3d:0x6c2630);this.accessory(`${side}Foot`,boot.group,true);this.bootSoles.push(boot.sole);
     }
   }
 
   private sample(m: AssetMotion | null, target: THREE.Quaternion[], weight=1): number | null {
     const clip=resolveAssetClip(m);if(!m||!clip)return null;
-    const mirror=!!m.side&&!!clip.direction&&m.side!==clip.direction&&/keeper(Dive|Block)/.test(m.group);
+    const mirror=!!m.side&&(m.group==='keeperStep'?!!clip.travel&&Math.sign(clip.travel[0])!==m.side
+      :!!clip.direction&&m.side!==clip.direction&&/keeper(Dive|Block)/.test(m.group));
     let u=m.loop?m.time%1:Math.min(1,Math.max(0,m.time/Math.max(.001,m.duration)));
-    if(!m.loop&&['boxingJab','boxingHook','footballShot','footballPass','golfDrive','golfChip','golfPutt'].includes(m.group)) {
+    if(m.loop&&m.travel!==undefined&&clip.cycle)u=((m.travel/(clip.cycle*this.scale))%1+1)%1;
+    else if(m.loop&&(m.group.endsWith('Slow')||m.group==='celebrationDance'))u=m.time/clip.duration%1;
+    else if(STRIKES.includes(m.group)&&Number.isFinite(m.duration)){
+      u=THREE.MathUtils.clamp((clip.contact+m.time-m.contact*m.duration)/clip.duration,0,1);
+    }
+    else if(REACTIONS.includes(m.group))u=Math.min(1,m.time*1.25/clip.duration);
+    else if(!m.loop&&(m.natural||NATURAL.test(m.group))){
+      const pace=m.natural||!Number.isFinite(m.duration)?1:THREE.MathUtils.clamp(clip.duration/Math.max(.001,m.duration),.6,1.4);
+      u=Math.min(1,Math.max(0,m.time*pace/clip.duration));
+    }
+    else if(!m.loop&&['golfDrive','golfChip','golfPutt'].includes(m.group)) {
       const impact=clip.contact/clip.duration, split=THREE.MathUtils.clamp(m.contact,.05,.95);
       u=u<split?u/split*impact:impact+(u-split)/(1-split)*(1-impact);
     }
@@ -261,17 +365,19 @@ export class Character {
   private calibrateGolf(m: AssetMotion, actor: Actor, time: number, actorRoot: THREE.Group) {
     if(!this.golfSocket||!this.golfClub||!this.hip)return;
     const clip=resolveAssetClip(m);if(!clip)return;
-    let grip=this.golfGrips.get(clip.id);
+    // A practice swing (natural pace) passes its clip's contact frame over the club head of the address; own entry, so strokes keep theirs.
+    const key=m.natural?`${clip.id}:practice`:clip.id;
+    let grip=this.golfGrips.get(key);
     if(!grip){
-      const contact=this.joints.map(j=>j.rest.clone()), y=this.sample({...m,time:m.duration*m.contact},contact), liveHip=this.hip.bone.position.clone();
+      const contact=this.joints.map(j=>j.rest.clone()), y=this.sample({...m,time:m.natural?clip.contact:m.duration*m.contact},contact), liveHip=this.hip.bone.position.clone();
       this.joints.forEach((j,i)=>j.bone.quaternion.copy(contact[i]));this.hip.bone.position.copy(this.hip.position).addScaledVector(this.hipUp,(y??0)*this.hipHeight);
       this.model.updateWorldMatrix(true,true);
       const hand=this.golfSocket.getWorldPosition(new THREE.Vector3());
-      const target=netContactPoint(actor,time,m.duration*m.contact), direction=target.sub(hand);
+      const target=netContactPoint(actor,time,m.natural?0:m.duration*m.contact), direction=target.sub(hand);
       const length=THREE.MathUtils.clamp(direction.length()/actorRoot.scale.y/.975,.7,1.4);
       const desired=new THREE.Quaternion().setFromUnitVectors(down,direction.normalize());
       const rotation=this.golfSocket.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(desired);
-      grip={rotation,length};this.golfGrips.set(clip.id,grip);
+      grip={rotation,length};this.golfGrips.set(key,grip);
       this.joints.forEach((j,i)=>j.bone.quaternion.copy(this.poseQ[i]));this.hip.bone.position.copy(liveHip);
     }
     this.golfSocket.quaternion.copy(grip.rotation);this.golfClub.scale.y=grip.length;
@@ -301,8 +407,36 @@ export class Character {
     end.quaternion.copy(end.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(keep));
   }
 
+  /** Around the contact frame the punching glove meets the opponent's face (or body) instead of the clip's empty air. */
+  private landPunch(m: AssetMotion, actor: Actor) {
+    const clip=resolveAssetClip(m),target=actor.faceTarget,opponent=target&&live.get(target);
+    if(!clip?.hand||!opponent||['crouch','fall','getUp'].includes(target.pose))return;
+    const w=1-THREE.MathUtils.smoothstep(Math.abs(m.time-m.contact*m.duration),0,.16);if(w<=0)return;
+    const side=clip.hand.startsWith('Left')?'Left':'Right',hand=this.joints.find(j=>j.name===`${side}Hand`)?.bone;
+    const aim=opponent.joints.find(j=>j.name===(m.group==='boxingBodyJab'?'Spine1':'Head'))?.bone;if(!hand||!aim)return;
+    this.model.updateWorldMatrix(true,true);
+    const from=hand.getWorldPosition(new THREE.Vector3()),point=aim.getWorldPosition(new THREE.Vector3());
+    if(m.group!=='boxingBodyJab')point.y+=.08*this.scale;
+    // The glove is centred .08 along the hand bone and .145 long: stop its front, not the wrist, on the target.
+    const glove=.225*this.scale;
+    point.addScaledVector(point.clone().sub(from).normalize(),-glove);
+    this.reach(`${side}Arm`,`${side}ForeArm`,`${side}Hand`,from.lerp(point,w));
+  }
+
+  /** Procedural pose: hands and feet on the choreography's contact points (ball, bike, racket). */
+  private fitLimbs(actor: Actor, driver: Athlete, actorRoot: THREE.Group) {
+    for(const [side,wrist,knee]of [['Left',driver.wristR,driver.kneeR],['Right',driver.wristL,driver.kneeL]] as const){
+      const hand=driver.bike&&actor.pose!=='celebrate'?actorRoot.localToWorld(new THREE.Vector3(.62,1,side==='Left'?-.2:.2)):wrist.getWorldPosition(new THREE.Vector3());
+      this.reach(`${side}Arm`,`${side}ForeArm`,`${side}Hand`,hand);
+      const foot=this.joints.find(j=>j.name===`${side}Foot`);
+      const rotation=driver.bike&&foot?actorRoot.getWorldQuaternion(new THREE.Quaternion()).multiply(facing).multiply(foot.world):undefined;
+      this.reach(`${side}UpLeg`,`${side}Leg`,`${side}Foot`,knee.localToWorld(new THREE.Vector3(0,-.4,0)),rotation);
+    }
+  }
+
   update(actor: Actor, time: number, carrying: boolean, driver: Athlete, actorRoot: THREE.Group) {
-    this.root.position.y=0;
+    this.carol?.apply(actor.appearance??actor.id);
+    this.root.position.y=0;this.scale=actorRoot.scale.y;
     actorRoot.updateWorldMatrix(true,true);
     actorRoot.getWorldQuaternion(this.driverInverse).invert();
     this.model.getWorldQuaternion(this.modelInverse).invert();
@@ -316,35 +450,49 @@ export class Character {
         joint.bone.quaternion.copy(this.q0).premultiply(this.q1);joint.bone.updateWorldMatrix(false,false);
       }
     }
-    for(let i=0;i<this.joints.length;i++)this.poseQ[i].copy(this.joints[i].bone.quaternion);
     const current=assetMotion(actor,time,carrying), previous=assetMotion(actor,time,carrying,true);
-    const blend=THREE.MathUtils.smoothstep(actor.poseBlendTime,0,CONFIG.visuals.poseBlendSec);
-    let hipOffset=(driver.body.position.y-.94)/this.norm;
-    if(blend<1){const y=this.sample(previous,this.poseQ);if(y!==null&&this.hip)hipOffset=y*this.hipHeight;}
-    const y=this.sample(current,this.poseQ,blend);
-    if(y!==null&&this.hip)hipOffset=THREE.MathUtils.lerp(hipOffset,y*this.hipHeight,blend);
+    // Strikes start already near contact: a long blend from the previous pose would land the boot or glove late.
+    const blend=THREE.MathUtils.smoothstep(actor.poseBlendTime,0,current&&STRIKES.includes(current.group)?.08:CONFIG.visuals.poseBlendSec);
+    const share=(m: AssetMotion|null)=>m?m.weight??1:0;
+    // Every target is a cross-fade over the procedural pose: previous gesture -> current gesture, gait -> nearby gait.
+    const procHip=(driver.body.position.y-.94)/this.norm;
+    if(share(current)<1||(blend<1&&share(previous)<1)){
+      if(this.hip)this.hip.bone.position.copy(this.hip.position).addScaledVector(this.hipUp,procHip);
+      this.fitLimbs(actor,driver,actorRoot);
+    }
+    for(let i=0;i<this.joints.length;i++)this.procQ[i].copy(this.joints[i].bone.quaternion);
+    const compose=(m: AssetMotion|null,target: THREE.Quaternion[])=>{
+      target.forEach((q,i)=>q.copy(this.procQ[i]));
+      let hip=procHip;const s=share(m);if(!m)return hip;
+      const y=this.sample(m,target,s);if(y!==null)hip=THREE.MathUtils.lerp(hip,y*this.hipHeight,s);
+      if(m.mix){const y2=this.sample(m.mix.motion,target,s*m.mix.weight);if(y2!==null)hip=THREE.MathUtils.lerp(hip,y2*this.hipHeight,s*m.mix.weight);}
+      return hip;
+    };
+    const planted=(m: AssetMotion|null)=>m?share(m)*((PLANTED.test(m.group)?1:0)*(1-(m.mix?.weight??0))+(m.mix&&PLANTED.test(m.mix.motion.group)?m.mix.weight:0)):0;
+    let hipOffset=compose(current,this.poseQ),floorWeight=planted(current);
+    if(blend<1){
+      const before=compose(previous,this.prevQ);
+      for(let i=0;i<this.joints.length;i++)this.poseQ[i].copy(this.prevQ[i].slerp(this.poseQ[i],blend));
+      hipOffset=THREE.MathUtils.lerp(before,hipOffset,blend);floorWeight=THREE.MathUtils.lerp(planted(previous),floorWeight,blend);
+    }
     for(let i=0;i<this.joints.length;i++)this.joints[i].bone.quaternion.copy(this.poseQ[i]);
     if(this.hip)this.hip.bone.position.copy(this.hip.position).addScaledVector(this.hipUp,hipOffset);
-    if(current&&/^(golfDrive|golfChip|golfPutt|idle|sidelineIdle|talk|officialYes|shove|footballIdle|footballPass|footballShot|boxingJab|boxingHook|boxingCombo|boxingRecoil|boxingBlock|walk|backward|stepLeft|stepRight|keeperIdle|keeperStep|keeperCarry)$/.test(current.group)){
+    if(floorWeight>0){
       const feet=this.joints.filter(j=>j.name==='LeftFoot'||j.name==='RightFoot');
       const lowest=Math.min(...feet.map(j=>j.bone.getWorldPosition(new THREE.Vector3()).y));
       if(Number.isFinite(lowest))this.root.position.y=-(lowest-actorRoot.position.y-this.ankleHeight*actorRoot.scale.y)/actorRoot.scale.y;
-      if(this.soles.length){
-        this.root.position.y=0;this.model.updateWorldMatrix(true,true);let floor=Infinity;const point=new THREE.Vector3();
+      if(this.soles.length||this.bootSoles.length){
+        // updateMatrixWorld also refreshes bindMatrixInverse; a stale one from the last render accumulated the previous offset every frame.
+        this.root.position.y=0;this.root.updateMatrixWorld(true);let floor=Infinity;const point=new THREE.Vector3();
         for(const {mesh,indices}of this.soles){mesh.skeleton.update();for(const i of indices){mesh.getVertexPosition(i,point);point.applyMatrix4(mesh.matrixWorld);floor=Math.min(floor,point.y);}}
+        for(const sole of this.bootSoles)floor=Math.min(floor,new THREE.Box3().setFromObject(sole).min.y);
         if(Number.isFinite(floor))this.root.position.y=-(floor-actorRoot.position.y)/actorRoot.scale.y;
       }
+      // Partly planted (fading into a run or a procedural gesture): only that share of the correction.
+      this.root.position.y*=floorWeight;
       this.root.updateWorldMatrix(true,true);
     }
-    if(!current){
-      for(const [side,wrist,knee]of [['Left',driver.wristR,driver.kneeR],['Right',driver.wristL,driver.kneeL]] as const){
-        const hand=driver.bike&&actor.pose!=='celebrate'?actorRoot.localToWorld(new THREE.Vector3(.62,1,side==='Left'?-.2:.2)):wrist.getWorldPosition(new THREE.Vector3());
-        this.reach(`${side}Arm`,`${side}ForeArm`,`${side}Hand`,hand);
-        const foot=this.joints.find(j=>j.name===`${side}Foot`);
-        const rotation=driver.bike&&foot?actorRoot.getWorldQuaternion(new THREE.Quaternion()).multiply(facing).multiply(foot.world):undefined;
-        this.reach(`${side}UpLeg`,`${side}Leg`,`${side}Foot`,knee.localToWorld(new THREE.Vector3(0,-.4,0)),rotation);
-      }
-    }
+    if(current&&/^boxing(Jab|BodyJab|Hook)$/.test(current.group))this.landPunch(current,actor);
     if(current&&/^golf(Drive|Chip|Putt)$/.test(current.group))this.calibrateGolf(current,actor,time,actorRoot);
     else if(!current&&this.golfSocket&&this.defaultGrip){this.golfSocket.quaternion.copy(this.defaultGrip);this.golfClub!.scale.y=1;}
     if(this.phone)this.phone.visible=actor.gesture==='phone';

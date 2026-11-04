@@ -127,10 +127,33 @@
               "sha256": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
             }
           ]
+        },
+        {
+          "name": "Hair_Beard",
+          "file": "assets/characters/humans/models/Hair_Beard.gltf",
+          "bytes": 25041,
+          "sha256": "ee6c0f0b2b337a491598203a96ee5193fbc9e732008158f64740c8b77c7ab559",
+          "dependencies": [
+            {
+              "file": "assets/characters/humans/models/Hair_Beard.bin",
+              "bytes": 41356,
+              "sha256": "bf2f46ef5808665ef31082f787bc68c51ff063e81b76ca1a51ac86a9ae723be7"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_Normal.png",
+              "bytes": 4326126,
+              "sha256": "57fd0ad8c96a4d01b38769637e066cecaa285b456f6e48ce00863754a457affb"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_BaseColor.png",
+              "bytes": 1570376,
+              "sha256": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
+            }
+          ]
         }
       ],
-      "triangles": 5117,
-      "optimizedBytes": 257716,
+      "triangles": 5427,
+      "optimizedBytes": 271180,
       "modifications": "Sporting materials with clipped seams, covered shorts/jersey, transferred existing football boots, canonical joint names, optimized geometry and textures"
     },
     {
@@ -231,10 +254,33 @@
               "sha256": "f9f4f2fb3eeeefb0b6f0fdef38b0770fd6607640c1c680b8139dd76697e9f9b3"
             }
           ]
+        },
+        {
+          "name": "Hair_BuzzedFemale",
+          "file": "assets/characters/humans/models/Hair_BuzzedFemale.gltf",
+          "bytes": 25746,
+          "sha256": "520ae79eb930666716c8c8cf8efb1416880b792f914ad7899a2b90dad4905126",
+          "dependencies": [
+            {
+              "file": "assets/characters/humans/models/Hair_BuzzedFemale.bin",
+              "bytes": 33372,
+              "sha256": "48fcdac8751e85c1d08ac9ff25b5c4d649e5b5d450d37ad8743b9f111a3a7e04"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_Normal.png",
+              "bytes": 4326126,
+              "sha256": "57fd0ad8c96a4d01b38769637e066cecaa285b456f6e48ce00863754a457affb"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_BaseColor.png",
+              "bytes": 1570376,
+              "sha256": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
+            }
+          ]
         }
       ],
-      "triangles": 6560,
-      "optimizedBytes": 380052,
+      "triangles": 6809,
+      "optimizedBytes": 407432,
       "modifications": "Sporting materials with clipped seams, covered shorts/jersey, transferred existing football boots, canonical joint names, optimized geometry and textures"
     }
   ],
@@ -360,9 +406,12 @@
       "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
       "clip": "Interact",
       "duration": 2,
-      "groups": [],
-      "decision": "no matching sporting action",
-      "joinedInto": null
+      "groups": [
+        "officialPoint"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "e126f8b565b233478d381cb8800ca7cc11cccdedc71b3d1429c407265a7b382a"
     },
     {
       "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
@@ -1025,6 +1074,6 @@
       "motionHash": "4e8675be01f487011a2cfc78760df76cb5eaa6123af29dc4a0900bc042e96376"
     }
   ],
-  "addedClips": 32,
+  "addedClips": 33,
   "alternatives": "Unity FBX and root-motion GLB are equivalent exports; game-ready RPG copies and medieval outfits were inspected, original clothing is unsuitable for sport."
 }

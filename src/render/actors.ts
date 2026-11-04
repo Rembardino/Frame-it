@@ -8,6 +8,7 @@ import { createBall } from './ball';
 import { actorMotion, stanceOffset } from '../animation/motion';
 import { mouthPose } from '../audio/speech';
 import { Character } from './characters';
+import type { TeamKit } from '../teams';
 
 interface PlayerView extends Athlete { actor: Actor; root: THREE.Group; shadow: THREE.Mesh; character?: Character; characterChoices?: Character[] }
 
@@ -49,6 +50,12 @@ export class ActorViews {
   /** La palla tocca terra: si schiaccia un istante e torna tonda. */
   bounce() { this.squash = 1; }
 
+  async setTeams(teams: TeamKit[]) {
+    await this.ready;
+    await Promise.all(this.views.filter(v=>v.character&&!['ref','coach','steward','fan','spectator'].includes(v.actor.role))
+      .map(v=>v.character!.setKit(teams[v.actor.team],v.actor)));
+  }
+
   update(dt: number) {
     for (const view of this.views) {
       view.root.visible = view.shadow.visible = view.actor.active;
@@ -74,6 +81,7 @@ export class ActorViews {
     // y: gli spettatori in tribuna stanno sul loro gradone.
     v.root.position.set(a.pos.x, a.pos.y, a.pos.z); v.root.rotation.y = -a.heading;
     if (v.bike) {
+      v.root.rotation.z = a.terrainPitch ?? 0;
       // Piega in curva (poseDir), bici sul fianco se cade, che dondola nello scatto; ruote che girano.
       const down = a.pose === 'fall';
       v.root.rotation.x = down ? 0 : a.poseDir;

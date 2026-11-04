@@ -25,6 +25,9 @@ try{
    const actor=match.actors.find(a=>a.role!=='gk'&&(!['basket','tennis','pallavolo','golf'].includes(sport)||a.team===1))??match.actors[0];actor.active=true;actor.vel.set(0,0,0);
    if(sport!=='golf')actor.heading=0;
    const action={calcio:['kick',.9,'footballShot'],basket:['shoot',.8],boxe:['combo',2.2,'boxingCombo'],tennis:['racket',.8],pallavolo:['spike',.8],golf:['swing',1.7,'golfDrive'],ciclismo:['sprint',1.5],vela:['grind',1.5]}[sport];
+   // Render between updates, as the game does: sole compensation must not accumulate the previous frame's offset.
+   const idleView=views.views.find(v=>v.actor===actor);let soleDrift=0;
+   for(let i=0;i<45;i++){match.setPose(actor,'normal',Infinity,null,'idle');actor.poseBlendTime=1;views.update(1/30);stage.renderer.render(stage.scene,stage.camera);soleDrift=Math.max(soleDrift,Math.abs(idleView.character.root.position.y));}
    match.setPose(actor,action[0],action[1],null,action[2]);actor.poseTime=action[1]*(sport==='golf'?.5:.32);actor.poseBlendTime=1;views.update(0);
    const view=views.views.find(v=>v.actor===actor);
    const snapshot=()=>{const result=[];view.character.model.traverse(o=>{if(o.isBone)result.push(...o.quaternion.toArray(),...o.position.toArray());});return result;};
@@ -50,11 +53,28 @@ try{
    const {assetMotion}=await import('/src/animation/assetMotion.ts');
    const oldOfficial=assetMotion({...actor,role:'ref',pose:'argue',gesture:undefined,animationCatalog:2},0,false);
    if(oldOfficial!==null)throw Error('Old clips must preserve procedural gestures without an original asset');
-   const {animationStats}=await import('/src/render/characters.ts');return{...animationStats(),characters,allHumans,crowdParts,replayError,legacy,added,selectedModel:view.character.name,geometries:stage.renderer.info.memory.geometries};
+   // Saved replays resolve clips by group length: catalogs 2 and 3 must keep exactly the pools they were recorded with.
+   const frozen=await (await fetch('/scripts/fixtures/animation-pools.json')).json(),poolErrors=[];
+   for(const [catalog,groups] of Object.entries(frozen))for(const [group,ids] of Object.entries(groups))ids.forEach((id,variant)=>{
+    const got=resolveAssetClip({group,variant,time:0,duration:1,contact:.32,loop:false,catalog:+catalog})?.id;if(got!==id)poolErrors.push(`${catalog}/${group}/${variant}: ${got} instead of ${id}`);});
+   const guard4=Array.from({length:4},(_,variant)=>resolveAssetClip({group:'idle',variant,time:0,duration:1,contact:.32,loop:false,catalog:4})?.id);
+   // Engaged boxers: at the jab's contact instant the glove must reach the opponent's face (IK), not stop in the air.
+   let gloveGap=0;
+   if(sport==='boxe'){
+    const [a,b]=match.actors;for(const x of [a,b]){x.active=true;x.vel.set(0,0,0);}a.pos.set(-.52,0,0);b.pos.set(.52,0,0);a.heading=0;b.heading=Math.PI;
+    match.setPose(b,'guard',Infinity,a);b.poseBlendTime=1;match.setPose(a,'jab',.65,b,'boxingJab');a.poseTime=.65*.32;a.poseBlendTime=1;views.update(0);views.update(0);
+    const bone=(v,n)=>{let r;v.character.model.traverse(o=>{if(o.isBone&&o.name===n)r=o;});return r;},va=views.views.find(v=>v.actor===a),vb=views.views.find(v=>v.actor===b);
+    const clip=resolveAssetClip({group:'boxingJab',variant:a.gestureVariant+a.id+(a.appearance??0)*31,catalog:4});
+    const glove=new Box3().setFromObject(bone(va,clip.hand).getObjectByName('team-glove'));
+    const face=bone(vb,'Head').getWorldPosition(new Vector3());face.y+=.08*vb.root.scale.y;gloveGap=glove.distanceToPoint(face);
+   }
+   const {animationStats}=await import('/src/render/characters.ts');return{...animationStats(),poolErrors,guard4,gloveGap,soleDrift,characters,allHumans,crowdParts,replayError,legacy,added,selectedModel:view.character.name,geometries:stage.renderer.info.memory.geometries};
   });
   await page.screenshot({path:`${out}/${sport}.png`});assert.deepEqual(errors,[],`${sport}: browser errors`);assert(result.characters.length>0);assert(result.clips>=160);
-  assert(result.allHumans,`${sport}: fantasy athlete`);assert(result.crowdParts>0,`${sport}: procedural crowd`);assert(result.replayError<1e-7,`${sport}: replay changed imported joint transforms`);
-  assert.equal(result.selectedModel,sport==='boxe'?'rpg-boxer':['basket','tennis','pallavolo','golf'].includes(sport)?'rpg-athlete-female':'footballer',`${sport}: expected imported body`);
+  assert(result.soleDrift<.2,`${sport}: feet drift ${result.soleDrift.toFixed(2)} m from the floor between rendered frames`);assert.deepEqual(result.poolErrors,[],'Replay pools changed');assert(result.gloveGap<.15,`Jab glove stops ${result.gloveGap.toFixed(2)} m from the face`);assert(!result.guard4.includes('idle_1_'),'Catalog 4 boxing guard must not use the arms-down idle');assert(result.allHumans,`${sport}: fantasy athlete`);assert(result.crowdParts>0,`${sport}: procedural crowd`);assert(result.replayError<1e-7,`${sport}: replay changed imported joint transforms`);
+  assert.equal(result.selectedModel,sport==='boxe'?'rpg-boxer':['tennis','golf'].includes(sport)?'athlete-carol':sport==='calcio'?'footballer':'athlete-tee',`${sport}: expected imported body`);
+  // The football kit stays in football: the other sports dress their men in a T-shirt or a polo.
+  if(sport!=='calcio'&&sport!=='boxe')assert(result.characters.some(c=>c.name===(sport==='golf'?'athlete-polo':'athlete-tee')),`${sport}: sportswear body missing`);
   assert.equal(result.legacy,'cross_punch','Old recordings must preserve the original animation pool');assert(result.added.startsWith('quaternius_'),'New recordings must reach the added variations');
   reports.push({sport,...result});console.log(`${sport}: ${result.characters.length} imported characters, ${result.clips} animation clips`);await page.close();
  }

@@ -1,5 +1,5 @@
 /**
- * CICLISMO — si riprende solo col drone. Il gruppo (due squadre) affronta gli ultimi 2 km: curve, il paese
+ * CICLISMO — si riprende solo col drone. Quattordici corridori individuali affrontano salite, discese, curve a S, il paese
  * con lo strappo, il ponte, il bosco, la volata. Scatti, cadute, volata e tifosi li decide la regia
  * (events/cycling.ts); qui ogni corridore avanza lungo la strada (s = metri percorsi) con il suo posto nel gruppo.
  * Il gruppo regola il passo per arrivare al traguardo verso la fine della diretta. Numeri in CONFIG.cycling.
@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { CONFIG } from '../../config';
 import type { Actor, Match } from '../match';
 import type { Effect, SportAction, SportSimulation } from './types';
-import { BENDS, BRIDGE_S, FINISH_S, LENGTH, ROAD_HALF, VILLAGE, WOODS, roadAt, roadCurve, roadDir } from './cyclingRoute';
+import { BENDS, BRIDGE_S, FINISH_S, LENGTH, ROAD_HALF, VILLAGE, WOODS, roadAt, roadCurve, roadDir, roadGrade, terrainHeight } from './cyclingRoute';
+import { riderName } from './cyclingRiders';
 import { standardRoute, type Key, type Species } from '../fauna';
 import { inside } from './shapes';
 import { t } from '../../i18n';
@@ -32,10 +33,11 @@ export class CyclingSimulation implements SportSimulation {
   private catchRate = 0;
   private fan: { a: Actor; rider: Rider; until: number } | null = null;
   private finishedAt = Infinity;
+  private finishOrder: Actor[] = [];
 
   constructor(private match: Match) {
     this.riders = match.actors.map((a, i) => ({ a, s: 0, lat: 0, v: this.packV, mode: 'pack', slot: i, until: 0, push: 0, jit: [rand(-0.25, 0.25), rand(-0.15, 0.15)], lat0: 0 }));
-    // Posti nel gruppo mescolati: le due squadre pedalano insieme.
+    // Posti nel gruppo mescolati: ogni corridore gareggia per sé.
     this.riders.sort(() => Math.random() - 0.5).forEach((r, i) => { r.slot = i; r.s = this.slotS(r); r.lat = this.slotLat(r); });
     this.place(0);
     match.phase = 'play';
@@ -60,7 +62,7 @@ export class CyclingSimulation implements SportSimulation {
   get finished() { return this.winner !== null; }
 
   drives(a: Actor) { return this.riders.some((r) => r.a === a); }
-  leaders() { return [...this.riders].filter((r) => r.mode !== 'crash').sort((a, b) => b.s - a.s).slice(0, 3).map((r) => r.a); }
+  leaders() { return [...this.finishOrder, ...this.riders.filter(r => r.mode !== 'crash' && !this.finishOrder.includes(r.a)).sort((a, b) => b.s - a.s).map(r => r.a)].slice(0, 3); }
 
   droneStart() {
     const s = this.packS, d = roadDir(s);
@@ -75,6 +77,7 @@ export class CyclingSimulation implements SportSimulation {
     const left = Math.max(15, c.arriveSec - m.clock);
     let want = THREE.MathUtils.clamp((FINISH_S - this.packS) / left, c.packSpeed[0], c.packSpeed[1]);
     if (this.inVillage) want *= c.villageSlow;
+    want *= THREE.MathUtils.clamp(1 - roadGrade(this.packS) * 3.2, 0.65, 1.25);
     // Curva a gomito in arrivo: si frena prima e si rilancia all'uscita (accelerazione laterale massima bendGrip).
     let curve = 0;
     for (let k = -5; k <= 30; k += 5) curve = Math.max(curve, Math.abs(roadCurve(this.packS + k)));
@@ -88,11 +91,13 @@ export class CyclingSimulation implements SportSimulation {
     for (const r of this.riders) this.ride(r, dt, time, down);
     if (this.fan) this.runAlong(time);
     // Il primo che passa lo striscione vince: la regia vuole l'esultanza (trigger "goal").
-    const first = this.riders.filter((r) => r.s >= FINISH_S).sort((a, b) => b.s - a.s)[0];
+    const crossed = this.riders.filter(r => r.s >= FINISH_S && !this.finishOrder.includes(r.a))
+      .sort((a, b) => (b.s - FINISH_S) / Math.max(1, b.v) - (a.s - FINISH_S) / Math.max(1, a.v));
+    this.finishOrder.push(...crossed.map(r => r.a));
+    const first = crossed[0];
     if (first && !this.winner) {
       this.winner = first.a;
       this.finishedAt = time;
-      m.score[first.a.team]++;
       m.sound('goal', first.a.pos);
       m.excitement = 1;
       m.events.push({ type: 'goal', scorer: first.a, at: time });
@@ -163,9 +168,12 @@ export class CyclingSimulation implements SportSimulation {
     let cx = 0, cz = 0, n = 0;
     for (const r of this.riders) {
       const a = r.a, p = roadAt(r.s), d = roadDir(r.s);
-      a.pos.set(p.x - d.z * r.lat, 0, p.z + d.x * r.lat);
+      a.pos.set(p.x - d.z * r.lat, p.y, p.z + d.x * r.lat);
+      a.pos.y = terrainHeight(a.pos.x, a.pos.z) + 0.2;
       a.target.copy(a.pos);
       a.vel.copy(d).multiplyScalar(r.v);
+      a.vel.y = roadGrade(r.s) * r.v;
+      a.terrainPitch = Math.atan(roadGrade(r.s));
       // Chi si sposta di lato sterza verso dove va (non scivola di fianco).
       if (r.mode !== 'crash') a.heading = Math.atan2(d.z, d.x) + (dt > 0 ? Math.atan2((r.lat - r.lat0) / dt, Math.max(1, r.v)) : 0);
       r.lat0 = r.lat;
@@ -237,17 +245,21 @@ export class CyclingSimulation implements SportSimulation {
     const f = this.fan!, d = roadDir(f.rider.s), side = new THREE.Vector3(-d.z, 0, d.x);
     if (time < f.until) f.a.target.copy(f.rider.a.pos).addScaledVector(side, ROAD_HALF * 0.9).addScaledVector(d, 1.2);
     else { f.a.target.copy(f.a.pos).addScaledVector(side, 8); this.fan = null; }
+    f.a.pos.y = terrainHeight(f.a.pos.x, f.a.pos.z) + 0.2;
     f.a.speedLimit = CONFIG.match.sprintSpeed;
   }
 
   scoreText() {
-    if (this.winner) return `${CONFIG.teams[this.winner.team].short} 1°`;
+    if (this.winner) return `1° ${riderName(this.winner.id)}`;
     const b = this.breakaway;
-    return b ? `+${Math.max(0, Math.round((b.s - this.packS) / Math.max(1, this.packV)))}"` : t('GRUPPO');
+    return b ? `${riderName(b.a.id)} +${Math.max(0, Math.round((b.s - this.packS) / Math.max(1, this.packV)))}"` : `${t('GRUPPO')} · ${riderName(this.leaders()[0].id)}`;
   }
 
   clockText() {
-    return this.winner ? t('ARRIVO') : t('{km} KM ALL’ARRIVO', { km: (Math.max(0, this.toFinish) / 1000).toFixed(1).replace('.', ',') });
+    if (this.winner) return t('ARRIVO');
+    const grade = Math.round(roadGrade(this.packS) * 100);
+    return t('{km} KM ALL’ARRIVO', { km: (Math.max(0, this.toFinish) / 1000).toFixed(1).replace('.', ',') })
+      + (Math.abs(grade) >= 2 ? ` · ${t(grade > 0 ? 'SALITA {grade}%' : 'DISCESA {grade}%', { grade: Math.abs(grade) })}` : '');
   }
 
   /** 'ahead' = davanti al gruppo, 'finish' = lo striscione. Scarto [avanti, di lato]. */
@@ -258,11 +270,11 @@ export class CyclingSimulation implements SportSimulation {
 
   animalRoute(route: string, species: Species): Key[] {
     const s = this.packS + (species === 'dog' ? 55 : 90), half = route === 'graze' ? ROAD_HALF + 20 : ROAD_HALF + 1;
-    return standardRoute(route, roadAt(s), roadDir(s), half);
+    return standardRoute(route, roadAt(s), roadDir(s), half).map(key => ({ ...key, p: key.p.clone().setY(key.p.y + terrainHeight(key.p.x, key.p.z)) }));
   }
 
   private effect(kind: Effect['kind'], at: THREE.Vector3) {
-    this.effects.push({ kind, at: at.clone().setY(0.2), t: this.match.time });
+    this.effects.push({ kind, at: at.clone().add(new THREE.Vector3(0, 0.2, 0)), t: this.match.time });
     if (this.effects.length > 8) this.effects.shift();
   }
 }

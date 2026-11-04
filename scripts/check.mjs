@@ -4,7 +4,8 @@ import { createServer } from 'vite';
 import { checkSports } from './check-sports.mjs';
 
 const assert = (cond, msg) => { if (!cond) throw new Error('FALLITO: ' + msg); };
-for (const sport of ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo', 'golf', 'ciclismo', 'vela']) {
+const selectedSports = process.argv.slice(2);
+for (const sport of ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo', 'golf', 'ciclismo', 'vela'].filter(sport => !selectedSports.length || selectedSports.includes(sport))) {
 // Lo sport si sceglie dall'URL: qui lo simulo. Un server nuovo per sport = moduli ricaricati da zero.
 globalThis.location = { search: '?sport=' + sport };
 const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' });

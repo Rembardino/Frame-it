@@ -13,22 +13,25 @@ try {
   const base = `http://127.0.0.1:${server.httpServer.address().port}/`;
   await page.goto(`${base}?debug&lang=it&sport=basket`);
   await page.waitForFunction(() => window.frameit);
-  await page.evaluate(async () => {
+  const recordedTeams=await page.evaluate(async () => {
     const { match, recorder, stage } = window.frameit;
     const { fresh, settle, saveCareer } = await import('/src/career/career.ts');
     const { saveClips, loadClip } = await import('/src/recorder/archive.ts');
+    const { CONFIG } = await import('/src/config.ts');
     const frames = [];
     for (let i = 0; i < 120; i++) {
       match.update(1 / 30);
       frames.push(recorder.capture({ rx: stage.camera.rotation.x, ry: stage.camera.rotation.y, fov: 40, x: 0, y: 5, z: 20 }, { excitement: 0, hotX: 0, hotLevel: 0, lookUp: 0 }));
     }
-    const clip = { label: 'Canestro', decisive: frames[60].t, frames };
+    // Stored URLs may belong to an earlier build; playback must resolve crests by the stable club ID.
+    const clip = { label: 'Canestro', decisive: frames[60].t, frames, teams: CONFIG.teams.map(team=>({...team,logo:'/old-build/missing-crest.webp'})) };
     const state = fresh();
     settle(state, { kind: 'own', sport: 'basket' }, [{ label: clip.label, stars: 4, score: 80, rare: false, clipId: 'basket-test' }], 80, false);
     state.videos.push({ label: 'Vecchio video', sport: 'calcio', stars: 3, views: 20, money: 1 });
     await saveClips([{ id: 'basket-test', recording: { clip, seeds: [...match.actors, ...match.extras].map(a => a.seed) } }], ['basket-test']);
     saveCareer(state);
     if (!(await loadClip('basket-test'))?.clip.frames.length) throw new Error('Recording missing');
+    return CONFIG.teams.map(team=>team.id);
   });
   // A fresh football page must switch to the recording's basketball scene.
   await page.goto(`${base}?debug&lang=it&sport=calcio`);
@@ -38,16 +41,21 @@ try {
   await page.getByRole('button', { name: 'Rivedi clip' }).click();
   await page.waitForURL(/sport=basket/);
   await page.waitForFunction(() => window.frameit?.replay.active);
+  const currentTeams=()=>page.evaluate(async()=>(await import('/src/config.ts')).CONFIG.teams.map(team=>team.id));
+  assert.deepEqual(await currentTeams(),recordedTeams,'Saved clip lost the original clubs and strips');
   const before = await page.evaluate(() => window.frameit.replay.t);
   await page.waitForFunction(t => window.frameit.replay.t > t + 0.1, before);
   await page.waitForFunction(() => !window.frameit.replay.active, null, { timeout: 20000 });
   await page.locator('#career:not(.hidden) [data-replay]').waitFor();
+  const menuTeams=await currentTeams();
   await page.getByRole('button', { name: 'Rivedi clip' }).click();
   await page.waitForFunction(() => window.frameit.replay.active);
+  assert.deepEqual(await currentTeams(),recordedTeams,'Repeat changed the recorded clubs');
   await page.locator('#replay').click();
   await page.waitForFunction(() => !window.frameit.replay.active);
   assert.equal(await page.locator('#career').isVisible(), true);
+  assert.deepEqual(await currentTeams(),menuTeams,'Skipping a saved clip did not restore the current clubs');
   assert.equal(await page.evaluate(() => window.frameit.match.time), 0, 'Menu scene restored after replay');
   assert.deepEqual(errors, []);
-  console.log('OK: persistent clips, legacy videos, cross-sport replay, playback completion, repeat and skip');
+  console.log('OK: persistent clips, original clubs and strips, stale crest URLs, legacy videos, cross-sport replay, completion, repeat and skip');
 } finally { await browser.close(); await server.close(); }

@@ -5,6 +5,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import * as THREE from 'three';
 import { readCharacterGLTF } from './read-character-gltf.mjs';
 import { anatomicalName } from './character-skeleton.mjs';
+import { annotateClips } from './annotate-clips.mjs';
 
 const source=resolve(process.argv[2]||resolve(process.env.USERPROFILE??'.','OneDrive - Posti Oyj/Desktop/RPG 3D'));
 const libraries=[
@@ -12,7 +13,7 @@ const libraries=[
  ['UAL2','3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb'],
 ];
 const selected={
- UAL1:{Crouch_Idle_Loop:['boxingDodge'],Dance_Loop:['celebration'],Death01:['knockdown'],Hit_Chest:['boxingRecoil'],Hit_Head:['boxingRecoil'],
+ UAL1:{Crouch_Idle_Loop:['boxingDodge'],Dance_Loop:['celebration'],Death01:['knockdown'],Hit_Chest:['boxingRecoil'],Hit_Head:['boxingRecoil'],Interact:['officialPoint'],
   Idle_Loop:['sidelineIdle'],Idle_Talking_Loop:['talk'],Jog_Fwd_Loop:['run'],PickUp_Table:['keeperCatch'],Punch_Cross:['boxingJab'],Punch_Jab:['boxingJab'],Push_Loop:['shove'],
   Sitting_Enter:['crowdSitIn'],Sitting_Exit:['crowdSitOut'],Sitting_Idle_Loop:['crowdSit'],Sitting_Talking_Loop:['crowdSitTalk'],Sprint_Loop:['run'],Walk_Formal_Loop:['walk'],Walk_Loop:['walk']},
  UAL2:{Hit_Knockback:['knockdown'],Idle_FoldArms_Loop:['sidelineIdle'],Idle_No_Loop:['dejected'],Idle_TalkingPhone_Loop:['phone'],LayToIdle:['getUp'],
@@ -20,6 +21,8 @@ const selected={
   Zombie_Idle_Loop:['mascotIdle'],Zombie_Scratch:['mascotReact'],Zombie_Walk_Fwd_Loop:['mascotWalk']}
 };
 const joins={Melee_Hook:['Melee_Hook_Rec'],Slide_Start:['Slide_Loop','Slide_Exit']};
+// Added after catalog 3 (second review): replays recorded earlier never see them.
+const since4=['UAL1/Interact'];
 const manifest=JSON.parse(await readFile('src/assets/characters/animations.json','utf8'));
 const base=manifest.clips.filter(c=>!c.id.startsWith('quaternius_')),baseLength=Math.max(...base.map(c=>c.offset+c.frames*c.stride));
 const old=gunzipSync(await readFile('src/assets/characters/animations.bin.gz'));
@@ -61,7 +64,8 @@ for(const [library,file]of libraries){
   }
   const motionHash=createHash('sha256').update(Buffer.from(values.buffer)).digest('hex');audit.at(-1).motionHash=motionHash;
   const id=`quaternius_${library.toLowerCase()}_${clip.name.toLowerCase()}`;
-  clips.push({id,source:`RPG 3D/${library}/${clip.name}`,groups,duration,sourceDuration:duration,trim:[0,duration],contact:duration*.32,direction:0,frames,bones:names,offset,stride});
+  clips.push({id,source:`RPG 3D/${library}/${clip.name}`,groups,duration,sourceDuration:duration,trim:[0,duration],contact:duration*.32,direction:0,frames,bones:names,offset,stride,
+   ...(since4.includes(`${library}/${clip.name}`)?{since:4}:{})});
   chunks.push(Buffer.from(values.buffer));offset+=values.length;
  }
 }
@@ -71,4 +75,5 @@ await writeFile('src/assets/characters/animations.bin.gz',gzipSync(Buffer.concat
 const models=JSON.parse(await readFile('artifacts/rpg-asset-audit/models.json','utf8'));
 await writeFile('docs/rpg-asset-audit.json',JSON.stringify({sourceProject:'RPG 3D',author:'Quaternius',license:'CC0 1.0',files,models,animations:audit,addedClips:clips.length-base.length,
  alternatives:'Unity FBX and root-motion GLB are equivalent exports; game-ready RPG copies and medieval outfits were inspected, original clothing is unsuitable for sport.'},null,2));
+await annotateClips();
 console.log(`${audit.length} source clips reviewed; ${clips.length-base.length} sports/ambient clips added; ${clips.length} clips total.`);
