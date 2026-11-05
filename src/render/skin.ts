@@ -28,14 +28,12 @@ function skinReference(mesh: THREE.Mesh, texture: THREE.Texture | null) {
 }
 
 /** Keep the supplied face detail; make tattoos optional and give the imported hair a readable colour instead of multiplying black texels. */
-export function styleSkin(material: THREE.MeshStandardMaterial, mesh: THREE.Mesh, model: THREE.Group, norm: number, id: number, hair: number, bald=false) {
+export function styleSkin(material: THREE.MeshStandardMaterial, mesh: THREE.Mesh, model: THREE.Group, norm: number, id: number, hair: number) {
   model.updateWorldMatrix(true,true);
   const frame=new THREE.Matrix4().copy(model.matrixWorld).invert().multiply(mesh.matrixWorld);
   const isHair=/Hair/.test(mesh.name);
   const reference=isHair?new THREE.Color():skinReference(mesh,material.map);
   const beardColor=new THREE.Color(hair);material.userData.beardColor=beardColor;
-  let scalpTop=0;
-  if(bald){const positions=mesh.geometry.getAttribute('position'),point=new THREE.Vector3();for(let i=0;i<positions.count;i++)scalpTop=Math.max(scalpTop,point.fromBufferAttribute(positions,i).applyMatrix4(frame).y*norm);}
   material.onBeforeCompile=shader=>{
     shader.uniforms.skinFrame={value:frame};shader.uniforms.skinNorm={value:norm};shader.uniforms.beardColor={value:beardColor};
     shader.uniforms.sourceSkinColor={value:reference};
@@ -57,9 +55,8 @@ export function styleSkin(material: THREE.MeshStandardMaterial, mesh: THREE.Mesh
         ${id%3===1?`float beard=(1.0-smoothstep(0.080,0.10,abs(vSkinPosition.x)))*smoothstep(0.06,0.085,vSkinPosition.z)
           *smoothstep(1.63,1.66,vSkinPosition.y)*(1.0-smoothstep(1.72,1.75,vSkinPosition.y));
           diffuseColor.rgb=mix(diffuseColor.rgb,beardColor,beard*0.8);`:''}
-        ${bald?`diffuseColor.rgb=mix(diffuseColor.rgb,diffuse,smoothstep(${(scalpTop-.065).toFixed(5)},${(scalpTop-.035).toFixed(5)},vSkinPosition.y));`:''}
       `}`);
   };
-  material.customProgramCacheKey=()=>`athlete-skin-v2-${isHair?'hair':id%12}-${bald?scalpTop.toFixed(5):'covered'}`;
+  material.customProgramCacheKey=()=>`athlete-skin-v3-${isHair?'hair':id%12}`;
   material.needsUpdate=true;
 }

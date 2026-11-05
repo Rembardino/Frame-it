@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Actor } from '../sim/match';
 
-export const PLAYER_HAIRSTYLES = ['buzz', 'fade', 'side-part', 'quiff', 'curls', 'afro', 'mohawk', 'topknot', 'swept-back', 'bald', 'fringe', 'locs', 'flat-top', 'ponytail'] as const;
-const styleOrder = [1, 4, 8, 0, 6, 3, 9, 2, 7, 5, 10, 12, 13, 11];
-const hairColours = [0x211916, 0x503122, 0x161b22, 0x926034, 0xc39a57, 0x645c56, 0x9b432b, 0x3c2c24];
+export const PLAYER_HAIRSTYLES = ['original', 'short', 'side-swept', 'trimmed-fringe', 'brushed-back'] as const;
+const styleOrder = [0, 1, 2, 0, 3, 4, 1, 2, 1, 4, 3, 0, 2, 1];
+const hairColours = [0x211b17, 0x473123, 0x17191e, 0x795638, 0xa78657, 0x625b54, 0x704c37, 0x302521];
 const skinColours = [0xe9bd9b, 0xd3a17c, 0xa87553, 0x80533b, 0xf0ceb0, 0x613e2c, 0xb88965, 0xe0aa85];
 const hash = (n: number) => { n = Math.imul(n ^ (n >>> 16), 0x45d9f3b); n = Math.imul(n ^ (n >>> 16), 0x45d9f3b); return (n ^ (n >>> 16)) >>> 0; };
 
@@ -31,37 +31,25 @@ function cap(rx: number, ry: number, rz: number) {
   return geometry;
 }
 
-const hairGeometries = new Map<number, THREE.BufferGeometry>();
-function hairGeometry(style: number) {
-  let geometry = hairGeometries.get(style); if (geometry) return geometry;
-  const parts: THREE.BufferGeometry[] = [];
-  const sphere = (x: number, y: number, z: number, rx: number, ry: number, rz: number) => {
-    const part = new THREE.SphereGeometry(1, 10, 7).scale(rx, ry, rz).translate(x, y, z); part.deleteAttribute('uv'); parts.push(part);
-  };
-  const rounded = style === 5, curly = style === 4 || rounded;
-  parts.push(cap(rounded ? .137 : .103, rounded ? .174 : style === 0 || style === 6 ? .121 : .135, rounded ? .135 : .108));
-  if (style === 1) sphere(0, .115, 0, .090, .043, .078);
-  if (style === 2) { sphere(-.035, .118, .008, .064, .038, .09); sphere(.048, .11, -.005, .042, .03, .079); }
-  if (style === 3) sphere(.012, .142, .062, .085, .062, .058);
-  if (curly) for (let i = 0; i < (rounded ? 38 : 24); i++) {
-    const phi = i * 2.399963, y = .18 + .78 * (i + .5) / (rounded ? 38 : 24), r = Math.sqrt(1 - y * y);
-    const rx = rounded ? .139 : .105, ry = rounded ? .175 : .138, rz = rounded ? .137 : .111, size = rounded ? .024 : .018;
-    sphere(Math.cos(phi) * r * rx, y * ry, Math.sin(phi) * r * rz, size, size * .85, size);
+interface HairPart { mesh: THREE.Mesh; source: THREE.BufferGeometry; frame: THREE.Matrix4; inverse: THREE.Matrix4 }
+const hairGeometries = new Map<string, THREE.BufferGeometry>();
+
+/** Keep the supplied strands, hairline, UVs and skin weights. Adjust only a few millimetres around that haircut. */
+function naturalHair(part: HairPart, style: number, fit: HeadFit, norm: number) {
+  if (style === 0 || /Beard/.test(part.mesh.name)) return part.source;
+  const key = `${part.source.uuid}:${style}`; let geometry = hairGeometries.get(key); if (geometry) return geometry;
+  geometry = part.source.clone(); const positions = geometry.getAttribute('position'), point = new THREE.Vector3();
+  for (let i = 0; i < positions.count; i++) {
+    point.fromBufferAttribute(positions, i).applyMatrix4(part.frame).multiplyScalar(norm);
+    const crown = THREE.MathUtils.smoothstep(point.y, fit.top - .08, fit.top + .025);
+    const front = THREE.MathUtils.smoothstep(point.z, fit.centerZ + fit.depth * .1, fit.centerZ + fit.depth * .75);
+    if (style === 1 && point.y > fit.top - .005) point.y = fit.top - .005 + (point.y - fit.top + .005) * .55;
+    if (style === 2) { point.x += .007 * crown; point.z -= .004 * crown; }
+    if (style === 3) { point.y += .009 * front * (1 - crown); point.z -= .004 * front; }
+    if (style === 4) { point.z -= .008 * crown; point.y += .003 * crown * front; }
+    point.multiplyScalar(1 / norm).applyMatrix4(part.inverse); positions.setXYZ(i, point.x, point.y, point.z);
   }
-  if (style === 6) for (let i = 0; i < 6; i++) { const z = -.085 + i * .032; sphere(0, .12 + .045 * (1 - Math.abs(z) / .12), z, .023, .041, .028); }
-  if (style === 7) sphere(0, .165, -.052, .048, .044, .045);
-  if (style === 8) for (let i = 0; i < 3; i++) sphere(-.046 + i * .043, .128, -.027, .035, .034, .104);
-  if (style === 10) for (let i = 0; i < 5; i++) sphere(-.068 + i * .033, .074, .104, .023, .052, .018);
-  if (style === 11) for (let i = 0; i < 9; i++) {
-    const phi = i / 9 * Math.PI * 2, x = Math.cos(phi) * .085, z = Math.sin(phi) * .088;
-    if (z < .045) sphere(x, .055, z, .018, .099, .019);
-  }
-  if (style === 12) {
-    const top = new THREE.CylinderGeometry(.089, .099, .09, 12).scale(1, 1, .88).translate(0, .135, 0); top.deleteAttribute('uv'); parts.push(top);
-  }
-  if (style === 13) { sphere(0, .05, -.122, .031, .041, .047); sphere(0, -.016, -.147, .027, .071, .027); }
-  geometry = mergeGeometries(parts)!; parts.forEach(part => part.dispose());
-  geometry.computeBoundingBox(); geometry.computeBoundingSphere(); hairGeometries.set(style, geometry); return geometry;
+  geometry.computeVertexNormals(); geometry.computeBoundingBox(); geometry.computeBoundingSphere(); hairGeometries.set(key, geometry); return geometry;
 }
 
 const helmetShell = cap(.124, .151, .141);
@@ -111,31 +99,38 @@ function fitHead(model: THREE.Group, norm: number, head: THREE.Object3D): HeadFi
     width: Math.max(.078, (scalp.max.x - scalp.min.x) / 2), depth: Math.max(.083, (scalp.max.z - scalp.min.z) / 2) };
 }
 
-/** Hair follows the head bone; its fit and the cyclist's shell share the same measured scalp. */
+/** Preserve the imported hair and fit the cyclist's shell to the measured scalp. */
 export class PlayerAppearance {
   private current = -1;
-  private hair = new THREE.Group();
-  private material = new THREE.MeshStandardMaterial({ roughness: .91 });
+  private hair: HairPart[] = [];
   private skin: THREE.MeshStandardMaterial[] = [];
   private brows: THREE.MeshStandardMaterial[] = [];
 
   constructor(private model: THREE.Group, norm: number, actor: Actor, helmetColour?: number) {
     const head = model.getObjectByName('Head'); if (!head) return;
+    model.updateWorldMatrix(true, true); const inverseHead = head.matrixWorld.clone().invert();
     model.traverse(o => {
       if (!(o as THREE.Mesh).isMesh) return; const mesh = o as THREE.Mesh, material = mesh.material as THREE.MeshStandardMaterial;
-      if (/Hair|Beard/.test(mesh.name)) mesh.visible = false;
+      if (/Hair|Beard/.test(mesh.name)) {
+        const frame = inverseHead.clone().multiply(mesh.matrixWorld);
+        this.hair.push({ mesh, source: mesh.geometry, frame, inverse: frame.clone().invert() });
+      }
       else if (/Body/.test(mesh.name)) this.skin.push(material);
       else if (/Brow/.test(mesh.name)) this.brows.push(material);
     });
-    const fit = fitHead(model, norm, head), frame = new THREE.Group();
-    frame.name = 'fitted-headwear'; frame.scale.setScalar(1 / norm); head.add(frame);
-    const shape = new THREE.Group(); shape.position.set(fit.centerX, fit.top - .115, fit.centerZ);
-    shape.scale.set(fit.width / .10, 1, fit.depth / .105); frame.add(shape);
-    this.hair.name = 'player-hairstyle'; shape.add(this.hair);
-    const look = playerLook(actor), mesh = new THREE.Mesh(hairGeometry(look.style), this.material);
-    mesh.name = 'styled-hair'; mesh.castShadow = true; this.hair.add(mesh);
-    this.hair.visible = helmetColour === undefined && look.style !== 9;
+    const fit = fitHead(model, norm, head);
+    const look = playerLook(actor);
+    for (const part of this.hair) {
+      part.mesh.geometry = naturalHair(part, look.style, fit, norm);
+      const isBeard = /Beard/.test(part.mesh.name);
+      const suppliedVariant = !/Hair_(Buzzed|SimpleParted)/.test(part.mesh.name)
+        || part.mesh.name === (look.style === 1 ? 'Hair_Buzzed' : 'Hair_SimpleParted');
+      part.mesh.visible = helmetColour === undefined && (isBeard ? actor.id % 3 === 1 : suppliedVariant);
+    }
     if (helmetColour !== undefined) {
+      const frame = new THREE.Group(); frame.name = 'fitted-headwear'; frame.scale.setScalar(1 / norm); head.add(frame);
+      const shape = new THREE.Group(); shape.position.set(fit.centerX, fit.top - .115, fit.centerZ);
+      shape.scale.set(fit.width / .10, 1, fit.depth / .105); frame.add(shape);
       const helmet = new THREE.Group(); helmet.name = 'cycling-helmet'; helmet.userData = { fittedToHead: true, vents: 5, straps: 5 };
       const shell = new THREE.Mesh(helmetShell, new THREE.MeshStandardMaterial({ color: helmetColour, roughness: .43 })); shell.name = 'cycling-helmet-shell';
       const details = new THREE.Mesh(helmetDetails, dark); details.name = 'cycling-helmet-liner'; helmet.add(details, shell);
@@ -148,7 +143,8 @@ export class PlayerAppearance {
 
   apply(actor: Actor) {
     const appearance = actor.appearance ?? 0; if (this.current === appearance) return; this.current = appearance;
-    const look = playerLook(actor); this.material.color.setHex(look.hair);
+    const look = playerLook(actor);
+    for (const { mesh } of this.hair) (mesh.material as THREE.MeshStandardMaterial).color.setHex(look.hair);
     for (const material of this.skin) { material.color.setHex(look.skin); material.userData.beardColor?.setHex(look.hair); }
     for (const material of this.brows) material.color.setHex(look.hair);
     this.model.userData.hairstyle = PLAYER_HAIRSTYLES[look.style];

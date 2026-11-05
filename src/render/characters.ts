@@ -269,7 +269,7 @@ export class Character {
         mesh.visible=this.name==='athlete-carol';
       }
       if(/Eyelashes/i.test(mesh.name)){mat.alphaTest=.4;mat.transparent=false;}
-      if(this.name!=='athlete-carol'&&/Body/.test(mesh.name))styleSkin(mat,mesh,this.model,this.norm,id,look.hair,look.style===9);
+      if(this.name!=='athlete-carol'&&/Body|Hair/.test(mesh.name))styleSkin(mat,mesh,this.model,this.norm,id,look.hair);
       if(player&&/Shirt/.test(mesh.name))this.wardrobe.push(dressUniform(mesh,this.model,kit,
         ['calcio','basket','pallavolo','ciclismo'].includes(SPORT)?id%99+1:0,['basket','pallavolo'].includes(SPORT),a.role==='gk'));
       if(player&&/Shorts/.test(mesh.name))this.wardrobe.push(dressUniform(mesh,this.model,kit,0,false,false,true));

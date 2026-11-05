@@ -68,7 +68,7 @@ try{
       const players=result.players.filter(p=>p.team===team);
       assert(new Set(players.map(p=>p.body)).size>=5,`${sport}: repeated body proportions`);
       assert(new Set(players.map(p=>p.height)).size>=5,`${sport}: repeated height`);
-      assert.equal(new Set(players.map(p=>p.hairstyle)).size,players.length,`${sport}: repeated haircut in a roster`);
+      assert(new Set(players.map(p=>p.hairstyle)).size>=3,`${sport}: insufficient natural haircut variety`);
     }
     if(sport==='calcio')assert(result.players.every(p=>!p.legacyPrint&&p.markings?.number&&!p.markings.front),'Football needs a single back number with no baked number or floating plane');
     if(sport==='boxe')assert(result.players.every(p=>p.cleats===0&&p.boxingBoots===2),'Boxers still have football boots');
