@@ -9,6 +9,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from '../config';
 import { CLUBHOUSE, COURSE, LAKE_BANK, LAKE_POLY, PATHS, TREES } from '../sim/sports/golfCourse';
 import type { Match } from '../sim/match';
+import type { GolfSimulation } from '../sim/sports/golf';
+import { createBall } from './ball';
 import { radialTexture, stadiumSeats, type SeatRow } from './stage';
 import { Ribbon, canvasTexture, createOutdoor, forest, groundLayer, layer, surfaceMaterial as mat, textCanvas, turf } from './outdoor';
 import { t } from '../i18n';
@@ -162,6 +164,10 @@ export function golfCourse(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTexture(), color: 0xfffbe6, sizeAttenuation: false, depthTest: false, transparent: true, fog: false }));
   halo.renderOrder = 21;
   scene.add(halo);
+  // La palla dell'altro giocatore, ferma dove si è fermata in attesa del suo turno.
+  const other = createBall();
+  other.visible = false;
+  scene.add(other);
 
   return {
     seatRows: rows,
@@ -178,6 +184,9 @@ export function golfCourse(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
         if (!trail.length || trail[trail.length - 1].distanceTo(b.pos) > 0.5) { if (trail.length >= 240) trail.shift(); trail.push(b.pos.clone()); }
         flewAt = time;
       }
+      const golf = match.sportSimulation as GolfSimulation;
+      other.visible = golf.otherVisible;
+      other.position.copy(golf.otherBall);
       const far = b.pos.distanceTo(camera.position);
       halo.visible = b.pos.y > 0 && far > 25;
       halo.position.copy(b.pos);

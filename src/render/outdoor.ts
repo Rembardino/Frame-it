@@ -5,7 +5,8 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CONFIG } from '../config';
+import { CONFIG, SPORT } from '../config';
+import { terrainHeight } from '../sim/sports/cyclingRoute';
 import type { Match } from '../sim/match';
 import type { Effect } from '../sim/sports/types';
 import { seeded, type Poly, type Tree } from '../sim/sports/shapes';
@@ -96,7 +97,7 @@ function skyDome(radius: number) {
 }
 
 /** Alberi a centinaia: pini e latifoglie, ognuno con la sua altezza e sfumatura di verde. */
-export function forest(scene: THREE.Scene, trees: Tree[]) {
+export function forest(scene: THREE.Scene, trees: Tree[], elevation = (_x: number, _z: number) => 0) {
   const unit = (parts: THREE.BufferGeometry[]) => { const g = mergeGeometries(parts.map((p) => p.toNonIndexed()))!; parts.forEach((p) => p.dispose()); return g; };
   const kinds = [
     { pine: true, trunk: new THREE.CylinderGeometry(0.018, 0.028, 0.32, 6).translate(0, 0.16, 0),
@@ -122,7 +123,7 @@ export function forest(scene: THREE.Scene, trees: Tree[]) {
     list.forEach((tr, i) => {
       const h = k.pine ? tr.h : tr.h * 0.8;
       q.setFromAxisAngle(up, tr.tint * 40);
-      m4.compose(new THREE.Vector3(tr.x, 0, tr.z), q, new THREE.Vector3(h, h, h));
+      m4.compose(new THREE.Vector3(tr.x, elevation(tr.x, tr.z), tr.z), q, new THREE.Vector3(h, h, h));
       trunks.setMatrixAt(i, m4); tops.setMatrixAt(i, m4);
       tops.setColorAt(i, color.setHSL(k.pine ? 0.33 + tr.tint * 0.04 : 0.24 + tr.tint * 0.09, k.pine ? 0.42 : 0.45, k.pine ? 0.17 + tr.tint * 0.05 : 0.22 + tr.tint * 0.1));
     });
@@ -245,9 +246,14 @@ export function createOutdoor(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   floor.renderOrder = GROUND;
   scene.add(floor);
   // L'acqua riflette il cielo (una piccola mappa d'ambiente fatta dallo stesso cielo).
-  const envScene = new THREE.Scene(); envScene.add(skyDome(50));
-  const env = new THREE.PMREMGenerator(renderer).fromScene(envScene, 0.03).texture;
-  const water = (color = 0x2b6884) => new THREE.MeshStandardMaterial({ color, roughness: 0.07, metalness: 0.2, envMap: env, envMapIntensity: 1.1 });
+  let env: THREE.Texture | undefined;
+  const water = (color = 0x2b6884) => {
+    if (!env) {
+      const envScene = new THREE.Scene(); envScene.add(skyDome(50));
+      const generator = new THREE.PMREMGenerator(renderer); env = generator.fromScene(envScene, 0.03).texture; generator.dispose();
+    }
+    return new THREE.MeshStandardMaterial({ color, roughness: 0.07, metalness: 0.2, envMap: env, envMapIntensity: 1.1 });
+  };
 
   const PARTS = 36, MAXP = 8 * PARTS;
   const pPos = new Float32Array(MAXP * 3), pCol = new Float32Array(MAXP * 3), pGeo = new THREE.BufferGeometry();
@@ -268,6 +274,7 @@ export function createOutdoor(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
       if (look.y < -0.05) aim.copy(camera.position).addScaledVector(look, Math.min(110, -camera.position.y / look.y));
       else aim.copy(camera.position).addScaledVector(look.setY(0).normalize(), 60);
       aim.set(Math.round(aim.x / 2) * 2, 0, Math.round(aim.z / 2) * 2);
+      if (SPORT === 'ciclismo') aim.y = terrainHeight(aim.x, aim.z);
       sun.target.position.copy(aim);
       sun.position.copy(aim).addScaledVector(SUN, 320);
       fauna.update(match);

@@ -42,8 +42,9 @@ export type Step = { t: number } & (
   | { do: 'move'; who: string; to: Point; speed?: Speed }
   | { do: 'follow'; who: string; target: string; off?: [number, number]; speed?: Speed }
   | { do: 'pass'; from: string; to: string }
-  | { do: 'shoot'; who: string; outcome?: ShotOutcome; goalChance?: number }    // senza esito decide il Director (punteggio coerente); goalChance = probabilità di gol di base
-  | { do: 'pose'; who: string; pose: Pose; dur: number; face?: string }
+  | { do: 'shoot'; who: string; outcome?: ShotOutcome; goalChance?: number; style?: 'dunk' }    // senza esito decide il Director
+  | { do: 'basketFoul'; who: string; victim: string; shots: 0 | 1 | 2 | 3 }
+  | { do: 'pose'; who: string; pose: Pose; dur: number; face?: string; gesture?: string }
   | { do: 'whistle' }                                      // gioco fermo
   | { do: 'restart'; side: Side }                          // riprende il gioco
   | { do: 'release'; who?: string[] }                      // restituisce gli attori al gioco automatico (tutti se omesso)

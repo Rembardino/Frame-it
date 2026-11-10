@@ -1,0 +1,67 @@
+{
+  "sourceFolder": "Downloads/new_animals",
+  "assets": [
+    {
+      "id": "husky",
+      "sourceArchive": "ultimate-animal-pack-100-animals-50-off.zip",
+      "source": "artifacts/animals/converted/pack.glb",
+      "output": "src/assets/animals/husky.glb",
+      "bytes": 574736,
+      "sha256": "4fb4a75545c0d9522ad7ee4c51507d800d3886ecd1ce3da1b92cbabc68502d4e",
+      "triangles": 6504,
+      "animations": [
+        {
+          "name": "walk",
+          "channels": 145
+        }
+      ],
+      "textures": 1,
+      "changes": "Selected the animated canine only; removed the static pack display and sales sign; restored fur texture; shortened muzzle and tail; optimized geometry, animation and textures."
+    },
+    {
+      "id": "eagle",
+      "sourceArchive": "eagle.zip",
+      "source": "artifacts/animals/source/eagle/source/eagle sketchfab.glb",
+      "output": "src/assets/animals/eagle.glb",
+      "bytes": 384000,
+      "sha256": "0ef7bec0fe894307252ab913210a614833f8730be8ab486148f2989646cab24b",
+      "triangles": 4510,
+      "animations": [
+        {
+          "name": "Animation",
+          "channels": 52
+        }
+      ],
+      "textures": 1,
+      "changes": "Removed heavy detail maps; optimized geometry, animation and base-colour texture."
+    },
+    {
+      "id": "eagle-alternative",
+      "sourceArchive": "animated-eagle.zip",
+      "source": "artifacts/animals/converted/eagle-animated.glb",
+      "output": "artifacts/animals/eagle-alternative.glb",
+      "bytes": 357760,
+      "sha256": "f8168a230f11c6cf35c47ff47b31516cd4ccfabdf07c08acf713992c03c1061d",
+      "triangles": 3858,
+      "animations": [
+        {
+          "name": "motion4",
+          "channels": 141
+        }
+      ],
+      "textures": 0,
+      "changes": "Removed heavy detail maps; optimized geometry, animation and base-colour texture."
+    }
+  ],
+  "otherAssets": [
+    {
+      "archive": "animated-rhinoceros-walking-animal-loop.zip",
+      "decision": "Not used: no rhinoceros event in the current game."
+    },
+    {
+      "archive": "ultimate-animal-pack-100-animals-50-off.zip",
+      "decision": "The other animals are part of a merged static display; only the canine has usable skeletal animation."
+    }
+  ],
+  "license": "No license or attribution file was included in the supplied archives; original downloads remain unchanged."
+}

@@ -1,0 +1,1079 @@
+{
+  "sourceProject": "RPG 3D",
+  "author": "Quaternius",
+  "license": "CC0 1.0",
+  "files": [
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "bytes": 7618436,
+      "sha256": "69591853d817488edaa8fd9bf8fc1d821eaeaf789f8627b3cd23b41c4ed67997",
+      "animations": 43,
+      "rootMotionExport": {
+        "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard_RM.glb",
+        "bytes": 7620504,
+        "sha256": "be684571ed655a1b892c2c07e6e2aeca053b606c442d34004adaf1d944090d01",
+        "use": "Equivalent animation set with baked root motion; use the in-place export because gameplay controls movement"
+      }
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "bytes": 8091444,
+      "sha256": "8cee20ab1bc55130092447e810e26df22dd2803eccc54f52137a7d54d7ab88a8",
+      "animations": 43,
+      "rootMotionExport": {
+        "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard_RM.glb",
+        "bytes": 8095936,
+        "sha256": "814eee878f82934992d3ea746c539df25e981487109c591f5efbb8dd03286f99",
+        "use": "Equivalent animation set with baked root motion; use the in-place export because gameplay controls movement"
+      }
+    }
+  ],
+  "models": [
+    {
+      "id": "rpg-boxer",
+      "source": "assets/characters/humans/models/Superhero_Male_FullBody.gltf",
+      "bytes": 33779,
+      "sha256": "016ed23de55d2f0c065a231bc0927522b4388d124b1d16a0f2ac61ebdabb45a0",
+      "dependencies": [
+        {
+          "file": "assets/characters/humans/models/Superhero_Male_FullBody.bin",
+          "bytes": 720076,
+          "sha256": "459003f9745853ae562a85506a2b94dd56515c1f37728f9fa3d2ce1a3e4cd92f"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Hair_1_Normal.png",
+          "bytes": 4326126,
+          "sha256": "57fd0ad8c96a4d01b38769637e066cecaa285b456f6e48ce00863754a457affb"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Hair_1_BaseColor.png",
+          "bytes": 1570376,
+          "sha256": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Eye_Normal.png",
+          "bytes": 15099,
+          "sha256": "9ed61f7726a54fe346a78b9e5a18905d8e2b88f86235d97f53cd207a26f3f8c7"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Eye_Brown.png",
+          "bytes": 35958,
+          "sha256": "d08e3356a83211bc6ca21fe3a8e39f4b5c1a3b8f85457fc2c0fb57be09935025"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Superhero_Male_Normal.png",
+          "bytes": 4252937,
+          "sha256": "9b25cf9200216eb754b79cf4c63b5380c419780788322f3c57cdd2b3e02679a6"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Superhero_Male_Dark.png",
+          "bytes": 1361903,
+          "sha256": "a151e4c95f7b3c453704ab8b7ba2e5d8bb5b797eb00ad1bbbc353351a6bcdded"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Superhero_Male_Roughness.png",
+          "bytes": 3152049,
+          "sha256": "c70dabf48574cda55644d556beae1ee7cf1bdcf68a50d259d20f2f2358f27991"
+        }
+      ],
+      "usedSkinTexture": {
+        "file": "3D asset download/People/Universal Base Characters[Standard]/Universal Base Characters[Standard]/Base Characters/Textures/T_Superhero_Male_Ligh.png",
+        "bytes": 1389170,
+        "sha256": "419f96dbb8811511e2d515bcdabc085ff2f219ec7b8b4e91050a84cba6888fe9"
+      },
+      "hair": [
+        {
+          "name": "Hair_Buzzed",
+          "file": "assets/characters/humans/models/Hair_Buzzed.gltf",
+          "bytes": 25045,
+          "sha256": "35a195e150b11a1b737a2cc86b7293c278c01b64b780ecc630c683f5575a9109",
+          "dependencies": [
+            {
+              "file": "assets/characters/humans/models/Hair_Buzzed.bin",
+              "bytes": 33372,
+              "sha256": "5d4b5452ff879ed1d516694be57d1106c070c7133e747a8c9432b01ebf20e908"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_Normal.png",
+              "bytes": 4326126,
+              "sha256": "57fd0ad8c96a4d01b38769637e066cecaa285b456f6e48ce00863754a457affb"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_BaseColor.png",
+              "bytes": 1570376,
+              "sha256": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
+            }
+          ]
+        },
+        {
+          "name": "Hair_SimpleParted",
+          "file": "assets/characters/humans/models/Hair_SimpleParted.gltf",
+          "bytes": 25051,
+          "sha256": "8c9101ae9ad751a295c0467d6eac70ad988d59cf4d07f4024c70928dacbf46f4",
+          "dependencies": [
+            {
+              "file": "assets/characters/humans/models/Hair_SimpleParted.bin",
+              "bytes": 51332,
+              "sha256": "ecd7c81959f3985d6254458a440daaaa18a8bfbb1dbe111c68a04a72374d54db"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_Normal.png",
+              "bytes": 4326126,
+              "sha256": "57fd0ad8c96a4d01b38769637e066cecaa285b456f6e48ce00863754a457affb"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_BaseColor.png",
+              "bytes": 1570376,
+              "sha256": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
+            }
+          ]
+        },
+        {
+          "name": "Hair_Beard",
+          "file": "assets/characters/humans/models/Hair_Beard.gltf",
+          "bytes": 25041,
+          "sha256": "ee6c0f0b2b337a491598203a96ee5193fbc9e732008158f64740c8b77c7ab559",
+          "dependencies": [
+            {
+              "file": "assets/characters/humans/models/Hair_Beard.bin",
+              "bytes": 41356,
+              "sha256": "bf2f46ef5808665ef31082f787bc68c51ff063e81b76ca1a51ac86a9ae723be7"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_Normal.png",
+              "bytes": 4326126,
+              "sha256": "57fd0ad8c96a4d01b38769637e066cecaa285b456f6e48ce00863754a457affb"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_BaseColor.png",
+              "bytes": 1570376,
+              "sha256": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
+            }
+          ]
+        }
+      ],
+      "triangles": 5427,
+      "optimizedBytes": 271180,
+      "modifications": "Sporting materials with clipped seams, covered shorts/jersey, transferred existing football boots, canonical joint names, optimized geometry and textures"
+    },
+    {
+      "id": "rpg-athlete-female",
+      "source": "assets/characters/humans/models/Superhero_Female_FullBody.gltf",
+      "bytes": 34522,
+      "sha256": "f20d0f3b9c44d3f23807e07cab493c08298fa1167e5faff6392a783fe5d88e4f",
+      "dependencies": [
+        {
+          "file": "assets/characters/humans/models/Superhero_Female_FullBody.bin",
+          "bytes": 990808,
+          "sha256": "3a8220a485b33d05d879115a50697728b45a151781106033afb8b8c243fca208"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Hair_2_Normal.png",
+          "bytes": 4710013,
+          "sha256": "172f230aae0d4366c3cfc0402b2e6d1811b11f8487344bff28605eeacac1558d"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Hair_2_BaseColor.png",
+          "bytes": 1729467,
+          "sha256": "f9f4f2fb3eeeefb0b6f0fdef38b0770fd6607640c1c680b8139dd76697e9f9b3"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Eye_Normal.png",
+          "bytes": 15099,
+          "sha256": "9ed61f7726a54fe346a78b9e5a18905d8e2b88f86235d97f53cd207a26f3f8c7"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Eye_Brown.png",
+          "bytes": 35958,
+          "sha256": "d08e3356a83211bc6ca21fe3a8e39f4b5c1a3b8f85457fc2c0fb57be09935025"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Superhero_Female_Normal.png",
+          "bytes": 3940537,
+          "sha256": "cf922460b43ccd31e983e34db05514c9d451dd2f9cdd01a843978e797719f859"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Superhero_Female_Dark_BaseColor.png",
+          "bytes": 1296299,
+          "sha256": "4934509de19c4d45233f97ad1973fa5ed934e004ec3e69d526860a65bff81a87"
+        },
+        {
+          "file": "assets/characters/humans/textures/T_Superhero_Female_Roughness.png",
+          "bytes": 3277022,
+          "sha256": "d2beabf2bd0313e32c68dcdbb80dca371a6e994fabf96efa97128bf9f14fa57b"
+        }
+      ],
+      "usedSkinTexture": {
+        "file": "3D asset download/People/Universal Base Characters[Standard]/Universal Base Characters[Standard]/Base Characters/Textures/T_Superhero_Female_Light_BaseColor.png",
+        "bytes": 1317541,
+        "sha256": "743f811857db0b950f3ad09a0733dfa4888801ead332313ca25becea14c54f8d"
+      },
+      "hair": [
+        {
+          "name": "Hair_Long",
+          "file": "assets/characters/humans/models/Hair_Long.gltf",
+          "bytes": 25782,
+          "sha256": "fe16d41467bebeace3e4980cc50c355b80dfcbd20771a026d81d89fc3ac13c22",
+          "dependencies": [
+            {
+              "file": "assets/characters/humans/models/Hair_Long.bin",
+              "bytes": 181756,
+              "sha256": "268fd531d2c2ac321783d36fcf106d15c5c76e8923eec2c8704d5fe9de953589"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_2_Normal.png",
+              "bytes": 4710013,
+              "sha256": "172f230aae0d4366c3cfc0402b2e6d1811b11f8487344bff28605eeacac1558d"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_2_BaseColor.png",
+              "bytes": 1729467,
+              "sha256": "f9f4f2fb3eeeefb0b6f0fdef38b0770fd6607640c1c680b8139dd76697e9f9b3"
+            }
+          ]
+        },
+        {
+          "name": "Hair_Buns",
+          "file": "assets/characters/humans/models/Hair_Buns.gltf",
+          "bytes": 25776,
+          "sha256": "543e386217a6770044827e7ada40d35e049a6a46df78fdbbdba11c6f8d23b884",
+          "dependencies": [
+            {
+              "file": "assets/characters/humans/models/Hair_Buns.bin",
+              "bytes": 205916,
+              "sha256": "811606cc84f0bfdefa2e6f1396f3d94c35138308a96d78a4f447b2e7dfc6ed6c"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_2_Normal.png",
+              "bytes": 4710013,
+              "sha256": "172f230aae0d4366c3cfc0402b2e6d1811b11f8487344bff28605eeacac1558d"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_2_BaseColor.png",
+              "bytes": 1729467,
+              "sha256": "f9f4f2fb3eeeefb0b6f0fdef38b0770fd6607640c1c680b8139dd76697e9f9b3"
+            }
+          ]
+        },
+        {
+          "name": "Hair_BuzzedFemale",
+          "file": "assets/characters/humans/models/Hair_BuzzedFemale.gltf",
+          "bytes": 25746,
+          "sha256": "520ae79eb930666716c8c8cf8efb1416880b792f914ad7899a2b90dad4905126",
+          "dependencies": [
+            {
+              "file": "assets/characters/humans/models/Hair_BuzzedFemale.bin",
+              "bytes": 33372,
+              "sha256": "48fcdac8751e85c1d08ac9ff25b5c4d649e5b5d450d37ad8743b9f111a3a7e04"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_Normal.png",
+              "bytes": 4326126,
+              "sha256": "57fd0ad8c96a4d01b38769637e066cecaa285b456f6e48ce00863754a457affb"
+            },
+            {
+              "file": "assets/characters/humans/textures/T_Hair_1_BaseColor.png",
+              "bytes": 1570376,
+              "sha256": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
+            }
+          ]
+        }
+      ],
+      "triangles": 6809,
+      "optimizedBytes": 407432,
+      "modifications": "Sporting materials with clipped seams, covered shorts/jersey, transferred existing football boots, canonical joint names, optimized geometry and textures"
+    }
+  ],
+  "animations": [
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "A_TPose",
+      "duration": 2.5,
+      "groups": [],
+      "decision": "reference pose",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Crouch_Fwd_Loop",
+      "duration": 2,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Crouch_Idle_Loop",
+      "duration": 2.933333396911621,
+      "groups": [
+        "boxingDodge"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "cfd94feeab7f525231b9cb50463664c39003fd48512ec23238651bef1de59e59"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Dance_Loop",
+      "duration": 1,
+      "groups": [
+        "celebration"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "b9197442354cc03e64596830355b8f2d08f3edc7a7d09c4336591e2acaa0f7a7"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Death01",
+      "duration": 2.4000000953674316,
+      "groups": [
+        "knockdown"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "d6b9d22223fdada1e97cd7bda815958159028d8e00e36d12fa9e22eab70ef3ea"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Driving_Loop",
+      "duration": 1.6666666269302368,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Fixing_Kneeling",
+      "duration": 5.199999809265137,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Hit_Chest",
+      "duration": 0.3333333432674408,
+      "groups": [
+        "boxingRecoil"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "ce79eeacfa09c335a52ea805b1ea62780f1c24ea0f853cc8316b9a8eab94867f"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Hit_Head",
+      "duration": 0.4333333373069763,
+      "groups": [
+        "boxingRecoil"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "8206848b235381b468809bd36e597f58a1ee01c863d5dda39d1a09cf828e7a36"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Idle_Loop",
+      "duration": 2.5,
+      "groups": [
+        "sidelineIdle"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "7cfd41bd5faec83d9c659c30332f4144c48802f0ad54e2fe316c3effcb638720"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Idle_Talking_Loop",
+      "duration": 2.933333396911621,
+      "groups": [
+        "talk"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "13035104a04497a235cff5a47f77702d598d82e36f43095b643b4a9058439a5e"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Idle_Torch_Loop",
+      "duration": 1.2666666507720947,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Interact",
+      "duration": 2,
+      "groups": [
+        "officialPoint"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "e126f8b565b233478d381cb8800ca7cc11cccdedc71b3d1429c407265a7b382a"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Jog_Fwd_Loop",
+      "duration": 0.9333333373069763,
+      "groups": [
+        "run"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "b21bfc26e22bf8936e60f30692dbfa15df3c24a0775c692ff12d2568f17261c2"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Jump_Land",
+      "duration": 1.2666666507720947,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Jump_Loop",
+      "duration": 2.5,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Jump_Start",
+      "duration": 1.3333333730697632,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "PickUp_Table",
+      "duration": 0.8333333134651184,
+      "groups": [
+        "keeperCatch"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "1035350ede297c3e1413fc5e3a1f57e1cac50d92410b6e0bf5c600b92e19e586"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Pistol_Aim_Down",
+      "duration": 0.1666666716337204,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Pistol_Aim_Neutral",
+      "duration": 0.1666666716337204,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Pistol_Aim_Up",
+      "duration": 0.1666666716337204,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Pistol_Idle_Loop",
+      "duration": 1.6666666269302368,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Pistol_Reload",
+      "duration": 1.6666666269302368,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Pistol_Shoot",
+      "duration": 0.6333333253860474,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Punch_Cross",
+      "duration": 1,
+      "groups": [
+        "boxingJab"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "61142281d364af228aaa209b035fac4e822d702c5de4af4e1823ad8e2559448b"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Punch_Jab",
+      "duration": 0.8666666746139526,
+      "groups": [
+        "boxingJab"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "cbaf048ac9011db0099f5adfa8ccc181bc149e1333375b6da5568ecd9fdf1a4b"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Push_Loop",
+      "duration": 2.6666667461395264,
+      "groups": [
+        "shove"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "be9d618696e5f490e6d922638e423f50aeb9632d3c9d46a5e1e37740b9d1fafc"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Roll",
+      "duration": 1.4666666984558105,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Sitting_Enter",
+      "duration": 1.2999999523162842,
+      "groups": [
+        "crowdSitIn"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "0f8109d3c80978c898aedc6621fa9062e0715e48471a7f90d0872fc65b28ed76"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Sitting_Exit",
+      "duration": 1.0333333015441895,
+      "groups": [
+        "crowdSitOut"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "492cbc471a5207128f34b53bb4c42c0c51474581f6c681b6c5414762048fdaa1"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Sitting_Idle_Loop",
+      "duration": 1.6666666269302368,
+      "groups": [
+        "crowdSit"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "5729a89cf7b8ae5c59b0bd92802c4aa9ef8bd5c7ded8c813dae37321f4a5ffc6"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Sitting_Talking_Loop",
+      "duration": 2.933333396911621,
+      "groups": [
+        "crowdSitTalk"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "baadddaf29f776caa81cfbf5b563d799144a973b1c80555f1eab0caa4e9d407d"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Spell_Simple_Enter",
+      "duration": 0.5333333611488342,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Spell_Simple_Exit",
+      "duration": 0.4333333373069763,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Spell_Simple_Idle_Loop",
+      "duration": 2.0999999046325684,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Spell_Simple_Shoot",
+      "duration": 0.5,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Sprint_Loop",
+      "duration": 0.6666666865348816,
+      "groups": [
+        "run"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "bf091a40a63343226035d0380de218e85ccabb9e2a6a6e5b70d39a7026762ebf"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Swim_Fwd_Loop",
+      "duration": 1.3333333730697632,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Swim_Idle_Loop",
+      "duration": 3.3333332538604736,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Sword_Attack",
+      "duration": 1.5333333015441895,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Sword_Idle",
+      "duration": 1.6666666269302368,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Walk_Formal_Loop",
+      "duration": 1.3333333730697632,
+      "groups": [
+        "walk"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "1a0c4726250c86dc54bf9025cd61c4dd31c77834af4e4dbe34316973c904df19"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+      "clip": "Walk_Loop",
+      "duration": 1.3333333730697632,
+      "groups": [
+        "walk"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "f5e128475420619273421a7c76ab5758fb7551eb1ccbe3c8b8ba4215d43cdf47"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "A_TPose",
+      "duration": 2.5,
+      "groups": [],
+      "decision": "reference pose",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Chest_Open",
+      "duration": 1.3666666746139526,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "ClimbUp_1m",
+      "duration": 0.6666666865348816,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Consume",
+      "duration": 1.3333333730697632,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Farm_Harvest",
+      "duration": 2.5,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Farm_PlantSeed",
+      "duration": 2.7666666507720947,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Farm_Watering",
+      "duration": 3.799999952316284,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Hit_Knockback",
+      "duration": 0.8333333134651184,
+      "groups": [
+        "knockdown"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "3b77e6074ef91694353bbe0e7fd6b31b7fdeaa723193236096e55be5ecf9f5e3"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Idle_FoldArms_Loop",
+      "duration": 2.5,
+      "groups": [
+        "sidelineIdle"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "e6a7ed44b411efbf03c797f37ede4633cf80ce37e4072349da8773dec7db558c"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Idle_Lantern_Loop",
+      "duration": 2.5,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Idle_No_Loop",
+      "duration": 2.5,
+      "groups": [
+        "dejected"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "c4b877a3cc97cb5bd36b1fc057af4ab508d9b15bae3b6e80a365d040d60d49dd"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Idle_Rail_Call",
+      "duration": 2.5,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Idle_Rail_Loop",
+      "duration": 2.5,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Idle_Shield_Break",
+      "duration": 1.0666667222976685,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Idle_Shield_Loop",
+      "duration": 2.5,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Idle_TalkingPhone_Loop",
+      "duration": 2.933333396911621,
+      "groups": [
+        "phone"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "adf24921b423c566314ada9f1945ffd9be67022aba1f07d35d182797da500567"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "LayToIdle",
+      "duration": 1.5333333015441895,
+      "groups": [
+        "getUp"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "016b7473f670d08d0815ae9617c0b8c707858dd02b8f052add398a84010d9ca3"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Melee_Hook",
+      "duration": 0.46666666865348816,
+      "groups": [
+        "boxingHook"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "298416ca2e8c3afad0582d0d1e70d7cfa68fac333202a9274056d7291f9ecb99"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Melee_Hook_Rec",
+      "duration": 0.6000000238418579,
+      "groups": [],
+      "decision": "joined recovery/exit",
+      "joinedInto": "Melee_Hook"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "NinjaJump_Idle_Loop",
+      "duration": 2,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "NinjaJump_Land",
+      "duration": 1.2666666507720947,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "NinjaJump_Start",
+      "duration": 0.9666666388511658,
+      "groups": [],
+      "decision": "no matching sporting action",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "OverhandThrow",
+      "duration": 1.3333333730697632,
+      "groups": [
+        "keeperThrow"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "27a1eb37f493164b48c02c88c7014347e9d07d9075bf16109b64844a4d75193b"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Shield_Dash",
+      "duration": 1.100000023841858,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Shield_OneShot",
+      "duration": 0.8333333134651184,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Slide_Exit",
+      "duration": 0.5,
+      "groups": [],
+      "decision": "joined recovery/exit",
+      "joinedInto": "Slide_Start"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Slide_Loop",
+      "duration": 2,
+      "groups": [],
+      "decision": "joined recovery/exit",
+      "joinedInto": "Slide_Start"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Slide_Start",
+      "duration": 0.8333333134651184,
+      "groups": [
+        "footballTackle"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "d92df9162ac8d4d9094f9297f6b2971f94577a269fe44103fd07981da35cead7"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Sword_Block",
+      "duration": 1.2333333492279053,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Sword_Dash",
+      "duration": 1.5666667222976685,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Sword_Heavy_Combo",
+      "duration": 4.333333492279053,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Sword_Regular_A",
+      "duration": 0.4333333373069763,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Sword_Regular_A_Rec",
+      "duration": 0.9666666388511658,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Sword_Regular_B",
+      "duration": 0.5333333611488342,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Sword_Regular_B_Rec",
+      "duration": 1.0333333015441895,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Sword_Regular_C",
+      "duration": 2,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Sword_Regular_Combo",
+      "duration": 3,
+      "groups": [],
+      "decision": "weapon or spell choreography",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "TreeChopping_Loop",
+      "duration": 0.9666666388511658,
+      "groups": [],
+      "decision": "requires a prop or activity absent from the sports game",
+      "joinedInto": null
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Walk_Carry_Loop",
+      "duration": 2,
+      "groups": [
+        "keeperCarry"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "da7190c9d1f1431d7b22fb81b4d449835983227e07a52c5f1bc2bbb0484c92bc"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Yes",
+      "duration": 2.5,
+      "groups": [
+        "officialYes",
+        "celebration"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "6baa599a70a9b66f831db10f0f363c1f55a2f25b7f416c9d367dab3530f8944e"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Zombie_Idle_Loop",
+      "duration": 1.3333333730697632,
+      "groups": [
+        "mascotIdle"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "fd1f65873f17abe4510e48056cf084bc8125ed585a203712bc7c54ccb929cf1a"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Zombie_Scratch",
+      "duration": 1.7999999523162842,
+      "groups": [
+        "mascotReact"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "16b762c4074fdaea2f4b61fad63033c31952e5435f2ecaa94a2145df25c2de81"
+    },
+    {
+      "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+      "clip": "Zombie_Walk_Fwd_Loop",
+      "duration": 1.3333333730697632,
+      "groups": [
+        "mascotWalk"
+      ],
+      "decision": "included",
+      "joinedInto": null,
+      "motionHash": "4e8675be01f487011a2cfc78760df76cb5eaa6123af29dc4a0900bc042e96376"
+    }
+  ],
+  "addedClips": 33,
+  "alternatives": "Unity FBX and root-motion GLB are equivalent exports; game-ready RPG copies and medieval outfits were inspected, original clothing is unsuitable for sport."
+}

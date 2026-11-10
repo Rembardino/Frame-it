@@ -1,6 +1,7 @@
 /**
- * GOLF — si riprende solo col drone. Una coppia gioca a colpi alternati (come nei "foursome") alcune buche
- * del percorso, partendo da una buca a caso. Si gioca contro il par: −1 = un colpo sotto.
+ * GOLF — si riprende solo col drone. Due giocatori, ognuno con la sua palla (stroke play), giocano alcune buche
+ * del percorso partendo da una buca a caso. Dal tee parte prima chi ha fatto meglio alla buca precedente; poi tira
+ * sempre chi è più lontano dalla bandiera. Ciascuno gioca contro il par: −1 = un colpo sotto.
  *
  * Nessun colpo parte da solo: ogni colpo è un evento della regia (events/golf.ts) che sceglie l'esito
  * (fairway, bunker, alberi, acqua, green, buca...). Qui si calcolano volo, rimbalzo e rotolamento.
@@ -39,6 +40,7 @@ interface Shot {
   t: number; impact: number; carry: number; apex: number; hopDur: number; hopArc: number; roll: number;
   cup: boolean; water: boolean; tree: boolean;
   launched: boolean; landed: boolean; done: boolean; lipped: boolean;
+  followed: boolean;
 }
 
 type Stage = 'setup' | 'ready' | 'shot' | 'walk' | 'holed' | 'done';
@@ -47,12 +49,12 @@ export class GolfSimulation implements SportSimulation {
   /** Le buche di questa partita, in ordine. */
   readonly round: Hole[];
   holeIdx = 0;
-  /** Colpi giocati sulla buca in corso (penalità comprese). */
-  strokes = 0;
-  /** Colpi sopra (+) o sotto (−) il par, buche finite. */
-  toPar = 0;
-  /** Risultato di ogni buca finita (colpi − par). */
+  /** Palla, colpi sulla buca in corso (penalità comprese) e stato di ciascun giocatore. */
+  readonly players = [0, 1].map(() => ({ ball: new THREE.Vector3(), strokes: 0, teed: false, holed: false, toPar: 0, last: 0 }));
+  /** Risultato di ogni buca imbucata, nell'ordine (colpi − par): due per buca. */
   readonly results: number[] = [];
+  /** Colpi di chi ha appena imbucato (per l'annuncio "buca in uno"). */
+  lastStrokes = 0;
   shooter: TeamId = 0;
   next: GolfNext = { kind: 'drive', dist: 0, water: false, fairwayBunker: false, greenBunker: false, tree: false };
   /** Sabbia, spruzzi, foglie: la grafica li disegna in base a match.time (anche nei replay). */
@@ -61,7 +63,10 @@ export class GolfSimulation implements SportSimulation {
   private shot: Shot | null = null;
   private stage: Stage = 'setup';
   private wait = 1;
+  /** Dove riprende il gioco dopo lo stacco: la palla di chi tira (anche droppata dopo l'acqua). */
   private drop: THREE.Vector3 | null = null;
+  /** Dopo lo stacco tira dal tee il secondo giocatore. */
+  private teeNext = false;
   private targets: { water: THREE.Vector3 | null; fairwayBunker: Poly | null; greenBunker: Poly | null; tree: Tree | null } =
     { water: null, fairwayBunker: null, greenBunker: null, tree: null };
 
@@ -73,6 +78,10 @@ export class GolfSimulation implements SportSimulation {
   }
 
   get hole() { return this.round[Math.min(this.holeIdx, this.round.length - 1)]; }
+  /** Colpi di chi sta per tirare, sulla buca in corso. */
+  get strokes() { return this.players[this.shooter].strokes; }
+  /** La palla dell'altro giocatore, ferma sul percorso (null se non è ancora partito dal tee o ha imbucato). */
+  get parked() { const o = this.players[1 - this.shooter]; return o.teed && !o.holed ? o.ball : null; }
   get busy() { return this.stage === 'shot'; }
   get finished() { return this.stage === 'done'; }
   private get golfer() { return this.match.actors.find((a) => a.team === this.shooter)!; }
@@ -85,6 +94,9 @@ export class GolfSimulation implements SportSimulation {
 
   update(dt: number) {
     const m = this.match;
+    const parked = this.parked;
+    this.otherVisible = !!parked;
+    if (parked) this.otherBall.copy(parked);
     if (m.isStopped) return;
     this.wait -= dt;
     if (this.shot) this.fly(this.shot, dt);
@@ -101,11 +113,16 @@ export class GolfSimulation implements SportSimulation {
         if (this.golfer.pose === 'normal') m.setPose(this.golfer, 'address');
         break;
       case 'shot':
+        if(this.shot?.launched&&!this.shot.followed&&this.golfer.pose==='normal'){
+          this.shot.followed=true;m.setPose(this.golfer,'address',1.4,null,'golfFollow');
+        }
         if (this.shot?.done) this.afterShot();
         break;
       case 'walk':
         if (this.wait > 0) break;
-        if (this.drop) { m.ball.pos.copy(this.drop); this.drop = null; }
+        if (this.teeNext) { this.teeNext = false; this.teeBall(); }
+        else if (this.drop) m.ball.pos.copy(this.drop);
+        this.drop = null;
         this.setupShot();
         break;
       case 'holed':
@@ -124,14 +141,23 @@ export class GolfSimulation implements SportSimulation {
     if (this.stage !== 'ready' || m.ball.holder !== actor) return;
     const putt = this.next.kind === 'putt';
     this.shot = this.plan(action);
-    this.strokes++;
+    this.players[this.shooter].strokes++;
     this.stage = 'shot';
-    m.setPose(actor, putt ? 'putt' : 'swing', putt ? 1.25 : 1.7);
+    m.setPose(actor, putt ? 'putt' : 'swing', putt ? 1.25 : 1.7, null,
+      putt ? 'golfPutt' : ['chip','bunker','approach'].includes(this.next.kind) ? 'golfChip' : 'golfDrive');
   }
 
   scoreText() {
-    return this.toPar === 0 ? 'PAR' : this.toPar > 0 ? `+${this.toPar}` : `−${-this.toPar}`;
+    const par = (n: number) => n === 0 ? 'PAR' : n > 0 ? `+${n}` : `−${-n}`;
+    // Il tabellone mostra già i nomi ai lati: MAR −1 · PAR GIU.
+    return this.players.map((p) => par(p.toPar)).join(' · ');
   }
+
+  /** La palla ferma dell'altro giocatore come la disegna la grafica: aggiornata dalla partita e dai replay. */
+  readonly otherBall = new THREE.Vector3();
+  otherVisible = false;
+  capture() { return [this.otherBall.x, this.otherBall.y, this.otherBall.z, this.otherVisible ? 1 : 0]; }
+  restore(s: number[]) { this.otherBall.set(s[0], s[1], s[2]); this.otherVisible = s[3] > 0.5; }
 
   clockText() {
     return t('BUCA {n}/{of} · PAR {par}', { n: Math.min(this.holeIdx + 1, this.round.length), of: this.round.length, par: this.hole.par });
@@ -157,14 +183,19 @@ export class GolfSimulation implements SportSimulation {
   // ---------------------------------------------------------------- tra un colpo e l'altro
 
   private toTee() {
-    const h = this.hole, m = this.match;
-    this.strokes = 0;
-    // A colpi alternati: un giocatore tira dal tee sulle buche dispari, l'altro su quelle pari.
-    this.shooter = (this.holeIdx % 2) as TeamId;
+    const h = this.hole, [a, b] = this.players;
+    // Onore: dal tee parte prima chi ha fatto meno colpi alla buca precedente (a parità resta l'ordine).
+    if (this.holeIdx > 0 && a.last !== b.last) this.shooter = (a.last < b.last ? 0 : 1) as TeamId;
+    for (const p of this.players) { p.strokes = 0; p.teed = false; p.holed = false; }
     this.pin.set(h.pin[0], 0, h.pin[1]);
-    const d = pointAt(h.line, h.lineS, 10).sub(v3(h.tee)).setY(0).normalize();
-    m.ball.pos.set(h.tee[0] + d.x * 2 - d.z * rand(-2, 2), R(), h.tee[1] + d.z * 2 + d.x * rand(-2, 2));
+    this.teeBall();
     this.setupShot();
+  }
+
+  /** Palla di chi tira sul tee, un po' a lato del centro. */
+  private teeBall() {
+    const h = this.hole, d = pointAt(h.line, h.lineS, 10).sub(v3(h.tee)).setY(0).normalize();
+    this.match.ball.pos.set(h.tee[0] + d.x * 2 - d.z * rand(-2, 2), R(), h.tee[1] + d.z * 2 + d.x * rand(-2, 2));
   }
 
   /** Stacco TV: tutti al loro posto per il prossimo colpo. Poi readySec secondi e si gioca. */
@@ -206,36 +237,48 @@ export class GolfSimulation implements SportSimulation {
 
   private afterShot() {
     const m = this.match, s = this.shot!, h = this.hole, golfer = this.golfer, partner = m.actors.find((a) => a !== golfer)!;
+    const me = this.players[this.shooter];
     this.shot = null;
-    this.shooter = (1 - this.shooter) as TeamId;
+    me.teed = true;
+    me.ball.copy(s.rest);
     if (s.cup) {
-      const diff = this.strokes - h.par;
-      this.toPar += diff;
+      const diff = me.strokes - h.par;
+      me.holed = true; me.toPar += diff; me.last = me.strokes;
       this.results.push(diff);
-      this.stage = 'holed';
-      this.wait = 3.6;
-      m.phase = 'reset';
+      this.lastStrokes = me.strokes;
       m.excitement = diff < 0 ? 1 : 0.6;
       m.sound(diff < 0 ? 'goal' : 'point', this.pin);
       // Par o meglio: la regia vuole l'esultanza (trigger "goal" degli eventi).
       if (diff <= 0) m.events.push({ type: 'goal', scorer: golfer, at: m.time });
-      if (!partner.scripted) m.setPose(partner, diff <= 0 ? 'celebrate' : 'dejected', 2);
-      return;
+      if (this.players.every((p) => p.holed)) {
+        this.stage = 'holed';
+        this.wait = 3.6;
+        m.phase = 'reset';
+        if (!partner.scripted) m.setPose(partner, diff <= 0 ? 'celebrate' : 'dejected', 2);
+        return;
+      }
     }
     if (s.water) {
-      this.strokes++; // un colpo di penalità, poi si droppa prima dell'acqua
+      me.strokes++; // un colpo di penalità, poi si droppa prima dell'acqua
       const back = s.from.clone().sub(s.land).setY(0).normalize(), p = s.land.clone();
       for (let k = 0; k < 150 && (lieAt(p.x, p.z) === 'water' || lieAt(p.x, p.z) === 'bunker'); k++) p.addScaledVector(back, 2);
-      this.drop = p.addScaledVector(back, 3).setY(R());
+      me.ball.copy(p.addScaledVector(back, 3).setY(R()));
     }
-    const good = flatDist(s.rest, this.pin) < 3 && !s.water;
-    if (!golfer.scripted) m.setPose(golfer, s.water || s.tree ? 'dejected' : good ? 'celebrate' : 'normal', 1.6);
+    const good = !s.cup && flatDist(s.rest, this.pin) < 3 && !s.water;
+    if (!golfer.scripted && !s.cup) m.setPose(golfer, s.water || s.tree ? 'dejected' : good ? 'celebrate' : 'normal', 1.6);
     if (good) { m.sound('point', this.pin); m.excitement = Math.max(m.excitement, 0.5); }
+    // Tocca a chi non è ancora partito dal tee, altrimenti a chi è più lontano dalla bandiera.
+    const other = this.players[1 - this.shooter];
+    if (!other.holed && (!other.teed || me.holed || flatDist(other.ball, this.pin) > flatDist(me.ball, this.pin))) {
+      this.shooter = (1 - this.shooter) as TeamId;
+      this.teeNext = !other.teed;
+      this.drop = other.teed ? other.ball.clone() : null;
+    } else this.drop = me.ball.clone();
     this.stage = 'walk';
     this.wait = G().restSec;
     m.phase = 'reset';
     m.ball.state = 'dead';
-    // Si incamminano verso la palla (fino allo stacco).
+    // Si incamminano verso la palla appena giocata (fino allo stacco).
     for (const a of [golfer, partner, m.coaches.find((c) => c.team === golfer.team)!]) {
       if (a.scripted) continue;
       a.target.copy(s.rest).addScaledVector(a.pos.clone().sub(s.rest).setY(0).normalize(), Math.min(flatDist(a.pos, s.rest), 6)).setY(0);
@@ -327,7 +370,7 @@ export class GolfSimulation implements SportSimulation {
       action, kind, from, land: pin.clone(), hop: pin.clone(), rest: pin.clone(), bend: null,
       t: 0, impact: kind === 'putt' ? T.puttImpact : T.impact, carry: T.carry[kind], apex: T.apex[kind],
       hopDur: HOP[kind][1], hopArc: HOP[kind][2], roll: 0,
-      cup: false, water: false, tree: false, launched: false, landed: false, done: false, lipped: false,
+      cup: false, water: false, tree: false, launched: false, landed: false, done: false, lipped: false, followed: false,
     };
     /** Arriva sul green in rest, atterrando un po' prima lungo la linea del colpo. */
     const toGreen = (rest: THREE.Vector3, back: number) => {

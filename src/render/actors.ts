@@ -7,10 +7,13 @@ import { createAthlete, type Athlete } from './athlete';
 import { createBall } from './ball';
 import { actorMotion, stanceOffset } from '../animation/motion';
 import { mouthPose } from '../audio/speech';
+import { Character } from './characters';
+import type { TeamKit } from '../teams';
 
-interface PlayerView extends Athlete { actor: Actor; root: THREE.Group; shadow: THREE.Mesh }
+interface PlayerView extends Athlete { actor: Actor; root: THREE.Group; shadow: THREE.Mesh; character?: Character; characterChoices?: Character[] }
 
 export class ActorViews {
+  readonly ready: Promise<void>;
   readonly group = new THREE.Group();
   private views: PlayerView[] = [];
   private ball: THREE.Mesh;
@@ -23,20 +26,35 @@ export class ActorViews {
     scene.add(this.group);
     const shadowGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     const shadowMat = new THREE.MeshBasicMaterial({ map: radialTexture('0,0,0'), transparent: true, depthWrite: false, opacity: 0.6 });
+    const loading: Promise<void>[] = [];
     for (const actor of [...match.actors, ...match.extras]) {
       const root = new THREE.Group(); root.scale.setScalar(actor.role === 'spectator' ? CONFIG.visuals.spectatorScale : CONFIG.visuals.playerScale);
       const athlete = createAthlete(actor); root.add(athlete.body);
       if (athlete.bike) { root.add(athlete.bike.group); root.rotation.order = 'YXZ'; }
       const shadow = new THREE.Mesh(shadowGeo, shadowMat);
-      this.group.add(root, shadow); this.views.push({ actor, root, ...athlete, shadow });
+      const view: PlayerView = { actor, root, ...athlete, shadow };
+      this.group.add(root, shadow); this.views.push(view);
+      if(actor.look==='mascot') {
+        loading.push(Promise.all(Array.from({length:14},(_,appearance)=>Character.create({...actor,appearance},athlete))).then(choices=>{
+          view.characterChoices=choices;choices.forEach(c=>{c.root.visible=false;root.add(c.root);});
+          view.character=choices[(actor.appearance??actor.id)%choices.length];view.character.root.visible=true;
+        }));
+      } else loading.push(Character.create(actor,athlete).then(character=>{view.character=character;root.add(character.root);}));
     }
     this.ball = createBall(); this.ball.castShadow = true; this.ballPivot.add(this.ball);
     this.ballShadow = new THREE.Mesh(shadowGeo, shadowMat); this.group.add(this.ballPivot, this.ballShadow);
     this.ballPivot.visible = this.ballShadow.visible = SPORT !== 'boxe';
+    this.ready=Promise.all(loading).then(()=>{this.update(0);});
   }
 
   /** La palla tocca terra: si schiaccia un istante e torna tonda. */
   bounce() { this.squash = 1; }
+
+  async setTeams(teams: TeamKit[]) {
+    await this.ready;
+    await Promise.all(this.views.filter(v=>v.character&&!['ref','coach','steward','fan','spectator'].includes(v.actor.role))
+      .map(v=>v.character!.setKit(teams[v.actor.team],v.actor)));
+  }
 
   update(dt: number) {
     for (const view of this.views) {
@@ -56,9 +74,14 @@ export class ActorViews {
 
   private apply(v: PlayerView) {
     const a = v.actor, p = actorMotion(a, this.match.time, this.match.ball.holder === a);
+    if(v.characterChoices){
+      const selected=v.characterChoices[(a.appearance??a.id)%v.characterChoices.length];
+      if(selected!==v.character){v.character!.root.visible=false;v.character=selected;selected.root.visible=true;}
+    }
     // y: gli spettatori in tribuna stanno sul loro gradone.
     v.root.position.set(a.pos.x, a.pos.y, a.pos.z); v.root.rotation.y = -a.heading;
     if (v.bike) {
+      v.root.rotation.z = a.terrainPitch ?? 0;
       // Piega in curva (poseDir), bici sul fianco se cade, che dondola nello scatto; ruote che girano.
       const down = a.pose === 'fall';
       v.root.rotation.x = down ? 0 : a.poseDir;
@@ -77,6 +100,9 @@ export class ActorViews {
     const open = Math.max(m.open, a.pose === 'celebrate' ? 0.3 : 0);
     v.mouth.scale.set(1, 1 + open * 3.4, m.wide);
     v.head.rotation.set(0, -p.turn * 0.35, -p.lean * 0.25 * (1 - p.bodyWeight));
+    if(v.bike&&a.pose!=='fall'){
+      v.torso.rotation.z=-.98;v.head.rotation.z=.7;
+    }
     const left = p.legSwing + p.legL, right = -p.legSwing + p.legR;
     v.legL.rotation.set(-p.legSpread + p.strideSide, 0, left);
     v.legR.rotation.set(p.legSpread - p.strideSide, 0, right);
@@ -90,5 +116,6 @@ export class ActorViews {
       v.ring.visible = a.pose === 'kneel';
       v.sparkle!.scale.setScalar(0.32 + 0.12 * Math.sin(this.match.time * 9));
     }
+    v.character?.update(a,this.match.time,this.match.ball.holder===a,v,v.root);
   }
 }

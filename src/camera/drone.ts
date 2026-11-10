@@ -11,7 +11,8 @@
  * Golf, ciclismo, vela: il drone è l'unica camera. Vola sempre, niente batteria né pilota, ed è più veloce e più alto.
  */
 import * as THREE from 'three';
-import { CONFIG, DRONE_ONLY } from '../config';
+import { CONFIG, DRONE_ONLY, SPORT } from '../config';
+import { CYCLING_ROUTE, terrainHeight } from '../sim/sports/cyclingRoute';
 import { createAthlete } from '../render/athlete';
 import type { Actor } from '../sim/match';
 import type { CameraController } from './cameraController';
@@ -23,7 +24,7 @@ const DEG = Math.PI / 180;
 /** Golf, ciclismo e vela: il drone è l'unica camera. */
 const GOLF = DRONE_ONLY;
 /** Quota massima e margine oltre le linee, proporzionati al campo (calcio: 30 m e 12 m; boxe: 8 m e 3 m; sport col drone: 70 m e 30 m). */
-const MAX_HEIGHT = GOLF ? 70 : THREE.MathUtils.clamp(W * 0.8, 8, 30);
+const MAX_HEIGHT = SPORT === 'ciclismo' ? CYCLING_ROUTE.hills[0] + 70 : GOLF ? 70 : THREE.MathUtils.clamp(W * 0.8, 8, 30);
 const MARGIN = GOLF ? 30 : THREE.MathUtils.clamp(W * 0.3, 3, 12);
 const MIN_HEIGHT = 0.3;
 /** Sui campi piccoli il drone va più piano. Negli sport col drone droneSpeed è già in m/s. */
@@ -142,6 +143,7 @@ export class Drone {
     if (this.active) {
       const before = pos.clone();
       this.box.clampPoint(pos, pos);
+      if (SPORT === 'ciclismo') pos.y = Math.max(pos.y, terrainHeight(pos.x, pos.z) + 0.6);
       // Contro un limite si ferma su quell'asse, senza rimbalzi.
       if (before.x !== pos.x) this.vel.x = 0;
       if (before.y !== pos.y) this.vel.y = 0;
@@ -152,6 +154,18 @@ export class Drone {
       if (pos.distanceTo(this.home) < 0.05) { pos.copy(this.home); this.vel.set(0, 0, 0); }
     }
     this.cam.free = this.airborne;
+  }
+
+  /** Pulsante "palla": il drone torna subito a distanza comoda dalla palla, dal lato in cui si trovava, e la inquadra. */
+  recall(p: THREE.Vector3) {
+    const pos = this.camera.position, away = pos.clone().sub(p).setY(0);
+    if (away.lengthSq() < 1e-4) away.set(0, 0, 1);
+    const [dist, height] = GOLF ? [30, 12] : [14, 6];
+    pos.copy(p).addScaledVector(away.normalize(), dist).setY(p.y + height);
+    this.box.clampPoint(pos, pos);
+    if (SPORT === 'ciclismo') pos.y = Math.max(pos.y, terrainHeight(pos.x, pos.z) + 0.6);
+    this.vel.set(0, 0, 0);
+    this.cam.snapTo(p);
   }
 
   /** Il pilota si vede solo quando la camera non è alla postazione (anche nel replay). */

@@ -4,7 +4,7 @@ import type { Actor } from './match';
 
 const desired = new THREE.Vector3();
 const delta = new THREE.Vector3();
-const planted = new Set(['serve', 'receive', 'set', 'spike', 'block', 'shoot', 'jab', 'hook', 'uppercut', 'crouch', 'hug', 'kiss', 'sleep', 'kneel', 'address', 'swing', 'practice', 'putt']);
+const planted = new Set(['serve', 'receive', 'set', 'spike', 'block', 'shoot', 'dunk', 'jab', 'hook', 'uppercut', 'combo', 'count', 'getUp', 'crouch', 'hug', 'kiss', 'sleep', 'kneel', 'address', 'swing', 'practice', 'putt']);
 const grounded = (a: Actor) => a.pose === 'fall' || a.pose === 'dive' || a.pose === 'tackle';
 const player = (a: Actor) => !['ref', 'coach', 'fan', 'steward', 'spectator'].includes(a.role);
 
@@ -16,6 +16,7 @@ export function steerActor(a: Actor, neighbors: readonly Actor[], dt: number) {
   let limit = a.speedLimit;
   if (a.pose === 'windUp') limit = Math.min(limit, 2.2);
   if (a.pose === 'racket' || a.pose === 'backhand') limit = Math.min(limit, 1.1);
+  if (SPORT === 'basket' && a.pose === 'throw') limit = Math.min(limit, 2);
   if (planted.has(a.pose)) limit = Math.min(limit, a.pose === 'crouch' ? 0.45 : 0.3);
   const accel = CONFIG.match.accel;
   if (distance > 0.001) {
@@ -76,7 +77,8 @@ export function separateActors(actors: readonly Actor[], dt: number) {
   }
   for (const a of actors) {
     if (!player(a)) continue;
-    const edgeX = CONFIG.pitch.length / 2 + (SPORT === 'pallavolo' ? 0.1 : -0.4), edgeZ = CONFIG.pitch.width / 2 - 0.4;
+    const edgeX = CONFIG.pitch.length / 2 + (SPORT === 'basket' && a.outOfBounds === 'endline' ? 0.8 : SPORT === 'pallavolo' ? 0.1 : -0.4);
+    const edgeZ = CONFIG.pitch.width / 2 + (SPORT === 'basket' && a.outOfBounds === 'sideline' ? 0.8 : -0.4);
     const x = THREE.MathUtils.clamp(a.pos.x, -edgeX, edgeX);
     const z = THREE.MathUtils.clamp(a.pos.z, -edgeZ, edgeZ);
     if (x !== a.pos.x) a.vel.x = 0;

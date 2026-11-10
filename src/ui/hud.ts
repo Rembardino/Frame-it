@@ -11,6 +11,8 @@ import type { Match } from '../sim/match';
 import { showAlbum } from './album';
 import { restartGame } from '../platform/navigation';
 import { numberText, t } from '../i18n';
+import { CYCLING_PROFILE, CYCLING_RELIEF, CYCLING_ROUTE, CYCLING_ROUTES } from '../sim/sports/cyclingRoute';
+import { riderName } from '../sim/sports/cyclingRiders';
 
 const $ = (id: string) => document.getElementById(id)!;
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
@@ -36,9 +38,40 @@ export class Hud {
 
   constructor(showFps: boolean) {
     this.fps.hidden = !showFps;
+    this.setTeams();
+  }
+
+  setTeams() {
+    const preview=document.getElementById('match-preview');preview?.replaceChildren();
+    if (SPORT === 'ciclismo') {
+      for (const i of [0, 1]) $(`t${i}`).parentElement!.style.display = 'none';
+      if (preview) {
+        const label = document.createElement('label'); label.className = 'race-route';
+        const text = document.createElement('span'); text.textContent = t('Gara individuale');
+        const select = document.createElement('select'); select.setAttribute('aria-label', t('Percorso'));
+        for (const route of CYCLING_ROUTES) { const option = document.createElement('option'); option.value = route.id; option.textContent = `${route.town} · ${t(route.label)}`; select.append(option); }
+        select.value = CYCLING_ROUTE.id;
+        select.addEventListener('change', () => { const url = new URL(location.href); url.searchParams.set('route', select.value); location.assign(url.href); });
+        const profile = document.createElement('span'); profile.className = 'race-profile';
+        const points = CYCLING_PROFILE.map((height, i) => `${i * 1.5},${29 - height * 0.18}`).join(' ');
+        profile.innerHTML = `<svg viewBox="0 0 120 30" aria-hidden="true"><polyline points="${points}" fill="none" stroke="#fbd95a" stroke-width="2" /></svg><small>↑ ${Math.round(CYCLING_RELIEF.climb)} m · ↓ ${Math.round(CYCLING_RELIEF.descent)} m</small>`;
+        label.append(text, select, profile); preview.append(label);
+      }
+      return;
+    }
     CONFIG.teams.forEach((team, i) => {
-      $(`t${i}`).textContent = SPORT === 'boxe' ? t(team.name).slice(0, 3) : team.short;
+      $(`t${i}`).textContent = t(team.short);
+      $(`t${i}`).parentElement!.title = t(team.name);
+      const image=$(`t${i}`).parentElement!.querySelector<HTMLImageElement>('.team-crest')??document.createElement('img');
+      image.className='team-crest';image.src=team.logo;image.alt=t(team.name);
+      if(!image.parentElement)$(`t${i}`).parentElement!.insertBefore(image,$(`t${i}`));
       $(`c${i}`).style.background = hex(team.shirt);
+      if(preview){
+        if(i){const versus=document.createElement('span');versus.className='versus';versus.textContent='VS';preview.append(versus);}
+        const club=document.createElement('div');club.className='club';
+        const crest=document.createElement('img');crest.src=team.logo;crest.alt='';
+        const name=document.createElement('span');name.textContent=t(team.name);club.append(crest,name);preview.append(club);
+      }
     });
   }
 
@@ -53,6 +86,10 @@ export class Hud {
       ? `R${Math.min(3, 1 + Math.floor(match.clock / (CONFIG.match.durationSec / 3)))}/3 · ${t('COLPI')}`
       : SPORT === 'tennis' ? t('GAME · PUNTI') : SPORT === 'pallavolo' ? t('PUNTI')
       : `${Math.min(mins, Math.floor((match.clock / CONFIG.match.durationSec) * mins))}'`);
+    if (!ended && match.basketball?.freeThrows) {
+      const free = match.basketball.freeThrows;
+      this.clock.textContent = t('LIBERO {current}/{total}', { current: Math.min(free.total, free.total - free.left + 1), total: free.total });
+    } else if (!ended && match.basketball?.inbound) this.clock.textContent = t('RIMESSA');
 
     // Regista in cuffia.
     const line = voice.current;
@@ -125,7 +162,7 @@ export class Hud {
     el.innerHTML = `
       <div class="sum">
         <div class="sum-title">${t('FINE PARTITA')}</div>
-        <div class="sum-score">${SPORT === 'golf' ? `${t(teams[0].name)} &amp; ${t(teams[1].name)} <b>${match.sportSimulation?.scoreText()}</b>`
+        <div class="sum-score">${SPORT === 'ciclismo' ? match.sportSimulation?.leaders?.().map((a, i) => `${i + 1}° ${riderName(a.id)}`).join(' · ') : SPORT === 'golf' ? `${t(teams[0].name)} &amp; ${t(teams[1].name)} <b>${match.sportSimulation?.scoreText()}</b>`
           : `${t(teams[0].name)} <b>${match.score[0]} - ${match.score[1]}</b> ${t(teams[1].name)}`}</div>
         <div class="sum-grid">
           <div><small>${t('Punti')}</small><b>${numberText(s.points)}</b>${isRecord ? `<em>${t('Nuovo record!')}</em>` : `<em>${t('Record')} ${numberText(record)}</em>`}</div>

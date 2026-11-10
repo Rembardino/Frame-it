@@ -13,6 +13,7 @@ import { golfCourse } from './golf';
 import { cyclingWorld } from './cycling';
 import { sailingWorld } from './sailing';
 import { FaunaViews } from './fauna';
+import { t } from '../i18n';
 
 const L = CONFIG.pitch.length;
 const W = CONFIG.pitch.width;
@@ -25,6 +26,8 @@ export interface SeatRow {
   facing: number;
   /** Squadra tifata prevalente: 0, 1 o -1 (misto). */
   team: number;
+  /** In piedi a terra (bordo strada), a grandezza naturale, invece che seduti in tribuna. */
+  standing?: boolean;
 }
 
 export function createStage(container: HTMLElement) {
@@ -357,10 +360,11 @@ function hoop(side: 1 | -1) {
   const square = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.59, 0.45).rotateY(-Math.PI / 2)), new THREE.LineBasicMaterial({ color: 0xff3b30 }));
   square.position.set(boardX - 0.01, rim + 0.2, 0);
 
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.02, 6, 20).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xff6a1a }));
+  const ringRadius = 0.23;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(ringRadius, 0.02, 6, 20).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xff6a1a }));
   ring.position.set(hx, rim, 0);
   const net = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.23, 0.14, 0.42, 12, 1, true),
+    new THREE.CylinderGeometry(ringRadius, ringRadius * 0.61, 0.42, 12, 1, true),
     new THREE.MeshBasicMaterial({ map: netTexture(6, 2), transparent: true, side: THREE.DoubleSide, depthWrite: false }),
   );
   net.position.set(hx, rim - 0.21, 0);
@@ -591,7 +595,7 @@ function bigScreen() {
       const x = i ? 300 : 24;
       ctx.fillStyle = colour(team.shirt); ctx.fillRect(x, 60, 188, 70);
       ctx.fillStyle = '#ffffff'; ctx.font = 'bold 44px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(team.short, x + 94, 96);
+      ctx.fillText(t(team.short), x + 94, 96);
       ctx.font = 'bold 96px system-ui, sans-serif'; ctx.fillText(String(match.score[i]), x + 94, 190);
     });
     ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 40px system-ui, sans-serif'; ctx.textAlign = 'center';

@@ -171,13 +171,17 @@ export class EventInstance {
       case 'shoot': {
         const a = role(s.who);
         if (m.ball.holder !== a) return false;
+        if (s.style === 'dunk' && !m.prepareDunk(a)) return false;
         const outcome = this.director.resolveOutcome(s.outcome, this.attack, s.goalChance);
         m.shoot(a, outcome);
         this.label = this.def.outcomeLabels?.[outcome] ?? this.def.label;
         return true;
       }
       case 'pose':
-        m.setPose(role(s.who), s.pose, s.dur, s.face ? role(s.face) : null);
+        m.setPose(role(s.who), s.pose, s.dur, s.face ? role(s.face) : null, s.gesture);
+        return true;
+      case 'basketFoul':
+        m.basketball?.foul(role(s.who), role(s.victim), s.shots);
         return true;
       case 'sport':
         // Finish the incoming ball instead of replacing a trajectory mid-flight.
@@ -462,7 +466,7 @@ export class Director {
       if (!h || h.scripted || h.role === 'gk' || b.inHands || m.phase !== 'play') return null;
       attack = h.team;
     } else {
-      attack = scorer ? scorer.team : Math.random() < 0.5 ? 0 : 1;
+      attack = SPORT === 'ciclismo' ? 0 : scorer ? scorer.team : Math.random() < 0.5 ? 0 : 1;
     }
     const mirror = def.fixedSide || Math.random() < 0.5 ? 1 : -1;
     const roles = new Map<string, Actor>();

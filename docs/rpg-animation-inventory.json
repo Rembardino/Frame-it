@@ -1,0 +1,1629 @@
+{
+ "generated": "2026-11-01",
+ "root": "RPG 3D",
+ "method": "Recursive walk excluding build/.godot/.git; GLB/GLTF JSON animations and skins; binary/ASCII FBX AnimStack names; GLB/GLTF/FBX inside ZIP archives read in memory. RAR/7z/blend/unitypackage are listed as opaque (not readable without extra tools).",
+ "filesExamined": 1436,
+ "zipEntriesExamined": 30,
+ "humanoidSources": {
+  "ual": "UAL1/UAL2 Standard GLB (in-place), _RM GLB (root motion), Unity FBX and _RM FBX: 43+43 logical clips, audited in rpg-asset-audit.json",
+  "wardrobeCopies": {
+   "files": 100,
+   "clips": [
+    "Crouch_Idle",
+    "Idle",
+    "Idle_Talking",
+    "Interact",
+    "Jog_Fwd",
+    "Sitting_Idle",
+    "Sword_Attack",
+    "Walk"
+   ],
+   "finding": "Same names and durations as UAL1 (Crouch_Idle_Loop, Idle_Loop, Idle_Talking_Loop, Interact, Jog_Fwd_Loop, Sitting_Idle_Loop, Sword_Attack, Walk_Loop); mean 1-|dot| of bone rotations 7e-4..9e-4 at four phases on Male_Guardia.glb and Female_Oste.glb: re-exports, no new motion"
+  },
+  "outfitCopy": "Modular Character Outfits Female_Peasant_Body.gltf: Jog_Fwd_Loop only (UAL1 copy)"
+ },
+ "animatedGltf": [
+  {
+   "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard.glb",
+   "kind": "humanoid-UAL",
+   "joints": [
+    65
+   ],
+   "clips": [
+    "A_TPose 2.5s",
+    "Chest_Open 1.37s",
+    "ClimbUp_1m 0.67s",
+    "Consume 1.33s",
+    "Farm_Harvest 2.5s",
+    "Farm_PlantSeed 2.77s",
+    "Farm_Watering 3.8s",
+    "Hit_Knockback 0.83s",
+    "Idle_FoldArms_Loop 2.5s",
+    "Idle_Lantern_Loop 2.5s",
+    "Idle_No_Loop 2.5s",
+    "Idle_Rail_Call 2.5s",
+    "Idle_Rail_Loop 2.5s",
+    "Idle_Shield_Break 1.07s",
+    "Idle_Shield_Loop 2.5s",
+    "Idle_TalkingPhone_Loop 2.93s",
+    "LayToIdle 1.53s",
+    "Melee_Hook 0.47s",
+    "Melee_Hook_Rec 0.6s",
+    "NinjaJump_Idle_Loop 2s",
+    "NinjaJump_Land 1.27s",
+    "NinjaJump_Start 0.97s",
+    "OverhandThrow 1.33s",
+    "Shield_Dash 1.1s",
+    "Shield_OneShot 0.83s",
+    "Slide_Exit 0.5s",
+    "Slide_Loop 2s",
+    "Slide_Start 0.83s",
+    "Sword_Block 1.23s",
+    "Sword_Dash 1.57s",
+    "Sword_Heavy_Combo 4.33s",
+    "Sword_Regular_A 0.43s",
+    "Sword_Regular_A_Rec 0.97s",
+    "Sword_Regular_B 0.53s",
+    "Sword_Regular_B_Rec 1.03s",
+    "Sword_Regular_C 2s",
+    "Sword_Regular_Combo 3s",
+    "TreeChopping_Loop 0.97s",
+    "Walk_Carry_Loop 2s",
+    "Yes 2.5s",
+    "Zombie_Idle_Loop 1.33s",
+    "Zombie_Scratch 1.8s",
+    "Zombie_Walk_Fwd_Loop 1.33s"
+   ]
+  },
+  {
+   "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unreal-Godot/UAL2_Standard_RM.glb",
+   "kind": "humanoid-UAL",
+   "joints": [
+    65
+   ],
+   "clips": [
+    "A_TPose 2.5s",
+    "Chest_Open 1.37s",
+    "ClimbUp_1m 0.67s",
+    "Consume 1.33s",
+    "Farm_Harvest 2.5s",
+    "Farm_PlantSeed 2.77s",
+    "Farm_Watering 3.8s",
+    "Hit_Knockback 0.83s",
+    "Idle_FoldArms_Loop 2.5s",
+    "Idle_Lantern_Loop 2.5s",
+    "Idle_No_Loop 2.5s",
+    "Idle_Rail_Call 2.5s",
+    "Idle_Rail_Loop 2.5s",
+    "Idle_Shield_Break 1.07s",
+    "Idle_Shield_Loop 2.5s",
+    "Idle_TalkingPhone_Loop 2.93s",
+    "LayToIdle 1.53s",
+    "Melee_Hook 0.47s",
+    "Melee_Hook_Rec 0.6s",
+    "NinjaJump_Idle_Loop 2s",
+    "NinjaJump_Land 1.27s",
+    "NinjaJump_Start 0.97s",
+    "OverhandThrow 1.33s",
+    "Shield_Dash 1.1s",
+    "Shield_OneShot 0.83s",
+    "Slide_Exit 0.5s",
+    "Slide_Loop 2s",
+    "Slide_Start 0.83s",
+    "Sword_Block 1.23s",
+    "Sword_Dash 1.57s",
+    "Sword_Heavy_Combo 4.33s",
+    "Sword_Regular_A 0.43s",
+    "Sword_Regular_A_Rec 0.97s",
+    "Sword_Regular_B 0.53s",
+    "Sword_Regular_B_Rec 1.03s",
+    "Sword_Regular_C 2s",
+    "Sword_Regular_Combo 3s",
+    "TreeChopping_Loop 0.97s",
+    "Walk_Carry_Loop 2s",
+    "Yes 2.5s",
+    "Zombie_Idle_Loop 1.33s",
+    "Zombie_Scratch 1.8s",
+    "Zombie_Walk_Fwd_Loop 1.33s"
+   ]
+  },
+  {
+   "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
+   "kind": "humanoid-UAL",
+   "joints": [
+    65
+   ],
+   "clips": [
+    "A_TPose 2.5s",
+    "Crouch_Fwd_Loop 2s",
+    "Crouch_Idle_Loop 2.93s",
+    "Dance_Loop 1s",
+    "Death01 2.4s",
+    "Driving_Loop 1.67s",
+    "Fixing_Kneeling 5.2s",
+    "Hit_Chest 0.33s",
+    "Hit_Head 0.43s",
+    "Idle_Loop 2.5s",
+    "Idle_Talking_Loop 2.93s",
+    "Idle_Torch_Loop 1.27s",
+    "Interact 2s",
+    "Jog_Fwd_Loop 0.93s",
+    "Jump_Land 1.27s",
+    "Jump_Loop 2.5s",
+    "Jump_Start 1.33s",
+    "PickUp_Table 0.83s",
+    "Pistol_Aim_Down 0.17s",
+    "Pistol_Aim_Neutral 0.17s",
+    "Pistol_Aim_Up 0.17s",
+    "Pistol_Idle_Loop 1.67s",
+    "Pistol_Reload 1.67s",
+    "Pistol_Shoot 0.63s",
+    "Punch_Cross 1s",
+    "Punch_Jab 0.87s",
+    "Push_Loop 2.67s",
+    "Roll 1.47s",
+    "Sitting_Enter 1.3s",
+    "Sitting_Exit 1.03s",
+    "Sitting_Idle_Loop 1.67s",
+    "Sitting_Talking_Loop 2.93s",
+    "Spell_Simple_Enter 0.53s",
+    "Spell_Simple_Exit 0.43s",
+    "Spell_Simple_Idle_Loop 2.1s",
+    "Spell_Simple_Shoot 0.5s",
+    "Sprint_Loop 0.67s",
+    "Swim_Fwd_Loop 1.33s",
+    "Swim_Idle_Loop 3.33s",
+    "Sword_Attack 1.53s",
+    "Sword_Idle 1.67s",
+    "Walk_Formal_Loop 1.33s",
+    "Walk_Loop 1.33s"
+   ]
+  },
+  {
+   "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard_RM.glb",
+   "kind": "humanoid-UAL",
+   "joints": [
+    65
+   ],
+   "clips": [
+    "A_TPose 2.5s",
+    "Crouch_Fwd_Loop 2s",
+    "Crouch_Idle_Loop 2.93s",
+    "Dance_Loop 1s",
+    "Death01 2.4s",
+    "Driving_Loop 1.67s",
+    "Fixing_Kneeling 5.2s",
+    "Hit_Chest 0.33s",
+    "Hit_Head 0.43s",
+    "Idle_Loop 2.5s",
+    "Idle_Talking_Loop 2.93s",
+    "Idle_Torch_Loop 1.27s",
+    "Interact 2s",
+    "Jog_Fwd_Loop 0.93s",
+    "Jump_Land 1.27s",
+    "Jump_Loop 2.5s",
+    "Jump_Start 1.33s",
+    "PickUp_Table 0.83s",
+    "Pistol_Aim_Down 0.17s",
+    "Pistol_Aim_Neutral 0.17s",
+    "Pistol_Aim_Up 0.17s",
+    "Pistol_Idle_Loop 1.67s",
+    "Pistol_Reload 1.67s",
+    "Pistol_Shoot 0.63s",
+    "Punch_Cross 1s",
+    "Punch_Jab 0.87s",
+    "Push_Loop 2.67s",
+    "Roll 1.47s",
+    "Sitting_Enter 1.3s",
+    "Sitting_Exit 1.03s",
+    "Sitting_Idle_Loop 1.67s",
+    "Sitting_Talking_Loop 2.93s",
+    "Spell_Simple_Enter 0.53s",
+    "Spell_Simple_Exit 0.43s",
+    "Spell_Simple_Idle_Loop 2.1s",
+    "Spell_Simple_Shoot 0.5s",
+    "Sprint_Loop 0.67s",
+    "Swim_Fwd_Loop 1.33s",
+    "Swim_Idle_Loop 3.33s",
+    "Sword_Attack 1.53s",
+    "Sword_Idle 1.67s",
+    "Walk_Formal_Loop 1.33s",
+    "Walk_Loop 1.33s"
+   ]
+  },
+  {
+   "file": "3D asset download/monster/spider-with-animation/source/Spider_Anim.glb",
+   "kind": "creature",
+   "joints": [
+    62
+   ],
+   "clips": [
+    "Spider_default.005 2.4s"
+   ]
+  },
+  {
+   "file": "3D asset download/monster/vampire-bat/source/bat.glb",
+   "kind": "creature",
+   "joints": [
+    25
+   ],
+   "clips": [
+    "ArmatureAction 0.43s"
+   ]
+  },
+  {
+   "file": "3D asset download/nature/animated-sheep/source/sheep_anim.glb",
+   "kind": "animal",
+   "joints": [],
+   "clips": [
+    "undefined 2.54s"
+   ]
+  },
+  {
+   "file": "3D asset download/object/6sntgsu03og0-Well_HighDetail/Well_HighDetail.FBX",
+   "kind": "prop",
+   "clips": [
+    "Take 001 undefineds",
+    "Take 001\n\tC:  undefineds"
+   ]
+  },
+  {
+   "file": "3D asset download/object/Fantasy Props MegaKit[Standard]/Exports/glTF/Chest_Wood.gltf",
+   "kind": "prop",
+   "joints": [
+    3
+   ],
+   "clips": [
+    "Chest_Close 0.5s",
+    "Chest_Closed 0.33s",
+    "Chest_Open 0.63s",
+    "Chest_Opened 0.33s"
+   ]
+  },
+  {
+   "file": "3D asset download/object/free-medieval-well/source/Pozzo sketchfab.fbx",
+   "kind": "prop",
+   "clips": [
+    "Take 001 undefineds",
+    "Take 001\n\tC:  undefineds"
+   ]
+  },
+  {
+   "file": "3D asset download/outfits/Modular Character Outfits - Fantasy[Standard]/Modular Character Outfits - Fantasy[Standard]/Exports/glTF (Godot-Unreal)/Modular Parts/Female_Peasant_Body.gltf",
+   "kind": "humanoid-outfit-copy",
+   "joints": [
+    65
+   ],
+   "clips": [
+    "Jog_Fwd_Loop 1.17s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Asino/Asino.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 1s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Capra/Capra.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 0.85s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Cavallo/Cavallo.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 1.15s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Cervo/Cervo.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 1.05s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Cinghiale/Cinghiale.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 0.75s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Coniglio/Coniglio.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 4s",
+    "Passo 0.5s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Fagiano/Fagiano.glb",
+   "kind": "animal",
+   "joints": [
+    14
+   ],
+   "clips": [
+    "Fermo 5s",
+    "Passo 0.5s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Gabbiano/Gabbiano.glb",
+   "kind": "animal",
+   "joints": [
+    18
+   ],
+   "clips": [
+    "Becca 1.6s",
+    "Fermo 4s",
+    "Passo 0.55s",
+    "Plana 3s",
+    "Vola 0.45s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Montone/Montone.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 0.9s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Oca/Oca.glb",
+   "kind": "animal",
+   "joints": [
+    14
+   ],
+   "clips": [
+    "Fermo 5s",
+    "Passo 0.62s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Pecora/Pecora.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 0.85s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Pecora_nera/Pecora_nera.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 0.85s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Pesce_rosso/Pesce_rosso.gltf",
+   "kind": "animal",
+   "joints": [
+    63
+   ],
+   "clips": [
+    "Scene 10.42s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Stambecco/Stambecco.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 0.9s"
+   ]
+  },
+  {
+   "file": "assets/characters/animali/Volpe/Volpe.glb",
+   "kind": "animal",
+   "joints": [
+    34
+   ],
+   "clips": [
+    "Fermo 6.5s",
+    "Passo 0.62s"
+   ]
+  },
+  {
+   "file": "assets/characters/animations/humanoid/UAL1_Standard.glb",
+   "kind": "humanoid-UAL",
+   "joints": [
+    65
+   ],
+   "clips": [
+    "A_TPose 2.5s",
+    "Crouch_Fwd_Loop 2s",
+    "Crouch_Idle_Loop 2.93s",
+    "Dance_Loop 1s",
+    "Death01 2.4s",
+    "Driving_Loop 1.67s",
+    "Fixing_Kneeling 5.2s",
+    "Hit_Chest 0.33s",
+    "Hit_Head 0.43s",
+    "Idle_Loop 2.5s",
+    "Idle_Talking_Loop 2.93s",
+    "Idle_Torch_Loop 1.27s",
+    "Interact 2s",
+    "Jog_Fwd_Loop 0.93s",
+    "Jump_Land 1.27s",
+    "Jump_Loop 2.5s",
+    "Jump_Start 1.33s",
+    "PickUp_Table 0.83s",
+    "Pistol_Aim_Down 0.17s",
+    "Pistol_Aim_Neutral 0.17s",
+    "Pistol_Aim_Up 0.17s",
+    "Pistol_Idle_Loop 1.67s",
+    "Pistol_Reload 1.67s",
+    "Pistol_Shoot 0.63s",
+    "Punch_Cross 1s",
+    "Punch_Jab 0.87s",
+    "Push_Loop 2.67s",
+    "Roll 1.47s",
+    "Sitting_Enter 1.3s",
+    "Sitting_Exit 1.03s",
+    "Sitting_Idle_Loop 1.67s",
+    "Sitting_Talking_Loop 2.93s",
+    "Spell_Simple_Enter 0.53s",
+    "Spell_Simple_Exit 0.43s",
+    "Spell_Simple_Idle_Loop 2.1s",
+    "Spell_Simple_Shoot 0.5s",
+    "Sprint_Loop 0.67s",
+    "Swim_Fwd_Loop 1.33s",
+    "Swim_Idle_Loop 3.33s",
+    "Sword_Attack 1.53s",
+    "Sword_Idle 1.67s",
+    "Walk_Formal_Loop 1.33s",
+    "Walk_Loop 1.33s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Abbysor/Abbysor.gltf",
+   "kind": "creature",
+   "joints": [
+    12
+   ],
+   "clips": [
+    "Abbysor|Attack no Move 0.83s",
+    "Abbysor|AttackMoved 1.67s",
+    "Abbysor|Idle 1.67s",
+    "Abbysor|Move 1.67s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Alaossa/Alaossa.glb",
+   "kind": "creature",
+   "joints": [
+    40
+   ],
+   "clips": [
+    "Artiglio 0.9s",
+    "Colpito 0.55s",
+    "Corsa 0.62s",
+    "Fermo 4s",
+    "Morte 1.8s",
+    "Passo 1s",
+    "Ruggito 1.5s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Anguilla/Anguilla.gltf",
+   "kind": "creature",
+   "joints": [
+    8
+   ],
+   "clips": [
+    "Take 001 10.7s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/BestiaRossa/BestiaRossa.glb",
+   "kind": "creature",
+   "joints": [
+    22
+   ],
+   "clips": [
+    "Artiglio 0.9s",
+    "Colpito 0.55s",
+    "Corsa 0.62s",
+    "Fermo 4s",
+    "Morte 1.8s",
+    "Passo 1s",
+    "Ruggito 1.5s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Cieco/Cieco.gltf",
+   "kind": "creature",
+   "joints": [
+    72
+   ],
+   "clips": [
+    "Take 001 2.55s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Colata/Colata.glb",
+   "kind": "creature",
+   "joints": [
+    28
+   ],
+   "clips": [
+    "Colpito 0.55s",
+    "Corsa 1s",
+    "Fermo 4.5s",
+    "Morso 1s",
+    "Morte 1.8s",
+    "Passo 1.7s",
+    "Ruggito 1.6s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Colosso/Colosso.glb",
+   "kind": "creature",
+   "joints": [
+    30
+   ],
+   "clips": [
+    "Colpito 0.55s",
+    "Corsa 1s",
+    "Fermo 4s",
+    "Morso 1s",
+    "Morte 2s",
+    "Passo 1.6s",
+    "Soffio 1.5s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/CosaDellaTomba/CosaDellaTomba.glb",
+   "kind": "creature",
+   "joints": [
+    22
+   ],
+   "clips": [
+    "Artiglio 0.9s",
+    "Colpito 0.55s",
+    "Corsa 0.81s",
+    "Fermo 4s",
+    "Morte 1.8s",
+    "Passo 1.3s",
+    "Ruggito 1.5s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Custode/Custode.glb",
+   "kind": "creature",
+   "joints": [
+    41
+   ],
+   "clips": [
+    "Artiglio 0.9s",
+    "Colpito 0.55s",
+    "Corsa 0.77s",
+    "Fermo 4s",
+    "Morte 1.8s",
+    "Passo 1.25s",
+    "Ruggito 1.5s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Drago/Drago.glb",
+   "kind": "creature",
+   "joints": [
+    51
+   ],
+   "clips": [
+    "Colpito 0.55s",
+    "Corsa 0.9s",
+    "Fermo 5s",
+    "Morso 1s",
+    "Morte 1.8s",
+    "Passo 1.6s",
+    "Soffio 1.6s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Drugdor/Drugdor.gltf",
+   "kind": "creature",
+   "joints": [
+    14
+   ],
+   "clips": [
+    "Attack1 2.92s",
+    "Attack2 2.5s",
+    "Attack3 1.67s",
+    "Defence1 4.17s",
+    "Defence2 3.54s",
+    "Defence3 1.67s",
+    "Idle 2.08s",
+    "IdlePieces 6.25s",
+    "Walk 2.08s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Eco/Eco.glb",
+   "kind": "creature",
+   "joints": [
+    40
+   ],
+   "clips": [
+    "Fermo 1.6s",
+    "Passo 1s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/GolemDOro/GolemDOro.glb",
+   "kind": "creature",
+   "joints": [
+    22
+   ],
+   "clips": [
+    "Artiglio 0.9s",
+    "Colpito 0.55s",
+    "Corsa 0.99s",
+    "Fermo 4s",
+    "Morte 1.8s",
+    "Passo 1.6s",
+    "Ruggito 1.5s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/GolemMuschio/GolemMuschio.gltf",
+   "kind": "creature",
+   "joints": [
+    43,
+    72
+   ],
+   "clips": [
+    "2322174138704_TempMotion 28.55s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Granchio/Granchio.gltf",
+   "kind": "creature",
+   "joints": [
+    66
+   ],
+   "clips": [
+    "CINEMA_4D_________ _____ 1.52s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Idra/Idra.gltf",
+   "kind": "creature",
+   "joints": [
+    87
+   ],
+   "clips": [
+    "Idra2 8.33s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Lupo/Lupo.gltf",
+   "kind": "creature",
+   "joints": [
+    45,
+    45
+   ],
+   "clips": [
+    "magic_wolf|0 0.03s",
+    "magic_wolf|Idle 2.3s",
+    "magic_wolf|Idle_001 0.53s",
+    "magic_wolf|Idle_002 1.63s",
+    "magic_wolf|Idle_002 sem bite 1.63s",
+    "magic_wolf|claw attack 1.17s",
+    "magic_wolf|damage 0.9s",
+    "magic_wolf|damage (SHOCK WAVE) 0.53s",
+    "magic_wolf|damage (SHOCK WAVE)_RETURN 0.37s",
+    "magic_wolf|flame thrower 0.8s",
+    "magic_wolf|flame thrower loop 2.7s",
+    "magic_wolf|run 0.5s",
+    "magic_wolf|stunned 0.9s",
+    "magic_wolf|trot 0.77s",
+    "magic_wolf|walk 0.97s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/LupoSpinoso/LupoSpinoso.gltf",
+   "kind": "creature",
+   "joints": [
+    38
+   ],
+   "clips": [
+    "Take 001 15.37s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Ogre/Ogre.gltf",
+   "kind": "creature",
+   "joints": [
+    25,
+    25,
+    25,
+    25
+   ],
+   "clips": [
+    "Scene 5.71s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Pipistrello/Pipistrello.glb",
+   "kind": "creature",
+   "joints": [],
+   "clips": [
+    "Vola 0.46s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Predatore/Predatore.gltf",
+   "kind": "creature",
+   "joints": [
+    508,
+    508,
+    508
+   ],
+   "clips": [
+    "rig|Idle 9.56s",
+    "rig|Powerfull_attack 7.96s",
+    "rig|Roar 7.96s",
+    "rig|Run 7.96s",
+    "rig|Sleeping 7.96s",
+    "rig|attack 7.96s",
+    "rig|walk 1.16s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Ragno/Ragno.gltf",
+   "kind": "creature",
+   "joints": [
+    62
+   ],
+   "clips": [
+    "Spider_default_005 2.4s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/RagnoNero/RagnoNero.gltf",
+   "kind": "creature",
+   "joints": [
+    48
+   ],
+   "clips": [
+    "Spider_Attack_1 10.9s",
+    "Spider_Attack_2 12.5s",
+    "Spider_Damage 9.5s",
+    "Spider_Death 13.83s",
+    "Spider_Idle 3s",
+    "Spider_Idle_long 8.33s",
+    "Spider_Walk 1.13s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/ReDeiPirati/ReDeiPirati.gltf",
+   "kind": "creature",
+   "joints": [
+    161
+   ],
+   "clips": [
+    "Mon_PiratesKing_Attack01 2.5s",
+    "Mon_PiratesKing_Attack02 6.6s",
+    "Mon_PiratesKing_CRun01 11.33s",
+    "Mon_PiratesKing_Cidle01 9.3s",
+    "Mon_PiratesKing_Death01 15.7s",
+    "Mon_PiratesKing_Idle01 21.07s",
+    "Mon_PiratesKing_Skill04_End 34.07s",
+    "Mon_PiratesKing_Skill04_Loop 35.73s",
+    "Mon_PiratesKing_Skill04_Start 36.93s",
+    "Mon_PiratesKing_Spwan01 42.1s",
+    "Mon_PiratesKing_Turn_L01 44.13s",
+    "Mon_PiratesKing_Turn_R01 46.17s",
+    "Mon_PiratesKing_Walk01 68.2s",
+    "Mon_PiratesKing_skill01 24.43s",
+    "Mon_PiratesKing_skill02 27.8s",
+    "Mon_PiratesKing_skill03 31.83s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/ScheletroVivo/ScheletroVivo.gltf",
+   "kind": "creature",
+   "joints": [
+    51
+   ],
+   "clips": [
+    "Take 001 44.07s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Scourger/Scourger.gltf",
+   "kind": "creature",
+   "joints": [
+    159
+   ],
+   "clips": [
+    "Action 0s",
+    "Action_001 2.75s",
+    "Action_002 2.29s",
+    "Action_003 2.29s",
+    "Action_005 3.54s",
+    "Idle 10s",
+    "Idle1 3.33s",
+    "Idle2 3.33s",
+    "Pose 0.04s",
+    "Rear Attack 2.29s",
+    "Scourger ArmatureAction 3.33s",
+    "Scourger ArmatureAction_002 2.75s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Segugio/Segugio.gltf",
+   "kind": "creature",
+   "joints": [
+    265
+   ],
+   "clips": [
+    "Idle 2.5s",
+    "Walk 1.33s",
+    "rig|Idle 2.5s",
+    "rig|Walk 1.33s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Spaiato/Spaiato.gltf",
+   "kind": "creature",
+   "joints": [
+    102
+   ],
+   "clips": [
+    "beastbendyv3_Model_Bendy_Monster_skeleton|attack 2.08s",
+    "beastbendyv3_Model_Bendy_Monster_skeleton|dazed 4.17s",
+    "beastbendyv3_Model_Bendy_Monster_skeleton|death 12.88s",
+    "beastbendyv3_Model_Bendy_Monster_skeleton|idle 2.75s",
+    "beastbendyv3_Model_Bendy_Monster_skeleton|ref 0s",
+    "beastbendyv3_Model_Bendy_Monster_skeleton|roar 2.08s",
+    "beastbendyv3_Model_Bendy_Monster_skeleton|run 1s",
+    "beastbendyv3_Model_Bendy_Monster_skeleton|walk 2.04s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Squalo/Squalo.gltf",
+   "kind": "creature",
+   "joints": [
+    17
+   ],
+   "clips": [
+    "Take 001 16s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Verme/Verme.gltf",
+   "kind": "creature",
+   "joints": [
+    11
+   ],
+   "clips": [
+    "Sandworm|SandwormBurrow 4.96s",
+    "Sandworm|SandwormEmerge 4.29s",
+    "Sandworm|SandwormIdle 4.96s",
+    "Sandworm|SandwormTurnLeft 9.96s",
+    "Sandworm|SandwormWiggle 9.96s"
+   ]
+  },
+  {
+   "file": "assets/characters/mostri/Zombie/Zombie.gltf",
+   "kind": "creature",
+   "joints": [
+    42
+   ],
+   "clips": [
+    "Take 001 12.3s"
+   ]
+  },
+  {
+   "file": "assets/props/quaternius/models/Chest_Wood.gltf",
+   "kind": "prop",
+   "joints": [
+    3
+   ],
+   "clips": [
+    "Chest_Close 0.5s",
+    "Chest_Closed 0.33s",
+    "Chest_Open 0.63s",
+    "Chest_Opened 0.33s"
+   ]
+  },
+  {
+   "file": "assets/props/scaricati/Giostra/Giostra.gltf",
+   "kind": "prop",
+   "joints": [],
+   "clips": [
+    "Take 001 21.79s"
+   ]
+  },
+  {
+   "file": "assets/props/scaricati/Sbarre/Sbarre.gltf",
+   "kind": "prop",
+   "joints": [
+    2
+   ],
+   "clips": [
+    "Armature_002|Armature_002Action 5.58s"
+   ]
+  }
+ ],
+ "animatedFbx": [
+  {
+   "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unity/UAL2_Standard.fbx",
+   "stacks": 43,
+   "limbNodes": 130,
+   "clips": "Armature|A_TPose, Armature|Chest_Open, Armature|ClimbUp_1m, Armature|Consume, Armature|Farm_Harvest, Armature|Farm_PlantSeed, Armature|Farm_Watering, Armature|Hit_Knockback",
+   "kind": "humanoid-UAL"
+  },
+  {
+   "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Unity/UAL2_Standard_RM.fbx",
+   "stacks": 43,
+   "limbNodes": 130,
+   "clips": "Armature|A_TPose, Armature|Chest_Open, Armature|ClimbUp_1m, Armature|Consume, Armature|Farm_Harvest, Armature|Farm_PlantSeed, Armature|Farm_Watering, Armature|Hit_Knockback",
+   "kind": "humanoid-UAL"
+  },
+  {
+   "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unity/UAL1_Standard.fbx",
+   "stacks": 43,
+   "limbNodes": 130,
+   "clips": "Armature|A_TPose, Armature|Crouch_Fwd_Loop, Armature|Crouch_Idle_Loop, Armature|Dance_Loop, Armature|Death01, Armature|Driving_Loop, Armature|Fixing_Kneeling, Armature|Hit_Chest",
+   "kind": "humanoid-UAL"
+  },
+  {
+   "file": "3D asset download/animation/Universal Animation Library[Standard]/Universal Animation Library[Standard]/Unity/UAL1_Standard_RM.fbx",
+   "stacks": 43,
+   "limbNodes": 130,
+   "clips": "Armature|A_TPose, Armature|Crouch_Fwd_Loop, Armature|Crouch_Idle_Loop, Armature|Dance_Loop, Armature|Death01, Armature|Driving_Loop, Armature|Fixing_Kneeling, Armature|Hit_Chest",
+   "kind": "humanoid-UAL"
+  },
+  {
+   "file": "3D asset download/monster/animated-hydra-dungeons-dragons/source/Hydra.zip!Hydra.FBX",
+   "stacks": 1,
+   "limbNodes": 174,
+   "clips": "Take 001",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/batim-beast-bendy-rig/source/BeastBendy.fbx",
+   "stacks": 8,
+   "limbNodes": 310,
+   "clips": "beastbendyv3_Model_Bendy_Monster_skeleton|attack, beastbendyv3_Model_Bendy_Monster_skeleton|dazed, beastbendyv3_Model_Bendy_Monster_skeleton|death, beastbendyv3_Model_Bendy_Monster_skeleton|idle, beastbendyv3_Model_Bendy_Monster_skeleton|ref, beastbendyv3_Model_Bendy_Monster_skeleton|roar, beastbendyv3_Model_Bendy_Monster_skeleton|run, beastbendyv3_Model_Bendy_Monster_skeleton|walk",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/creature-monster-3d-by-oscar-creativo/source/Creature Monster 3d by Oscar Creativo.fbx",
+   "stacks": 1,
+   "limbNodes": 272,
+   "clips": "6447666955008_TempMotion",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/dragon-character-3d-by-oscar-creativo/source/Dragon Character 3d by Oscar Creativo.fbx",
+   "stacks": 1,
+   "limbNodes": 213,
+   "clips": "3677379169280_TempMotion",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/dune-sandworm-rigged-animated (1)/source/SandwormV2.fbx",
+   "stacks": 5,
+   "limbNodes": 24,
+   "clips": "Sandworm|SandwormBurrow, Sandworm|SandwormEmerge, Sandworm|SandwormIdle, Sandworm|SandwormTurnLeft, Sandworm|SandwormWiggle",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/four-legged-predator/source/Four Legged Predator.fbx",
+   "stacks": 7,
+   "limbNodes": 1456,
+   "clips": "rig|attack, rig|Idle, rig|Powerfull_attack, rig|Roar, rig|Run, rig|Sleeping, rig|walk",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/game-model-downloadable/source/876.fbx",
+   "stacks": 1,
+   "limbNodes": 132,
+   "clips": "CINEMA_4D_________ _____",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/gdoi5oiog8hs-Black-Dragon-NEW-27.03.2017/Black Dragon NEW/Dragon_Baked_Actions_fbx_7.4_binary.fbx",
+   "stacks": 4,
+   "limbNodes": 364,
+   "clips": "Armature|Fly_New, Armature|Idel_New, Armature|Run_New, Armature|Walk_New",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/ghoul-walk/source/walk_sketchfab3.fbx",
+   "stacks": 1,
+   "limbNodes": 144,
+   "clips": "Take 001",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/gold-sandworm/source/GoldSandworm.zip!GoldSandworm/GoldSandworm.FBX",
+   "stacks": 1,
+   "limbNodes": 16,
+   "clips": "Take 001",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/infernal-magma-hound-free-lava-creature-asset/source/fire_dog.fbx",
+   "stacks": 4,
+   "limbNodes": 714,
+   "clips": "Idle, Walk, rig|Idle, rig|Walk",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/magic-wolf/source/Magic wolf render.fbx",
+   "stacks": 15,
+   "limbNodes": 126,
+   "clips": "magic_wolf|0, magic_wolf|claw attack, magic_wolf|damage, magic_wolf|damage (SHOCK WAVE), magic_wolf|damage (SHOCK WAVE).RETURN, magic_wolf|flame thrower, magic_wolf|flame thrower loop, magic_wolf|Idle",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/monster/source/skjeb.fbx",
+   "stacks": 1,
+   "limbNodes": 426,
+   "clips": "Take 001",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/mutant-golem/source/MutantGolem1.fbx",
+   "stacks": 1,
+   "limbNodes": 210,
+   "clips": "2322174138704_TempMotion",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/ogre/source/ogre.fbx",
+   "stacks": 1,
+   "limbNodes": 50,
+   "clips": "Scene",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/skeleton-animated/source/Skeleton animated.fbx",
+   "stacks": 1,
+   "limbNodes": 102,
+   "clips": "Take 001",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/spider-animated-character/source/Spider_sketchfab.fbx",
+   "stacks": 8,
+   "limbNodes": 96,
+   "clips": "Spider_Tpose, Spider_Walk, Spider_Idle, Spider_Idle_long, Spider_Damage, Spider_Attack_1, Spider_Attack_2, Spider_Death",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/sweet-crab-sketchfabweekly/source/SweetCrabSketchfab.fbx",
+   "stacks": 1,
+   "limbNodes": 100,
+   "clips": "Idle",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/sweet-crab-sketchfabweekly (1)/source/SweetCrabSketchfab.fbx",
+   "stacks": 1,
+   "limbNodes": 100,
+   "clips": "Idle",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/toon-mutant-wolf/source/ToonMutantWolf.zip!ToonMutantWolf/animations/walk.fbx",
+   "stacks": 1,
+   "limbNodes": 94,
+   "clips": "Take 001",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/nature/abbysor-the-sea-monster-psx-animated/source/Abbysor.zip!Abbysor.fbx",
+   "stacks": 4,
+   "limbNodes": 24,
+   "clips": "Abbysor|Attack no Move, Abbysor|AttackMoved, Abbysor|Idle, Abbysor|Move",
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/nature/bighorn-realistic-3d-model-demo-free/source/source.zip!source/BIGHORN_DEMO.fbx",
+   "stacks": 3,
+   "limbNodes": 238,
+   "clips": "Bighorn Sheep|BighornSheep_Breathing, Bighorn Sheep|BighornSheep_Idle, Bighorn Sheep|BighornSheep_WalkFast_F",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/cartoon-clownfish-animated/source/Clownfish (animated).fbx",
+   "stacks": 1,
+   "limbNodes": 42,
+   "clips": "ArmatureAction",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/horse-realistic-3d-model-demo-free/source/source.zip!source/HORSE_DEMO.fbx",
+   "stacks": 2,
+   "limbNodes": 1352,
+   "clips": "Horse|Horse_Idle, Horse|Horse_Walk",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/jelly-fish-spongebob/source/Jelly Fish.zip!Jelly Fish.FBX",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/pa-shark/source/PA Shark.zip!Models/PA_Shark.fbx",
+   "stacks": 1,
+   "limbNodes": 34,
+   "clips": "Take 001",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/pa-shark/source/PA Shark.zip!Models/PA_SharkHigh.fbx",
+   "stacks": 1,
+   "limbNodes": 34,
+   "clips": "Take 001",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/realistic-animated-elk-3d-model/source/Elk Animated.fbx",
+   "stacks": 53,
+   "limbNodes": 72,
+   "clips": "Stand_Eating_01, Take 001, Lying_Breathing_01, Lying_Idle_02, WalkR, WalkL, Walk, TrotR",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/seagull-stylized-animated-3d-model/source/Seagull_1_0.fbx",
+   "stacks": 7,
+   "limbNodes": 66,
+   "clips": "walk, run, look, glide, fly, eat, clearing",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/sheep-test-non-commercial/source/sheep-group.fbx",
+   "stacks": 2,
+   "limbNodes": 92,
+   "clips": "Armature|Armature|Armature|Idle|Armature|Idle, Armature|Armature|Armature|Jump|Armature|Jump",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/tosakin-goldfish/source/TosakinSf.fbx",
+   "stacks": 1,
+   "limbNodes": 126,
+   "clips": "Scene",
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/object/6sntgsu03og0-Well_HighDetail/Well_HighDetail.FBX",
+   "stacks": 2,
+   "limbNodes": 0,
+   "clips": "Take 001, Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/airship/source/KURSACH.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/caravel-ship (1)/source/model.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/caravel-ship2/source/model.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/cgt-441-carousel-model/source/final.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/coffin/source/sketch fab coffin.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/dungeonprison-bars-door/source/G_dungeon_bars_rig.fbx",
+   "stacks": 1,
+   "limbNodes": 4,
+   "clips": "Armature.002|Armature.002Action",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/fallen-log-low-poly/source/Fallen log.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/Fantasy Props MegaKit[Standard]/Exports/FBX/Chest_Wood.fbx",
+   "stacks": 4,
+   "limbNodes": 6,
+   "clips": "Chest_Armature|Chest_Close, Chest_Armature|Chest_Closed, Chest_Armature|Chest_Open, Chest_Armature|Chest_Opened",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/free-medieval-well/source/Pozzo sketchfab.fbx",
+   "stacks": 2,
+   "limbNodes": 0,
+   "clips": "Take 001, Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/free-pack-cobwebs/source/Props Pack - Cobwebs.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/kelp/source/Kelp.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Plane.192|Plane.192Action",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/kelp (1)/source/Kelp.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Plane.192|Plane.192Action",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/sailing-ship (1)/source/sailing2.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/seaweed-m/source/maya2sketchfab.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/stone-altar/source/Altar.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/urn/source/Urn.zip!Urn/Urn - Textured.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/vines/source/Vines.zip!Vines/Vines.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/wip-cgma-merry-go-round-carousel/source/skethcf_test.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Take 001",
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/People/Universal Base Characters[Standard]/Universal Base Characters[Standard]/Hairstyles/anime-hair-9/source/Anime Hair 9.fbx",
+   "stacks": 1,
+   "limbNodes": 0,
+   "clips": "Default animation",
+   "kind": "prop"
+  },
+  {
+   "file": "assets/characters/capi/Infinian.fbx",
+   "stacks": 14,
+   "limbNodes": 380,
+   "clips": "Mon_Infinian_001_CombatIdle, Mon_Infinian_001_DeSpawn, Mon_Infinian_001_Die, Mon_Infinian_001_NormalAttcak01, Mon_Infinian_001_Run, Mon_Infinian_001_Skill01, Mon_Infinian_001_Skill02, Mon_Infinian_001_Skill03_Down",
+   "kind": "creature"
+  }
+ ],
+ "opaqueArchives": [
+  {
+   "file": "3D asset download/animation/Universal Animation Library 2[Standard]/Female Mannequin/Mannequin_F.blend",
+   "type": ".blend",
+   "bytes": 4130952,
+   "kind": "humanoid-UAL"
+  },
+  {
+   "file": "3D asset download/monster/animated-female-zombie/source/Female.rar",
+   "type": ".rar",
+   "bytes": 2628077,
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/drugdor-the-golem-animated/source/BossMonsterAnimations.blend",
+   "type": ".blend",
+   "bytes": 2279204,
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/gdoi5oiog8hs-Black-Dragon-NEW-27.03.2017/Black Dragon NEW/BGE_Dragon_2.5_Blender_Game_Engine.blend",
+   "type": ".blend",
+   "bytes": 3030630,
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/gdoi5oiog8hs-Black-Dragon-NEW-27.03.2017/Black Dragon NEW/Dragon Unity 5.unitypackage",
+   "type": ".unitypackage",
+   "bytes": 12455171,
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/gdoi5oiog8hs-Black-Dragon-NEW-27.03.2017/Black Dragon NEW/Dragon_2.5_Cycles.blend",
+   "type": ".blend",
+   "bytes": 14593010,
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/gdoi5oiog8hs-Black-Dragon-NEW-27.03.2017/Black Dragon NEW/Dragon_2.5_For_Animations.blend",
+   "type": ".blend",
+   "bytes": 2882186,
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/gdoi5oiog8hs-Black-Dragon-NEW-27.03.2017/Black Dragon NEW/Dragon_Baked_Actions.blend",
+   "type": ".blend",
+   "bytes": 14575424,
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/scourger-rig/source/Scourger3.blend",
+   "type": ".blend",
+   "bytes": 150782532,
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/monster/wop-octopus-pirate-king-high-poly/source/WoP - Pirate King.rar",
+   "type": ".rar",
+   "bytes": 34905083,
+   "kind": "creature"
+  },
+  {
+   "file": "3D asset download/nature/koi-fish/source/koifish.blend",
+   "type": ".blend",
+   "bytes": 2170792,
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/model-54a-caribbean-reef-shark/source/Reef Shark E (Baked Animation).blend",
+   "type": ".blend",
+   "bytes": 98437592,
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/nature/model-73a-great-hammerhead-shark/source/hammerhead_geo_294_RE-PACKED_jpgs.blend",
+   "type": ".blend",
+   "bytes": 9938404,
+   "kind": "animal"
+  },
+  {
+   "file": "3D asset download/object/2y5xiok5jskg-SwingRide/SwingRide.blend",
+   "type": ".blend",
+   "bytes": 2340648,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/bone-pile/source/BonePile.blend",
+   "type": ".blend",
+   "bytes": 878832,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/coffin (1)/source/Coffin.rar",
+   "type": ".rar",
+   "bytes": 39345774,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/coffin1/source/Coffin.rar",
+   "type": ".rar",
+   "bytes": 39345774,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/dress-form/source/dressForm.rar",
+   "type": ".rar",
+   "bytes": 73222789,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/low poly house furniture by niko.blend",
+   "type": ".blend",
+   "bytes": 2622980,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/low-poly-island-dock-platform/source/dockbbb.blend",
+   "type": ".blend",
+   "bytes": 1233116,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/lowpoly-textured-ice-crystals/source/MC_10009.rar",
+   "type": ".rar",
+   "bytes": 252772,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/medieval-rowboat/source/MedievalBoatExport.blend",
+   "type": ".blend",
+   "bytes": 1416456,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/prison-cell-door/source/Sketchfab_2019_08_18_11_16_45.blend",
+   "type": ".blend",
+   "bytes": 168064,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/roman-column-ruins/source/Sketchfab_2024_06_05_18_44_13.blend",
+   "type": ".blend",
+   "bytes": 20898570,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/object/segelschiff-sailing-ship-updated-pbr/source/Segelschiff_Sketchfab.blend",
+   "type": ".blend",
+   "bytes": 22939770,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/People/Universal Base Characters[Standard]/Universal Base Characters[Standard]/Hairstyles/female-hairs/source/Sketchfab_2020_04_15_12_16_04.blend",
+   "type": ".blend",
+   "bytes": 4301762,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/People/Universal Base Characters[Standard]/Universal Base Characters[Standard]/Hairstyles/hair-barbarianstylzed-free/source/hair barbarian fbx.rar",
+   "type": ".rar",
+   "bytes": 71642494,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/texture/infinian-lineage-series/source/Infinian.rar",
+   "type": ".rar",
+   "bytes": 30653462,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/stylised_weapons/stylised_weapons/stylised_axe/stylised_axe_render.blend",
+   "type": ".blend",
+   "bytes": 3104080,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/stylised_weapons/stylised_weapons/stylised_greatsword/greatsword_F.blend",
+   "type": ".blend",
+   "bytes": 1937244,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/stylised_weapons/stylised_weapons/stylised_hammer/hammer_F.blend",
+   "type": ".blend",
+   "bytes": 1424880,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/swords_pack/dist/blend/sword_1.blend",
+   "type": ".blend",
+   "bytes": 507624,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/swords_pack/dist/blend/sword_2.blend",
+   "type": ".blend",
+   "bytes": 504648,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/swords_pack/dist/blend/sword_3.blend",
+   "type": ".blend",
+   "bytes": 489620,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/swords_pack/dist/blend/sword_4.blend",
+   "type": ".blend",
+   "bytes": 485524,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/swords_pack/dist/blend/sword_5.blend",
+   "type": ".blend",
+   "bytes": 485628,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/swords_pack/dist/blend/sword_6.blend",
+   "type": ".blend",
+   "bytes": 489640,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/swords_pack/dist/blend/sword_7.blend",
+   "type": ".blend",
+   "bytes": 486580,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/swords_pack/dist/blend/sword_8.blend",
+   "type": ".blend",
+   "bytes": 485548,
+   "kind": "prop"
+  },
+  {
+   "file": "3D asset download/weapons/swords_pack/dist/blend/sword_9.blend",
+   "type": ".blend",
+   "bytes": 467672,
+   "kind": "prop"
+  }
+ ]
+}

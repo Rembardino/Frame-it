@@ -1,5 +1,5 @@
 /**
- * MOMENTI SEGRETI — piccole scene fuori dalla partita (in tribuna o a bordo campo) che nessuno annuncia:
+ * MOMENTI SEGRETI — piccole scene sugli spalti, fra il pubblico, che nessuno annuncia:
  * niente indizi del regista, niente indicatori ai bordi. Se le scopri e le riprendi valgono punti bonus
  * e, in Carriera, diventano video virali.
  *
@@ -16,18 +16,26 @@ import { project, starsFor, type FrameEval, type ScoreResult, type ShotSize, typ
 import type { DirectorResult } from './director';
 
 const S = () => CONFIG.secrets;
-const W = CONFIG.pitch.width;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 /** Altezza sullo schermo (frazione) di ciò che si sta valutando: dal punto più basso al più alto. */
 function screenHeight(ev: FrameEval) {
   const ys = ev.points.filter((p) => !p.behind).map((p) => p.y);
   return ys.length ? (Math.max(...ys) - Math.min(...ys)) / 2 : 0;
 }
-/** Corridoio fra la linea laterale lontana e i cartelloni pubblicitari. */
-const WALKWAY_Z = -(W / 2 + 2.3);
+interface StandPlace { row: SeatRow; along: THREE.Vector3; forward: THREE.Vector3; depth: number }
+const places = new WeakMap<Actor, StandPlace>();
+function onStand(actor: Actor, point: THREE.Vector3) {
+  const place = places.get(actor);
+  if (!place) return point;
+  const { row, along, forward, depth } = place, length = row.from.distanceTo(row.to);
+  const u = THREE.MathUtils.clamp(point.clone().sub(row.from).dot(along) / length, 0.04, 0.96);
+  return point.lerpVectors(row.from, row.to, u).addScaledVector(forward, depth);
+}
+
+export const isSecretCaptured = (result: ScoreResult | null) => !!result && !result.decisiveMissed && result.score >= S().captureScore;
 
 /** gap = distanza (m) fra i due di una coppia affiancata: i busti sono larghi ~0,55 m. */
-type Cast = { seat: 'stand' | 'walkway'; look?: 'plain' | 'costume' | 'mascot'; count: 1 | 2; couple?: 'behind' | 'side'; gap?: number };
+type Cast = { seat: 'stand'; openSky?: boolean; look?: 'plain' | 'costume' | 'mascot'; count: 1 | 2; couple?: 'behind' | 'side'; gap?: number };
 interface Plan {
   id: string;
   label: string;
@@ -77,7 +85,7 @@ const near = (a: Actor, ahead: number, side: number, up: number) => {
 const HEAD_TOP = 1.92 * CONFIG.visuals.spectatorScale;
 /** Camminata lungo il corridoio, nel verso dir. */
 const stroll = (a: Actor, dir: number, dist: number) => {
-  a.target.set(a.pos.x + dir * dist, 0, a.pos.z);
+  a.target.copy(a.pos).add(new THREE.Vector3(Math.sin(a.heading), 0, -Math.cos(a.heading)).multiplyScalar(dir * dist));
   a.speedLimit = CONFIG.match.walkSpeed * 0.8;
 };
 
@@ -106,7 +114,7 @@ export const PLANS: Plan[] = [
   {
     id: 's-proposal', label: 'Proposta di matrimonio!', size: 'medium', reactive: false, decisive: 3.7, duration: 9,
     // Lontani quanto basta per il braccio teso con l'anello; poi si avvicinano per il bacio.
-    cast: { seat: 'walkway', count: 2, couple: 'side', gap: 1.05 },
+    cast: { seat: 'stand', count: 2, couple: 'side', gap: 1.05 },
     steps: [
       [0, ([a, b]) => { a.faceTarget = b; b.faceTarget = a; }],
       [2, ([a, b], m) => pose(m, a, 'kneel', 3.9, b)],
@@ -128,7 +136,7 @@ export const PLANS: Plan[] = [
   },
   {
     id: 's-trip', label: 'Che capitombolo!', size: 'medium', reactive: false, decisive: 3.7, duration: 8,
-    cast: { seat: 'walkway', count: 1 },
+    cast: { seat: 'stand', count: 1 },
     steps: [
       [0, ([a]) => stroll(a, Math.sign(-a.pos.x) || 1, 9)],
       [3.2, ([a], m) => pose(m, a, 'stumble', 0.45)],
@@ -138,8 +146,8 @@ export const PLANS: Plan[] = [
   },
   {
     id: 's-ufo', label: 'Rapito dagli alieni!', size: 'medium', reactive: false, once: true, decisive: 6.1, duration: UFO.gone + 0.5,
-    // Allo stadio la tribuna lontana ha il tetto: la navicella prende uno che guarda la partita dal corridoio.
-    cast: { seat: DRONE_ONLY ? 'stand' : 'walkway', count: 1 },
+    // La navicella sceglie una tribuna scoperta, così il raggio non attraversa il tetto.
+    cast: { seat: 'stand', openSky: true, count: 1 },
     // Arriva da dietro le tribune, accende il raggio e se lo porta via (in tribuna il posto resta vuoto).
     setup: ([a], m) => { Object.assign(m.sky.ufo, { t0: m.time, seat: a.pos.clone(), side: Math.random() < 0.5 ? 1 : -1 }); m.sound('ufo', a.pos); },
     steps: [
@@ -174,11 +182,14 @@ export const PLANS: Plan[] = [
   },
   {
     id: 's-dog', label: 'Cane in fuga!', size: 'medium', reactive: false, decisive: 4.5, duration: 10.5,
-    cast: { seat: 'walkway', count: 1 },
+    cast: { seat: 'stand', count: 1 },
     // Il cane scappa al padrone lungo il corridoio; lui lo rincorre, inciampa, e il cane torna a fargli le feste.
     steps: [
       [0, ([a], m) => {
-        const dir = Math.sign(-a.pos.x) || 1, p = (dx: number, dz = 0) => new THREE.Vector3(a.pos.x + dir * dx, 0, WALKWAY_Z + dz);
+        const dir = Math.sign(-a.pos.x) || 1, origin = a.pos.clone();
+        const along = new THREE.Vector3(Math.sin(a.heading), 0, -Math.cos(a.heading));
+        const front = new THREE.Vector3(Math.cos(a.heading), 0, Math.sin(a.heading));
+        const p = (dx: number, dz = 0) => onStand(a, origin.clone().addScaledVector(along, dir * dx).addScaledVector(front, dz));
         m.fauna.spawn('dog', [
           { p: p(0.9), t: 0 }, { p: p(0.9), t: 0.7 }, { p: p(7, 0.5), t: 2 }, { p: p(12, -0.4), t: 3 }, { p: p(15.5), t: 3.8 },
           { p: p(15.6), t: 5.6 }, { p: p(14.2, 0.6), t: 6.3 }, { p: p(14.3, 0.6), t: 8.2 }, { p: p(32), t: 10.5 },
@@ -186,7 +197,7 @@ export const PLANS: Plan[] = [
         m.sound('bark', p(0.9));
       }],
       [0.8, ([a], m) => { pose(m, a, 'protest', 0.7); m.say(a, 'dog'); }],
-      [1.3, ([a]) => { a.target.set(a.pos.x + (Math.sign(-a.pos.x) || 1) * 13, 0, a.pos.z); a.speedLimit = CONFIG.match.runSpeed * 0.75; }],
+      [1.3, ([a]) => { stroll(a, Math.sign(-a.pos.x) || 1, 13); a.speedLimit = CONFIG.match.runSpeed * 0.75; }],
       [3.9, ([a], m) => pose(m, a, 'stumble', 0.4)],
       [4.3, ([a], m) => pose(m, a, 'fall', 2.6)],
       [5.9, ([a], m) => m.sound('bark', a.pos)],
@@ -195,7 +206,7 @@ export const PLANS: Plan[] = [
   },
   {
     id: 's-mascot', label: 'La mascotte inciampa!', size: 'medium', reactive: false, decisive: 3.95, duration: 8,
-    cast: { seat: 'walkway', count: 1, look: 'mascot' }, sports: ['calcio', 'basket'],
+    cast: { seat: 'stand', count: 1, look: 'mascot' }, sports: ['calcio', 'basket'],
     steps: [
       [0, ([a], m) => { stroll(a, Math.sign(-a.pos.x) || 1, 9); pose(m, a, 'wave', 2); }],
       [3.5, ([a], m) => pose(m, a, 'stumble', 0.4)],
@@ -221,6 +232,9 @@ class Secret {
 
   update(now: number, view: View) {
     const m = this.match, p = this.plan;
+    for (const actor of this.actors) if (actor.active && actor.pose !== 'float') {
+      onStand(actor, actor.pos); onStand(actor, actor.target);
+    }
     this.tracker.sample(now, view, frameInput(this.actors.map((a) => actorSubject(a, 'Spettatore')), 0, p.size));
     if (this.triggerAt === null) {
       const ev = this.tracker.last!;
@@ -233,25 +247,28 @@ class Secret {
     }
     while (this.step < p.steps.length && now - this.triggerAt >= p.steps[this.step][0]) p.steps[this.step++][1](this.actors, m);
     p.tick?.(this.actors, m, now - this.triggerAt);
+    for (const actor of this.actors) if (actor.active && actor.pose !== 'float') onStand(actor, actor.target);
     if (now >= this.tracker.moment.end) this.done = true;
   }
 
   get seen() { return this.triggerAt !== null && this.tracker.maxCoverage >= 0.3; }
 
   /**
-   * Voto di un momento segreto: conta solo averli TUTTI in quadro nell'istante decisivo (± 0,5 s).
-   * Tutto dentro = 100; un pezzo fuori = in proporzione; mai visti nell'istante giusto = poco.
+   * Coverage and actual shot size throughout the decisive second. A distant glimpse cannot become a viral capture.
    */
   result(): ScoreResult {
     const d = this.tracker.moment.decisive;
     const near = this.tracker.samples.filter((s) => Math.abs(s.t - d) <= 0.5);
-    const best = near.length ? Math.max(...near.map((s) => s.ev.coverage)) : this.tracker.maxCoverage * 0.5;
-    const score = Math.round(Math.min(1, best / S().noticeCoverage) * 100);
+    const detail = (ev: FrameEval) => Math.min(1, Math.pow(Math.exp(-Math.max(0, ev.zoomRatio)) / 0.82, 3.3));
+    const coverage = near.length ? near.reduce((sum, sample) => sum + sample.ev.coverage, 0) / near.length : 0;
+    const size = near.length ? near.reduce((sum, sample) => sum + detail(sample.ev), 0) / near.length : 0;
+    const score = Math.round(near.length ? near.reduce((sum, sample) => sum
+      + Math.min(1, sample.ev.coverage / S().noticeCoverage) * (0.03 + 0.97 * detail(sample.ev)), 0) / near.length * 100 : 0);
     const all = score >= 100;
     return {
-      score, stars: starsFor(score), enabled: ['coverage'], decisiveMissed: !near.length,
-      components: { coverage: score, size: 0, composition: 0, smoothness: 0, timing: 0 },
-      reasons: [all ? { text: 'Tutto in quadro!', good: true } : { text: 'Spettatore fuori inquadratura', good: false }],
+      score, stars: starsFor(score), enabled: ['coverage', 'size'], decisiveMissed: !near.length,
+      components: { coverage: coverage * 100, size: size * 100, composition: 0, smoothness: 0, timing: 0 },
+      reasons: [all ? { text: 'Tutto in quadro!', good: true } : { text: size < 0.9 ? 'Troppo lontano' : 'Spettatore fuori inquadratura', good: false }],
     };
   }
 }
@@ -296,8 +313,7 @@ export class SecretMoments {
     });
     if (this.stopped || this.active.length || now < this.next) return;
     this.next = now + rand(S().every[0], S().every[1]);
-    // Negli sport col drone non c'è il corridoio a bordo campo: solo le tribune (green, paese, arrivo, molo).
-    const options = PLANS.filter((p) => p.id !== this.last && !(p.once && this.used.has(p.id)) && (!p.sports || p.sports.includes(SPORT)) && (!DRONE_ONLY || p.cast.seat === 'stand'));
+    const options = PLANS.filter((p) => p.id !== this.last && !(p.once && this.used.has(p.id)) && (!p.sports || p.sports.includes(SPORT)));
     const forced = PLANS.find((p) => p.id === this.force);
     this.force = null;
     const plan = forced ?? options[Math.floor(Math.random() * options.length)];
@@ -308,26 +324,24 @@ export class SecretMoments {
     this.active.push(new Secret(plan, actors, this.match, now));
   }
 
-  /** Mette in scena gli spettatori: in un posto a caso della tribuna, o nel corridoio a bordo campo. */
+  /** Mette in scena gli spettatori su una fila reale e conserva il suo piano di appoggio. */
   private cast(c: Cast): Actor[] | null {
     const m = this.match;
     const look = c.look ?? 'plain';
     const want = (a: Actor) => look === 'plain' ? a.look === 'plain' : look === 'mascot' ? a.look === 'mascot' : a.look !== 'plain' && a.look !== 'mascot';
-    let at: THREE.Vector3, forward: THREE.Vector3, along: THREE.Vector3;
-    if (c.seat === 'stand') {
-      // Sport col drone: una tribuna vicina all'azione (la palla, o il punto che si segue: le altre sono a centinaia di metri).
-      const rows = DRONE_ONLY ? this.rows.filter((r) => Math.hypot(r.from.x - m.ball.pos.x, r.from.z - m.ball.pos.z) < 90) : this.rows;
-      const row = rows[Math.floor(Math.random() * rows.length)];
-      if (!row) return null;
-      at = new THREE.Vector3().lerpVectors(row.from, row.to, rand(0.15, 0.85));
-      // Il tifoso "guarda" verso il suo +x locale ruotato di facing: heading = -facing.
-      forward = new THREE.Vector3(Math.cos(-row.facing), 0, Math.sin(-row.facing));
-      along = row.to.clone().sub(row.from).normalize();
-    } else {
-      at = new THREE.Vector3(rand(-0.3, 0.3) * CONFIG.pitch.length, 0, WALKWAY_Z);
-      forward = new THREE.Vector3(0, 0, 1);
-      along = new THREE.Vector3(1, 0, 0);
+    // Sport col drone: una tribuna vicina all'azione, senza apparizioni lontane centinaia di metri.
+    const nearby = DRONE_ONLY ? this.rows.filter((r) => Math.hypot(r.from.x - m.ball.pos.x, r.from.z - m.ball.pos.z) < 120) : this.rows;
+    const elevated = nearby.filter(row => !row.standing && row.from.y > 0.25);
+    let rows = elevated.length ? elevated : nearby;
+    if (c.openSky && !DRONE_ONLY) {
+      const uncovered = rows.filter(row => Math.abs((row.from.x + row.to.x) / 2) > CONFIG.pitch.length / 2);
+      if (uncovered.length) rows = uncovered;
     }
+    const row = rows[Math.floor(Math.random() * rows.length)];
+    if (!row) return null;
+    const at = new THREE.Vector3().lerpVectors(row.from, row.to, rand(0.15, 0.85));
+    const forward = new THREE.Vector3(Math.cos(-row.facing), 0, Math.sin(-row.facing));
+    const along = row.to.clone().sub(row.from).normalize();
     // Lui dietro e un po' di lato, così dalla camera si vedono tutte e due le teste.
     const gap = c.gap ?? 0.6;
     const spots = c.count === 1 ? [at]
@@ -338,6 +352,7 @@ export class SecretMoments {
       const a = m.spawnExtra('spectator', spot, (x) => want(x) && !out.includes(x));
       if (!a) { out.forEach((x) => m.despawnExtra(x)); return null; }
       a.heading = Math.atan2(forward.z, forward.x);
+      places.set(a, { row, along, forward, depth: spot.clone().sub(at).dot(forward) });
       out.push(a);
     }
     return out;
@@ -354,7 +369,7 @@ export class SecretMoments {
     const { start, decisive, end } = s.tracker.moment;
     this.finished.push({
       id: s.plan.id,
-      label: `Virale: ${s.plan.label}`,
+      label: `${isSecretCaptured(result) ? 'Virale' : 'Pubblico'}: ${s.plan.label}`,
       category: 'secret',
       importance: 1,
       result,

@@ -103,6 +103,11 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
       p.lean = curve(u, [[0, 0.08], [0.18, 0.15], [0.36, -0.15], [1, -0.03]]);
       p.turn = hit * 0.22; p.lift = jump * (SPORT === 'pallavolo' ? 0.32 : 0.12); break;
     case 'receive':
+      if (SPORT === 'basket') {
+        plant(); p.armL = p.armR = 0.95; p.elbowL = p.elbowR = 0.9;
+        p.raiseL = p.raiseR = -0.18; p.legSpread = 0.11; p.lean = -0.05;
+        break;
+      }
       plant(); p.armL = p.armR = 1.1 + jump * 0.22; p.elbowL = p.elbowR = 0.06;
       p.raiseL = p.raiseR = -0.13; p.legSpread = 0.18;
       p.legL = p.legR = 0.28; p.kneeL = p.kneeR = -0.65; p.lean = -0.28; break;
@@ -127,6 +132,12 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
         p.raiseL = 0.5 + 0.7 * back; p.raiseR = 0.4 + 0.5 * back; p.lean = -0.05 + 0.18 * back;
       }
       break;
+    case 'dunk':
+      plant(); p.lift = curve(u, [[0, 0], [0.2, 0.12], [0.52, 1.02], [0.62, 0.94], [1, 0]]);
+      p.armL = p.armR = curve(u, [[0, 1], [0.3, 2.45], [0.55, 2.95], [0.72, 2.55], [1, 0.7]]);
+      p.elbowL = p.elbowR = curve(u, [[0, 1.05], [0.4, 0.25], [0.55, 0.08], [1, 0.7]]);
+      p.kneeL = -0.3 - jump * 0.45; p.kneeR = -0.3 - jump * 0.65;
+      p.lean = -0.1 * jump; p.wristFlexL = p.wristFlexR = -Math.max(0, u - 0.55) * 1.8; break;
     case 'shoot':
       plant(); p.lift = jump * 0.42;
       p.armL = p.armR = curve(u, [[0, 1.7], [0.26, 2.6], [0.42, 2.85], [0.72, 2.65], [1, 0.5]]);
@@ -282,8 +293,8 @@ export function stanceOffset(p: MotionPose) {
 }
 
 /** Sample the same articulated hand/racket chain used by the athlete rig. */
-export function netContactPoint(a: Actor, time: number, poseTime = a.poseTime) {
-  const p = samplePose(a, time, a.pose, poseTime, a.poseDur);
+export function netContactPoint(a: Actor, time: number, poseTime = a.poseTime, pose: Pose = a.pose, duration = a.poseDur) {
+  const p = samplePose(a, time, pose, poseTime, duration);
   const hand = (side: number) => {
     const right = side < 0;
     // Racchetta, testa del bastone da golf, o il palmo.
@@ -301,6 +312,6 @@ export function netContactPoint(a: Actor, time: number, poseTime = a.poseTime) {
     return point.multiplyScalar(CONFIG.visuals.playerScale).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a.heading).add(a.pos);
   };
   const contact = hand(-1);
-  if (SPORT === 'pallavolo' && (a.pose === 'set' || a.pose === 'receive')) contact.add(hand(1)).multiplyScalar(0.5);
+  if ((SPORT === 'pallavolo' && (pose === 'set' || pose === 'receive')) || SPORT === 'basket') contact.add(hand(1)).multiplyScalar(0.5);
   return contact;
 }

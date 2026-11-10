@@ -3,15 +3,21 @@
  * in un buffer circolare degli ultimi secondi. Serve al replay e, in futuro, all'esportazione delle clip
  * da condividere: clip() restituisce dati semplici, serializzabili in JSON.
  */
-import { CONFIG } from '../config';
+import { CONFIG, SPORT } from '../config';
 import type { Match, Pose, Ball } from '../sim/match';
 import type { MotionPose } from '../animation/motion';
 import type { Speech } from '../audio/speech';
+import type { TeamKit } from '../teams';
 
 export interface ActorFrame {
+  terrainPitch?: number;
   x: number; y: number; z: number; vx: number; vz: number;
+  /** Velocità smorzata dell'andatura (assente nelle registrazioni precedenti). */
+  gx?: number; gz?: number;
   heading: number; runPhase: number;
   pose: Pose; poseTime: number; poseDur: number; poseDir: number;
+  gesture?: string; gestureVariant?: number; previousGesture?: string; previousGestureVariant?: number; appearance?: number;
+  animationCatalog?: number;
   previousPose: Pose; previousPoseTime: number; previousPoseDur: number; poseBlendTime: number;
   poseFrom: MotionPose | null;
   active: boolean;
@@ -43,6 +49,8 @@ export interface Clip {
   label: string;
   decisive: number;
   frames: Frame[];
+  /** Club identity and strips stay with a saved video, even after the next random fixture. */
+  teams?: TeamKit[];
 }
 
 const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
@@ -72,9 +80,13 @@ export class Recorder {
       t: m.time,
       cam: { ...cam },
       actors: [...m.actors, ...m.extras].map((a) => ({
-        x: a.pos.x, y: a.pos.y, z: a.pos.z, vx: a.vel.x, vz: a.vel.z,
+        terrainPitch: a.terrainPitch,
+        x: a.pos.x, y: a.pos.y, z: a.pos.z, vx: a.vel.x, vz: a.vel.z, gx: a.gaitVel?.x ?? a.vel.x, gz: a.gaitVel?.z ?? a.vel.z,
         heading: a.heading, runPhase: a.runPhase,
         pose: a.pose, poseTime: a.poseTime, poseDur: a.poseDur, poseDir: a.poseDir,
+        gesture: a.gesture, gestureVariant: a.gestureVariant, previousGesture: a.previousGesture,
+        previousGestureVariant: a.previousGestureVariant, appearance: a.appearance,
+        animationCatalog:a.animationCatalog??3,
         previousPose: a.previousPose, previousPoseTime: a.previousPoseTime,
         previousPoseDur: a.previousPoseDur, poseBlendTime: a.poseBlendTime,
         poseFrom: a.poseFrom,
@@ -104,17 +116,26 @@ export class Recorder {
       actor.pos.z = lerp(fa.z, fb.z, u);
       actor.vel.x = lerp(fa.vx, fb.vx, u);
       actor.vel.z = lerp(fa.vz, fb.vz, u);
+      (actor.gaitVel ??= actor.vel.clone()).set(lerp(fa.gx ?? fa.vx, fb.gx ?? fb.vx, u), 0, lerp(fa.gz ?? fa.vz, fb.gz ?? fb.vz, u));
       actor.heading = lerpAngle(fa.heading, fb.heading, u);
+      actor.terrainPitch = fa.terrainPitch === undefined && fb.terrainPitch === undefined ? undefined : lerp(fa.terrainPitch ?? 0, fb.terrainPitch ?? 0, u);
       actor.runPhase = lerp(fa.runPhase, fb.runPhase, u);
-      const f = u < 0.5 || fa.pose !== fb.pose ? fa : fb;
+      const samePose=fa.pose===fb.pose&&fa.gesture===fb.gesture&&(fa.gestureVariant??0)===(fb.gestureVariant??0);
+      const f = u < 0.5 || !samePose ? fa : fb;
       actor.pose = f.pose;
       actor.poseDur = f.poseDur;
       actor.poseDir = f.poseDir;
-      actor.poseTime = fa.pose === fb.pose ? lerp(fa.poseTime, fb.poseTime, u) : f.poseTime;
+      actor.gesture = f.gesture;
+      actor.gestureVariant = f.gestureVariant;
+      actor.previousGesture = f.previousGesture;
+      actor.previousGestureVariant = f.previousGestureVariant;
+      actor.appearance = f.appearance ?? actor.appearance;
+      actor.animationCatalog=f.animationCatalog??2;
+      actor.poseTime = samePose ? lerp(fa.poseTime, fb.poseTime, u) : f.poseTime;
       actor.previousPose = f.previousPose;
       actor.previousPoseTime = f.previousPoseTime;
       actor.previousPoseDur = f.previousPoseDur;
-      actor.poseBlendTime = fa.pose === fb.pose ? lerp(fa.poseBlendTime, fb.poseBlendTime, u) : f.poseBlendTime;
+      actor.poseBlendTime = samePose ? lerp(fa.poseBlendTime, fb.poseBlendTime, u) : f.poseBlendTime;
       actor.poseFrom = f.poseFrom;
       actor.active = fa.active;
       actor.say = f.say;
@@ -147,6 +168,6 @@ export class Recorder {
 
   /** Fotogrammi tra t0 e t1: è la clip da rivedere o, in futuro, da esportare e condividere. */
   clip(label: string, decisive: number, t0: number, t1: number): Clip {
-    return { label, decisive, frames: this.frames.filter((f) => f.t >= t0 && f.t <= t1) };
+    return { label, decisive, ...(SPORT === 'ciclismo' ? {} : { teams: CONFIG.teams.map(team=>({...team})) }), frames: this.frames.filter((f) => f.t >= t0 && f.t <= t1) };
   }
 }

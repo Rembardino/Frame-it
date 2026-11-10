@@ -9,7 +9,9 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
 /** Tre riprese arcade: colpi puliti, difesa, combinazioni e knockdown recuperabili. */
 export class BoxingSimulation implements SportSimulation {
   private next = 2;
-  private hits: { actor: Actor; opponent: Actor; kind: SportAction; delay: number }[] = [];
+  private hits: { actor: Actor; opponent: Actor; kind: SportAction; delay: number; body?: boolean }[] = [];
+  /** Every third jab goes to the body: counted, not drawn from Math.random, so the rest of the bout is unchanged. */
+  private jabs = 0;
   /** Combinazione automatica in corso: chi attacca e i colpi che restano. */
   private attacker: Actor | null = null;
   private combo: SportAction[] = [];
@@ -23,9 +25,10 @@ export class BoxingSimulation implements SportSimulation {
   private round = 1;
   private pause = -1;
   constructor(private match: Match) {
+    match.referee.pos.set(0,0,-2.1);match.referee.target.copy(match.referee.pos);
     match.actors.forEach((a) => {
       a.pos.set(a.team === 0 ? -0.6 : 0.6, 0, 0); a.target.copy(a.pos);
-      match.setPose(a, 'guard'); a.faceTarget = match.actors[1 - a.team];
+      match.setPose(a, 'guard',1.1,null,a.team===0?'boxingEntry':'entry'); a.faceTarget = match.actors[1 - a.team];
     });
     match.ball.holder = match.actors[0];
   }
@@ -36,20 +39,27 @@ export class BoxingSimulation implements SportSimulation {
       hit.delay -= dt;
       if (hit.delay > 0) continue;
       // Fuori distanza, già a terra o schivato abbassandosi: colpo a vuoto.
-      if (hit.actor.pos.distanceTo(hit.opponent.pos) > 1.85 || hit.opponent.pose === 'fall' || hit.opponent.pose === 'crouch') continue;
+      if (hit.actor.pos.distanceTo(hit.opponent.pos) > 1.85 || ['fall','getUp','crouch'].includes(hit.opponent.pose)) continue;
       // Nello scambio di sottofondo una parte dei colpi finisce sui guantoni: niente punto, reazione breve.
       if (!this.match.ballScripted && hit.kind !== 'knockdown' && hit.opponent.pose === 'guard' && Math.random() < 0.32) {
-        this.match.setPose(hit.opponent, 'recoil', 0.28, hit.actor);
+        this.match.setPose(hit.opponent, 'recoil', 0.28, hit.actor, 'boxingBlock');
         this.match.sound('punch', hit.opponent.pos, 0.3);
         this.match.excitement = Math.max(this.match.excitement, 0.45);
         continue;
       }
-      this.match.setPose(hit.opponent, hit.kind === 'knockdown' ? 'fall' : 'recoil', hit.kind === 'knockdown' ? 2.5 : 0.55, hit.actor);
+      this.match.setPose(hit.opponent, hit.kind === 'knockdown' ? 'fall' : 'recoil', hit.kind === 'knockdown' ? 2.5 : 0.55, hit.actor,
+        hit.kind === 'knockdown' ? undefined : hit.body ? 'boxingRecoilBody' : 'boxingRecoilHead');
       // Contano solo i colpi all'avversario, non quelli a chi invade il ring.
       if (this.match.actors.includes(hit.opponent)) this.match.score[hit.actor.team] += hit.kind === 'knockdown' ? 2 : 1;
       this.match.sound(hit.kind === 'knockdown' ? 'knockdown' : 'punch', hit.opponent.pos, hit.kind === 'jab' ? 0.6 : 1);
       this.match.excitement = hit.kind === 'knockdown' ? 1 : 0.7;
-      if (hit.kind === 'knockdown') this.cheer = { actor: hit.actor, in: 0.5 };
+      if (hit.kind === 'knockdown') {
+        this.cheer = { actor: hit.actor, in: 0.5 };
+        const ref=this.match.referee;
+        ref.target.copy(hit.opponent.pos).add(new THREE.Vector3(0,0,1.25));
+        ref.target.x=THREE.MathUtils.clamp(ref.target.x,-2.3,2.3);ref.target.z=THREE.MathUtils.clamp(ref.target.z,-2.3,2.3);
+        this.match.setPose(ref,'count',3.6,hit.opponent);
+      }
     }
     this.hits = this.hits.filter(hit => hit.delay > 0);
     if (this.cheer && (this.cheer.in -= dt) <= 0) {
@@ -65,11 +75,12 @@ export class BoxingSimulation implements SportSimulation {
     // Il centro del combattimento gira per tutto il ring, non solo al centro.
     const cx = Math.sin(t * 0.31) * 1.3 + Math.sin(t * 0.13 + 2) * 0.4;
     const cz = Math.sin(t * 0.27 + 1) * 1.1;
-    const radius = 1 - this.engage * 0.38 + Math.sin(t * 1.3) * 0.07;
+    // Engaged, centres ~1.04 m apart: the imported punches reach the face only from there.
+    const radius = 1 - this.engage * 0.48 + Math.sin(t * 1.3) * 0.07;
     const angle = Math.sin(t * 0.42) * 0.9 + Math.sin(t * 0.87) * 0.2;
     for (const a of this.match.actors) {
       const opponent = this.match.actors[1 - a.team];
-      if (!a.scripted && a.pose !== 'fall') {
+      if (!a.scripted && !['fall','getUp','combo'].includes(a.pose)) {
         const ang = angle + a.team * Math.PI;
         // Piccoli passi laterali, ognuno col suo ritmo.
         const sway = Math.sin(t * 2.1 + a.team * 1.7) * 0.15;
@@ -93,7 +104,7 @@ export class BoxingSimulation implements SportSimulation {
     if (!this.attacker) {
       // Nuova combinazione: 1-3 colpi. A volte chi la subisce si abbassa e la schiva.
       const a = this.match.actors[Math.random() < 0.5 ? 0 : 1], opponent = this.match.actors[1 - a.team];
-      if (a.pose === 'fall' || opponent.pose === 'fall') { this.next = 0.5; return; }
+      if (['fall','getUp'].includes(a.pose) || ['fall','getUp'].includes(opponent.pose)) { this.next = 0.5; return; }
       this.attacker = a;
       this.combo = Array.from({ length: 1 + Math.floor(Math.random() * 3) }, () => AMBIENT_PUNCHES[Math.floor(Math.random() * AMBIENT_PUNCHES.length)]);
       this.next = 0.35; // il tempo di entrare
@@ -101,6 +112,11 @@ export class BoxingSimulation implements SportSimulation {
       return;
     }
     const a = this.attacker, opponent = this.match.actors[1 - a.team];
+    if (this.combo.length && a.pose !== 'fall' && opponent.pose !== 'fall' && Math.random()<.22) {
+      this.match.setPose(a,'combo',2.2,opponent,'boxingCombo');
+      for(const delay of [.45,.95,1.55])this.hits.push({actor:a,opponent,kind:'jab',delay});
+      this.attacker=null;this.combo=[];this.next=2.4;return;
+    }
     if (this.combo.length && a.pose !== 'fall' && opponent.pose !== 'fall') {
       if (this.slip && this.combo.length === 1) this.match.setPose(opponent, 'crouch', 0.45, a);
       this.action(this.combo.shift()!, a);
@@ -145,8 +161,9 @@ export class BoxingSimulation implements SportSimulation {
     const opponent = target ?? this.match.actors[1 - actor.team];
     actor.target.copy(actor.pos);
     const pose = kind === 'knockdown' ? 'uppercut' : kind === 'counter' ? 'hook' : kind;
-    this.match.setPose(actor, pose === 'jab' || pose === 'hook' || pose === 'uppercut' ? pose : 'jab', 0.65, opponent);
-    this.hits.push({ actor, opponent, kind, delay: 0.65 * 0.32 });
+    const body = pose === 'jab' && this.jabs++ % 3 === 2;
+    this.match.setPose(actor, pose === 'jab' || pose === 'hook' || pose === 'uppercut' ? pose : 'jab', 0.65, opponent, body ? 'boxingBodyJab' : undefined);
+    this.hits.push({ actor, opponent, kind, delay: 0.65 * 0.32, body });
   }
 
   scoreText() { return `${this.match.score[0]} - ${this.match.score[1]}`; }

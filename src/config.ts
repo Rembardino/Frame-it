@@ -1,3 +1,4 @@
+import { selectTeams, type TeamKit } from './teams';
 import { TEST, applyUpgrades, loadCareer, readPending } from './career/career';
 
 /**
@@ -124,9 +125,10 @@ const BASE = {
     /** Giocatori e palla un po' più grandi del reale, per leggibilità su schermo piccolo. */
     playerScale: 1.12,
     /** Spettatori dei momenti segreti: un po' più grandi del pubblico, così si notano (più alto = più evidenti). */
-    spectatorScale: 1.15,
+    spectatorScale: 0.85,
     ballRadius: 0.11,
-    ballScale: 2,
+    /** Calcio: pallone appena più grande del vero (i giocatori sono già 1,12×); 2 sembrava un pallone da spiaggia. */
+    ballScale: 1.3,
     /** Breve raccordo fra due gesti, registrato anche nei replay. */
     poseBlendSec: 0.18,
     /** Colori di arbitro, steward e tifoso invasore. */
@@ -135,10 +137,7 @@ const BASE = {
     fan: { shirt: 0xff4fd8, shorts: 0x3b5bdb, socks: 0xf2f2f2 },
   },
 
-  teams: [
-    { name: 'AURORA', short: 'AUR', shirt: 0x2f6fde, shorts: 0xf2f2f2, socks: 0x1d3f8a, keeper: 0x2bd47a },
-    { name: 'VULCANI', short: 'VUL', shirt: 0xe0403a, shorts: 0x1c1c1c, socks: 0x8a1f1b, keeper: 0xf2c230 },
-  ],
+  teams: [] as TeamKit[],
 
   scoring: {
     /** Progressione: 1 = solo Copertura + Tempismo, 2 = + Taglia, 3 = tutte le voci. Anche ?level=1 nell'URL. */
@@ -255,13 +254,14 @@ const BASE = {
   },
 
   secrets: {
-    /** Momenti segreti (in tribuna, a bordo campo): il primo dopo N secondi, poi uno ogni [min, max]. Mai annunciati. */
+    /** Momenti segreti fra il pubblico: il primo dopo N secondi, poi uno ogni [min, max]. Mai annunciati. */
     firstAt: 15,
     every: [14, 26],
-    /** Si accorgono della camera (e il bonus è pieno) quando sono TUTTI nell'inquadratura (copertura ≥ noticeCoverage)
-     *  e alti almeno noticeScreen dello schermo (basta un filo di zoom). Tempo di reazione in s. */
+    /** Reagiscono quando sono tutti visibili e abbastanza grandi. Il voto richiede uno zoom più stretto nell'istante decisivo. */
     noticeCoverage: 0.95,
-    noticeScreen: 0.06,
+    noticeScreen: 0.10,
+    /** A viral capture requires a clear, sustained close view of the decisive moment. */
+    captureScore: 70,
     reactDelay: 0.35,
     /** Moltiplicatore dei punti rispetto a un'azione normale. */
     bonus: 2,
@@ -342,9 +342,9 @@ const BASE = {
   },
 
   cycling: {
-    /** Corridori (per squadra) e velocità del gruppo (m/s): il gruppo regola il passo per arrivare al traguardo verso la fine. */
-    ridersPerTeam: 7,
-    packSpeed: [9, 15],
+    /** Corridori individuali e velocità del gruppo (m/s), regolata per arrivare verso la fine della diretta. */
+    riders: 14,
+    packSpeed: [9, 22],
     /** Secondo della diretta in cui il gruppo vuole arrivare al traguardo. */
     arriveSec: 165,
     /** Nel paese c'è uno strappo: il gruppo rallenta (frazione della velocità). */
@@ -411,16 +411,12 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
         clockMinutes: 40,
         walkSpeed: 1.5, jogSpeed: 3.2, runSpeed: 5.2, sprintSpeed: 7, dribbleSpeed: 4.2,
         passSpeed: 10, shotSpeed: 7,
-        holdTimeMin: 0.6, holdTimeMax: 1.6,
+        holdTimeMin: 0.45, holdTimeMax: 1.2,
         badPassChance: 0.08,
         tackleRate: 0.12,
         celebrateSec: 2.2,
       },
-      visuals: { playerScale: 1.2, ballRadius: 0.12, ballScale: 1.7 },
-      teams: [
-        { name: 'LUPI', short: 'LUP', shirt: 0x7b3fe4, shorts: 0x7b3fe4, socks: 0xf2f2f2, keeper: 0x7b3fe4 },
-        { name: 'DELFINI', short: 'DEL', shirt: 0x12b5c9, shorts: 0x0d5e6b, socks: 0x0d5e6b, keeper: 0x12b5c9 },
-      ],
+      visuals: { playerScale: 1.2, ballRadius: 0.12, ballScale: 1.2 },
       /** Ritmo più alto: nel basket si cambia giocatore in continuazione. Punteggio in punti, non in gol. */
       director: {
         firstMainAt: 3, mainEvery: [8, 11],
@@ -438,11 +434,8 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
       camera: { position: { x: 0, y: 3, z: 8.5 }, startPitch: -10, startFov: 45, fovMax: 65 },
       scoring: { decisiveTooWide: 2 },
       match: { clockMinutes: 9, runSpeed: 2.8, sprintSpeed: 3.5, walkSpeed: 1, accel: 10 },
-      visuals: { playerScale: 1.05 },
-      teams: [
-        { name: 'ROSSO', short: 'ROS', shirt: 0xcc3547, shorts: 0xcc3547, socks: 0x202433, keeper: 0xcc3547 },
-        { name: 'BLU', short: 'BLU', shirt: 0x3878df, shorts: 0x3878df, socks: 0x202433, keeper: 0x3878df },
-      ],
+      /** Arbitro in camicia chiara: sul ring in penombra il nero sparisce. */
+      visuals: { playerScale: 1.05, referee: { shirt: 0xeef1f4, shorts: 0x1b1d22, socks: 0x1b1d22 } },
       director: { firstMainAt: 3, mainEvery: [9, 13], distractionMinDist: 2, goalBudget: 999 },
       crowd: { rowsFar: 5, rowsEnd: 4 },
     },
@@ -454,11 +447,8 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
       camera: { position: { x: 1.8, y: 5, z: 18 }, startYaw: -5.7, startPitch: -12, startFov: 46, fovMax: 64 },
       scoring: { decisiveTooWide: 2 },
       match: { clockMinutes: 30, runSpeed: 6, sprintSpeed: 7, accel: 18 },
-      visuals: { ballRadius: 0.034, ballScale: 3.5 },
-      teams: [
-        { name: 'ROSSI', short: 'ROS', shirt: 0xf27342, shorts: 0xffffff, socks: 0xffffff, keeper: 0xf27342 },
-        { name: 'BIANCHI', short: 'BIA', shirt: 0x64d5bd, shorts: 0x203653, socks: 0xffffff, keeper: 0x64d5bd },
-      ],
+      /** Palla ingrandita quanto basta per seguirla: 3,5 volte sembrava un'arancia. */
+      visuals: { ballRadius: 0.034, ballScale: 1.8 },
       director: { firstMainAt: 3, mainEvery: [11, 15], distractionMinDist: 3, goalBudget: 999 },
       crowd: { rowsFar: 6, rowsEnd: 4 },
     },
@@ -470,11 +460,7 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
       camera: { position: { x: 1.5, y: 4.5, z: 14 }, startYaw: -6.1, startPitch: -8, startFov: 46, fovMax: 66 },
       scoring: { decisiveTooWide: 2 },
       match: { clockMinutes: 25, runSpeed: 4.5, sprintSpeed: 6, accel: 18 },
-      visuals: { playerScale: 1.1, ballRadius: 0.105, ballScale: 1.8 },
-      teams: [
-        { name: 'FALCHI', short: 'FAL', shirt: 0xf5bd32, shorts: 0x1d345a, socks: 0xffffff, keeper: 0xf5bd32 },
-        { name: 'AQUILE', short: 'AQU', shirt: 0xe95d78, shorts: 0x25344c, socks: 0xffffff, keeper: 0xe95d78 },
-      ],
+      visuals: { playerScale: 1.1, ballRadius: 0.105, ballScale: 1.2 },
       director: { firstMainAt: 3, mainEvery: [11, 15], distractionMinDist: 3, goalBudget: 999 },
       crowd: { rowsFar: 6, rowsEnd: 4 },
     },
@@ -488,17 +474,14 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
       camera: { startFov: 42, fovMin: 2, fovMax: 62, droneSpeed: 42, shakeAmplitude: 0.03 },
       /** Allargare troppo dall'alto non basta: nell'istante decisivo serve almeno un terzo dello zoom giusto. */
       scoring: { decisiveTooWide: 3 },
-      match: { durationSec: 300, walkSpeed: 1.4, jogSpeed: 2.6, runSpeed: 5.5, sprintSpeed: 7 },
+      /** Tetto di sicurezza: la partita finisce col giro (due palle, 3 buche: circa 5 minuti). */
+      match: { durationSec: 420, walkSpeed: 1.4, jogSpeed: 2.6, runSpeed: 5.5, sprintSpeed: 7 },
       visuals: {
         playerScale: 1.12, ballRadius: 0.0214, ballScale: 3,
         /** Il marshal (giacca verde, pantaloni chiari) col cartello del silenzio. */
         referee: { shirt: 0x245a3a, shorts: 0xd9cfb4, socks: 0x2a2a2a },
       },
-      /** Una coppia a colpi alternati. socks = pettorina del caddie. */
-      teams: [
-        { name: 'MARCO', short: 'MAR', shirt: 0x1f3f7a, shorts: 0xe8e2d2, socks: 0xf4f4f4, keeper: 0x1f3f7a },
-        { name: 'GIULIA', short: 'GIU', shirt: 0xe0557d, shorts: 0x3b4252, socks: 0xf4f4f4, keeper: 0xe0557d },
-      ],
+      /** Due giocatori, ognuno con la sua palla. socks = pettorina del caddie. */
       /** Ogni colpo è un'azione: parte appena il golfista è sulla palla. Le distrazioni succedono lontano, vicino al green. */
       director: {
         firstMainAt: 2, mainEvery: [0.5, 1], firstDistractionAt: 30, distractionEvery: [26, 40],
@@ -540,10 +523,6 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
       match: { durationSec: 300 },
       visuals: { playerScale: 1.05 },
       /** Due team con due barche ciascuno (due velisti per barca). */
-      teams: [
-        { name: 'GRECALE', short: 'GRE', shirt: 0xd8393f, shorts: 0x22262e, socks: 0xf2f2f2, keeper: 0xd8393f },
-        { name: 'MAESTRALE', short: 'MAE', shirt: 0x15a6b8, shorts: 0x22262e, socks: 0xf2f2f2, keeper: 0x15a6b8 },
-      ],
       director: {
         firstMainAt: 3.5, mainEvery: [8, 12], firstDistractionAt: 18, distractionEvery: [18, 28],
         dilemmaChance: 0.3, dilemmaBy: 2, goalBudget: 999,
@@ -569,6 +548,7 @@ for (const [k, v] of Object.entries(over)) {
   const key = k as keyof Base;
   (BASE as Record<string, unknown>)[key] = Array.isArray(v) ? v : { ...BASE[key], ...(v as object) };
 }
+BASE.teams = selectTeams(SPORT);
 const pending = readPending();
 /** Partita della modalità Carriera (scelta dal menu Carriera); null = modalità libera, senza potenziamenti. */
 export const CAREER = pending && pending.sport === SPORT ? pending : null;

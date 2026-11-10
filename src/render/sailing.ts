@@ -16,11 +16,21 @@ const LAND = [blob({ c: [900, 700], r: [420, 230], rot: 0.3 }, 0, 4), blob({ c: 
 const BEACH = [blob({ c: [900, 700], r: [420, 230], rot: 0.3 }, 14, 4), blob({ c: [-1250, -250], r: [520, 950], rot: 0.1 }, 18, 6), blob({ c: [300, -1150], r: [900, 300] }, 18, 8)];
 const PIER = { from: new THREE.Vector3(600, 0, 520), to: new THREE.Vector3(640, 0, 455) };
 
-function colored(g: THREE.BufferGeometry, color: number) {
-  const flat = g.index ? g.toNonIndexed() : g, c = new THREE.Color(color), v = new Float32Array(flat.attributes.position.count * 3);
-  for (let i = 0; i < v.length; i += 3) { v[i] = c.r; v[i + 1] = c.g; v[i + 2] = c.b; }
+/** Vertex colours for the merged painted meshes; with `top`, faces looking up (decks) get that colour. */
+function colored(g: THREE.BufferGeometry, color: number, top?: number) {
+  const flat = g.index ? g.toNonIndexed() : g, c = new THREE.Color(color), d = new THREE.Color(top ?? color), v = new Float32Array(flat.attributes.position.count * 3);
+  const normal = flat.attributes.normal;
+  for (let i = 0; i < v.length; i += 3) { const k = top !== undefined && normal.getY(i / 3) > 0.7 ? d : c; v[i] = k.r; v[i + 1] = k.g; v[i + 2] = k.b; }
   flat.setAttribute('color', new THREE.BufferAttribute(v, 3));
+  if (flat.hasAttribute('uv')) flat.deleteAttribute('uv');
   return flat;
+}
+
+/** Thin round bar (stay, bowsprit) from a to b. */
+function rod(a: THREE.Vector3, b: THREE.Vector3, r: number, color: number) {
+  const d = b.clone().sub(a), g = new THREE.CylinderGeometry(r, r, d.length(), 6);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize()));
+  return colored(g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2), color);
 }
 const painted = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 });
 
@@ -30,18 +40,34 @@ function hullGeometry(z: number) {
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), r0 = Math.hypot(p.getY(i), p.getZ(i));
     if (r0 < 1e-4) continue;
-    const r = (1 - x) ** 0.7 * Math.sqrt(Math.min(1, (1 + x) * 4)) / 1.48;
-    p.setY(i, (p.getY(i) * r) / r0); p.setZ(i, (p.getZ(i) * r) / r0);
+    const r = (1 - x) ** 0.7 * Math.sqrt(Math.min(1, (1 + x) * 4)) / 1.48, y = (p.getY(i) * r) / r0;
+    // Coperta piatta (dove sta l'equipaggio) sopra una carena tonda.
+    p.setY(i, y > 0 ? Math.min(y, r * 0.5) * 1.5 : y); p.setZ(i, (p.getZ(i) * r) / r0);
   }
   g.computeVertexNormals();
   return g.scale(7.5, 0.62, 0.48).translate(0, 0.5, z);
 }
 
-/** Ala rigida da y0 a y1 (m), che si stringe verso l'alto. */
+/** Ala rigida da y0 a y1 (m), che si stringe verso l'alto: elemento principale e flap, con profilo alare simmetrico. */
 function wingPart(y0: number, y1: number, color: number) {
-  const g = new THREE.BoxGeometry(2.6, y1 - y0, 0.28, 1, 2, 1).translate(0.6, (y0 + y1) / 2, 0), p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) p.setX(i, 0.6 + (p.getX(i) - 0.6) * (1 - ((p.getY(i) - 1.2) / 20) * 0.6));
-  return colored(g, color);
+  const chord = (y: number) => 2.6 * (1 - ((y - 1.2) / 20) * 0.6), n = 10, ring = 2 * n;
+  // Profilo NACA: dal bordo d'uscita sopra, al bordo d'attacco, e di nuovo indietro sotto (punti fitti sul bordo d'attacco).
+  const profile = Array.from({ length: ring }, (_, i) => {
+    const s = i <= n ? 1 - i / n : (i - n) / n, x = s * s;
+    return [x, (i <= n ? 1 : -1) * (0.2969 * Math.sqrt(x) - 0.126 * x - 0.3516 * x * x + 0.2843 * x ** 3 - 0.1036 * x ** 4) * 5];
+  });
+  const parts: THREE.BufferGeometry[] = [];
+  for (const [from, size, thick] of [[0, 0.62, 0.18], [0.66, 0.34, 0.12]]) {
+    const at = (y: number, [x, z]: number[]) => [0.6 + 0.45 * chord(y) - (from + x * size) * chord(y), y, z * thick * size * chord(y)];
+    const side = new THREE.BufferGeometry(), cap = new THREE.BufferGeometry(), index: number[] = [];
+    side.setAttribute('position', new THREE.Float32BufferAttribute([...profile.flatMap((q) => at(y0, q)), ...profile.flatMap((q) => at(y1, q))], 3));
+    for (let i = 0; i < ring; i++) { const j = (i + 1) % ring; index.push(i, j, ring + i, j, ring + j, ring + i); }
+    side.setIndex(index); side.computeVertexNormals();
+    cap.setAttribute('position', new THREE.Float32BufferAttribute(profile.flatMap((q) => at(y1, q)), 3));
+    cap.setIndex(Array.from({ length: ring - 2 }, (_, i) => [0, i + 1, i + 2]).flat()); cap.computeVertexNormals();
+    parts.push(colored(side, color), colored(cap, color));
+  }
+  return mergeGeometries(parts)!;
 }
 
 /** Catamarano volante, lungo 15 m: prua verso +x, scafi a z = ±2.6. Ala col colore della squadra; tip = colore della punta. */
@@ -50,13 +76,19 @@ function catamaran(color: number, tip: number) {
   const jib = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(1.4, 1.4, 0), new THREE.Vector3(6.8, 1.2, 0), new THREE.Vector3(1.6, 15, 0)]);
   jib.computeVertexNormals();
   group.add(new THREE.Mesh(mergeGeometries([
-    colored(hullGeometry(2.6), color), colored(hullGeometry(-2.6), color),
-    colored(new THREE.BoxGeometry(1, 0.3, 5.6).translate(1.5, 0.95, 0), 0x22262e), colored(new THREE.BoxGeometry(1, 0.3, 5.6).translate(-3.5, 0.95, 0), 0x22262e),
+    colored(hullGeometry(2.6), color, 0x2b2f36), colored(hullGeometry(-2.6), color, 0x2b2f36),
+    // Traverse carenate, piano di coperta, bompresso per il gennaker e sartie dell'ala.
+    colored(new THREE.CapsuleGeometry(0.22, 5.2, 4, 10).rotateX(Math.PI / 2).scale(2, 0.7, 1).translate(1.5, 0.95, 0), 0x22262e),
+    colored(new THREE.CapsuleGeometry(0.22, 5.2, 4, 10).rotateX(Math.PI / 2).scale(2, 0.7, 1).translate(-3.5, 0.95, 0), 0x22262e),
     colored(new THREE.BoxGeometry(5, 0.06, 5).translate(-1, 0.95, 0), 0x3a3f48),
+    rod(new THREE.Vector3(1.8, 1, 0), new THREE.Vector3(9.6, 1.4, 0), 0.07, 0x22262e),
+    ...[2.6, -2.6].flatMap((z) => [rod(new THREE.Vector3(0.9, 15, 0), new THREE.Vector3(0.6, 1.05, z), 0.025, 0x15181d),
+      rod(new THREE.Vector3(1.4, 15.5, 0), new THREE.Vector3(5.5, 0.95, z * 0.8), 0.025, 0x15181d)]),
     wingPart(1.2, 9, color), wingPart(9, 17.5, 0xf2f4f6), wingPart(17.5, 21.2, tip),
-    // Foil a T sotto gli scafi e timoni.
+    // Foil a L sotto gli scafi (punta verso l'interno) e timoni a T.
     colored(new THREE.BoxGeometry(0.4, 2.4, 0.1).translate(0.5, -0.9, 2.6), 0x15181d), colored(new THREE.BoxGeometry(0.4, 2.4, 0.1).translate(0.5, -0.9, -2.6), 0x15181d),
-    colored(new THREE.BoxGeometry(0.5, 0.06, 1.6).translate(0.5, -2.1, 2.6), 0x15181d), colored(new THREE.BoxGeometry(0.5, 0.06, 1.6).translate(0.5, -2.1, -2.6), 0x15181d),
+    colored(new THREE.BoxGeometry(0.5, 0.06, 1.5).rotateX(0.12).translate(0.5, -2.05, 1.9), 0x15181d), colored(new THREE.BoxGeometry(0.5, 0.06, 1.5).rotateX(-0.12).translate(0.5, -2.05, -1.9), 0x15181d),
+    colored(new THREE.BoxGeometry(0.5, 0.06, 1.2).translate(-7, -1.55, 2.6), 0x15181d), colored(new THREE.BoxGeometry(0.5, 0.06, 1.2).translate(-7, -1.55, -2.6), 0x15181d),
     colored(new THREE.BoxGeometry(0.3, 2, 0.08).translate(-7, -0.6, 2.6), 0x15181d), colored(new THREE.BoxGeometry(0.3, 2, 0.08).translate(-7, -0.6, -2.6), 0x15181d),
   ])!, painted));
   group.add(new THREE.Mesh(jib, new THREE.MeshStandardMaterial({ color: 0xf6f6f2, side: THREE.DoubleSide, roughness: 0.6 })));

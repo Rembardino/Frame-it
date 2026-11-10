@@ -1,0 +1,56 @@
+{
+  "author": "Adobe Mixamo characters Ch42 and Ch01; Carol Tennis Player Girl (Sketchfab, CC BY 4.0) rigged with Mixamo, all supplied by the user",
+  "models": [
+    {
+      "id": "athlete-tee",
+      "source": "character.fbx",
+      "bytes": 53722240,
+      "sha256": "f9efdd615b8de657d0e088577d18618ae5a35ef7178d370ec404b18c3590b0c1",
+      "meshes": [
+        "Shoes",
+        "Body",
+        "Shirt",
+        "Shorts",
+        "Eyelashes",
+        "Hair"
+      ],
+      "triangles": 6377,
+      "optimizedBytes": 570000
+    },
+    {
+      "id": "athlete-polo",
+      "source": "character (2).fbx",
+      "bytes": 54613248,
+      "sha256": "78324147f2465bd8a851b13fc754d859eff0d5fdb51f6ad1bb6ac9d209b26b80",
+      "meshes": [
+        "Body",
+        "Shirt",
+        "Shoes",
+        "Pants",
+        "Eyelashes",
+        "Hair"
+      ],
+      "triangles": 6501,
+      "optimizedBytes": 581232
+    },
+    {
+      "id": "athlete-carol",
+      "source": "carol-tennis.fbx",
+      "bytes": 5041600,
+      "sha256": "e706c370a6d0c2456c707893e5cd9c7538082429db70a75205ad4ed0ea9fa140",
+      "meshes": [
+        "Bands",
+        "Socks",
+        "Shoes",
+        "Skirt",
+        "Shirt",
+        "BodyHead",
+        "Hair",
+        "Cap",
+        "Body"
+      ],
+      "triangles": 8793,
+      "optimizedBytes": 869068
+    }
+  ]
+}

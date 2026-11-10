@@ -10,6 +10,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from '../config';
 import type { SeatRow } from './stage';
 import { radialTexture } from './stage';
+import { createCrowdHumans } from './characters';
 
 interface Fan {
   x: number;
@@ -30,6 +31,8 @@ interface Fan {
   stand: number;
   /** Indice della bandiera che tiene, o -1. */
   flag: number;
+  /** Moltiplica SCALE: chi sta in piedi a bordo strada ha la statura dei corridori. */
+  size: number;
 }
 
 export interface CrowdState {
@@ -47,8 +50,12 @@ const HAIR = [0x30241e, 0x8c613c, 0x111111, 0xd9b26a, 0x4a2a1a, 0x9a9a9a];
 const FLASHES = 48;
 /** Scala del tifoso: il modello è alto ~0,85 m, moltiplicato arriva a una persona vera; da seduto si abbassa. */
 const SCALE = 1.5;
+/** Pubblico in piedi visto da vicino (bordo strada): circa 1,85 m, accanto ad atleti e spettatori veri di ~2 m. */
+const STANDING = 1.45;
 
 export class Crowd {
+  readonly ready: Promise<void>;
+  private fanState?: THREE.InstancedBufferAttribute;
   private fans: Fan[] = [];
   private body: THREE.InstancedMesh;
   private arms: THREE.InstancedMesh;
@@ -79,7 +86,7 @@ export class Crowd {
     const flagColors: number[] = [];
     for (const row of rows) {
       const len = row.from.distanceTo(row.to);
-      const n = Math.max(1, Math.floor(len / CONFIG.crowd.spacing));
+      const n = Math.max(1, Math.floor(len / (CONFIG.crowd.spacing * (row.standing ? 1.3 : 1))));
       const rot = new THREE.Quaternion().setFromAxisAngle(up, row.facing);
       // I vuoti si raggruppano: qualche posto libero vicino a un altro, non un rumore uniforme.
       let empty = 0;
@@ -96,8 +103,8 @@ export class Crowd {
           phase: Math.random() * 10, energy: 0.5 + Math.random() * 0.5, pointer: Math.random() < 0.75,
           wide: 0.86 + Math.random() * 0.3, tall: 0.9 + Math.random() * 0.2,
           // Nelle curve si sta in piedi quasi sempre; in tribuna ci si alza solo per le occasioni.
-          standAt: curve ? Math.random() * 0.35 : 0.2 + Math.random() * 0.75,
-          stand: 0, flag: flag ? this.flagFans.length : -1,
+          standAt: row.standing ? -1 : curve ? Math.random() * 0.35 : 0.2 + Math.random() * 0.75,
+          stand: 0, flag: flag ? this.flagFans.length : -1, size: row.standing ? STANDING : 1,
         });
         if (flag) { this.flagFans.push(this.fans.length - 1); flagColors.push(team >= 0 ? CONFIG.teams[team].shirt : 0xffffff); }
         shirts.push(team >= 0 && Math.random() < 0.7 ? CONFIG.teams[team].shirt : NEUTRAL[Math.floor(Math.random() * NEUTRAL.length)]);
@@ -161,6 +168,14 @@ export class Crowd {
     this.armsL = armsL;
     this.update(0, { excitement: 0, hot: { x: 0, level: 0 }, lookUp: 0 });
     scene.add(this.body, head, hair, scarf, sleeves, forearms, this.arms, armsL, this.phones, this.flagPoles, this.flagCloth, this.flashes);
+    this.ready=createCrowdHumans(count,shirts).then(({meshes,fanState})=>{
+      const matrices=this.body.instanceMatrix;
+      for(const old of [this.body,head,hair,scarf,sleeves,forearms,this.arms,armsL]){
+        scene.remove(old);old.geometry.dispose();
+      }
+      for(const mesh of meshes){mesh.instanceMatrix=matrices;scene.add(mesh);}
+      this.body=meshes[0];this.fanState=fanState;
+    });
   }
 
   /** gaps = posti occupati dagli spettatori "veri" dei momenti segreti: lì il tifoso finto sparisce. */
@@ -186,18 +201,21 @@ export class Crowd {
       const standTarget = excite > f.standAt || wave > 0.3 || look > 0.3 ? 1 : 0;
       f.stand += (standTarget - f.stand) * k;
       const stand = f.stand;
+      const raised = !gaps.some(g=>Math.abs(g.y-f.y)<.3&&Math.hypot(g.x-f.x,g.z-f.z)<.6) && (look>.05?f.pointer:excite*f.energy>.55||wave>.6);
+      this.fanState?.setXYZW(i,stand,raised?Math.min(1,Math.max(look,excite,wave)):0,
+        (.5+.5*Math.sin(t*.8+f.phase))*(1-stand)*.65,standTarget>=stand?1:-1);
       const idle = Math.sin(t * 1.5 + f.phase) * 0.025;
       const jump = excite * f.energy * Math.max(0, Math.sin(t * 9 + f.phase)) * 0.4 * stand * (1 - look);
       const rise = wave * 0.35 * (1 - look);
       // Seduto: più basso e un po' più corto; in piedi: altezza piena.
-      const seatDrop = (1 - stand) * 0.28;
+      const seatDrop = (1 - stand) * (this.fanState ? .1 : .28);
       this.p.set(f.x, f.y + idle * (1 - look) + jump + rise - seatDrop, f.z);
       // Applausi/esultanza: oscillazione laterale del busto quando si esulta.
       this.tilt.setFromAxisAngle(this.xAxis, Math.sin(t * 7 + f.phase) * 0.08 * excite * stand);
       this.q.multiplyQuaternions(f.rot, this.lean).multiply(this.tilt);
       const gap = gaps.length > 0 && gaps.some((g) => Math.abs(g.y - f.y) < 0.3 && Math.hypot(g.x - f.x, g.z - f.z) < 0.6);
       if (gap) this.m.compose(this.p, this.q, this.zero);
-      else { this.s.set(f.wide * SCALE, f.tall * SCALE * (0.8 + 0.2 * stand), f.wide * SCALE); this.m.compose(this.p, this.q, this.s); }
+      else { this.s.set(f.wide * SCALE * f.size, f.tall * SCALE * f.size * (this.fanState?1:0.8+0.2*stand), f.wide * SCALE * f.size); this.m.compose(this.p, this.q, this.s); }
       this.body.setMatrixAt(i, this.m);
       if (showArms) {
         // Braccia su: chi indica il cielo, una parte di chi esulta (a turno, con la propria energia), la cresta dell'ola.
@@ -216,6 +234,7 @@ export class Crowd {
       }
     }
     this.body.instanceMatrix.needsUpdate = true;
+    if(this.fanState)this.fanState.needsUpdate=true;
     if (showArms) this.arms.instanceMatrix.needsUpdate = true;
     if (flagPos) this.flagPoles.instanceMatrix.needsUpdate = true;
     this.updateFlashes(dt, s.excitement + s.hot.level * 0.5);

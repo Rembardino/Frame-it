@@ -8,7 +8,29 @@ import type { EventDef } from './types';
 
 const ALL = ['mid', 'fwd', 'def'] as const;
 
+function shootingFoul(shots: 2 | 3): EventDef {
+  return {
+    id: `b-liberi-${shots}`, label: shots === 2 ? 'Fallo di tiro: due liberi' : 'Fallo sulla tripla: tre liberi',
+    hint: 'Contatto sul tiro: segui il tiratore in lunetta!', category: 'main', weight: shots === 2 ? 0.9 : 0.45,
+    importance: 0.8, ownsBall: true, exclusive: true, holderGoalDist: [3, 20],
+    roles: {
+      shooter: { label: 'Tiratore', pick: 'holder' },
+      defender: { label: 'Difensore', pick: 'player', side: 'defense', roles: [...ALL], near: 'shooter' },
+    },
+    steps: [
+      { t: 0, do: 'move', who: 'shooter', to: { goal: [shots === 2 ? 4 : 8.8, 1.8] }, speed: 'run' },
+      { t: 0.2, do: 'follow', who: 'defender', target: 'shooter', off: [0.6, 0.2], speed: 'run' },
+      { t: 1.7, do: 'pose', who: 'shooter', pose: 'shoot', dur: 0.6 },
+      { t: 1.9, do: 'basketFoul', who: 'defender', victim: 'shooter', shots },
+    ],
+    cues: [{ t: 1, signal: 'crowdRise', who: 'shooter' }], decisive: 1.9, duration: 6,
+    shots: [{ from: 0, size: 'medium', subjects: ['shooter', 'defender', 'ball'] },
+      { from: 2.4, size: 'wide', subjects: ['shooter', 'ball', 'goal'] }],
+  };
+}
+
 export const BASKET: EventDef[] = [
+  shootingFoul(2), shootingFoul(3),
   // ---------------------------------------------------------------- AZIONI PRINCIPALI
   {
     id: 'b-contropiede',
@@ -32,7 +54,7 @@ export const BASKET: EventDef[] = [
       { t: 1.5, do: 'pass', from: 'carrier', to: 'runner' },
       { t: 1.7, do: 'release', who: ['carrier'] },
       { t: 1.9, do: 'move', who: 'runner', to: { goal: [2.2, 0.4] }, speed: 'sprint' },
-      { t: 3.3, do: 'shoot', who: 'runner', outcome: 'goal' },
+      { t: 3.3, do: 'shoot', who: 'runner', outcome: 'goal', style: 'dunk' },
       { t: 3.3, do: 'release', who: ['chaser'] },
     ],
     cues: [
@@ -181,13 +203,12 @@ export const BASKET: EventDef[] = [
       { t: 0, do: 'move', who: 'defender', to: { goal: [3.6, 0] }, speed: 'run' },
       { t: 1.9, do: 'pose', who: 'driver', pose: 'shove', dur: 0.5, face: 'defender' },
       { t: 2.0, do: 'pose', who: 'defender', pose: 'fall', dur: 2.4 },
-      { t: 2.2, do: 'whistle' },
+      { t: 2.2, do: 'basketFoul', who: 'driver', victim: 'defender', shots: 0 },
       { t: 2.4, do: 'move', who: 'referee', to: { near: 'defender', off: [-1.5, -2] }, speed: 'run' },
       { t: 3.0, do: 'pose', who: 'driver', pose: 'protest', dur: 2.5, face: 'referee' },
       { t: 3.5, do: 'move', who: 'mate', to: { near: 'driver', off: [0.8, 0.8] }, speed: 'run' },
       { t: 3.8, do: 'pose', who: 'mate', pose: 'argue', dur: 2, face: 'referee' },
-      { t: 4.3, do: 'pose', who: 'referee', pose: 'card', dur: 1.6 },
-      { t: 6.5, do: 'restart', side: 'defense' }, // sfondamento: palla alla difesa
+      { t: 4.3, do: 'pose', who: 'referee', pose: 'wave', dur: 1.6 },
       { t: 6.5, do: 'release' },
     ],
     cues: [
@@ -338,3 +359,8 @@ export const BASKET: EventDef[] = [
     ],
   },
 ];
+
+const drive = BASKET.find(event => event.id === 'b-penetrazione')!;
+BASKET.push({ ...drive, id: 'b-schiacciata', label: 'Schiacciata!', hint: 'Attacca il ferro: tieni mani e canestro!', weight: 1.6,
+  outcomeLabels: { goal: 'Schiacciata!', save: 'Schiacciata sul ferro!', wide: 'Appoggio sbagliato' },
+  steps: drive.steps.map(step => step.do === 'shoot' ? { ...step, style: 'dunk' } : step) });

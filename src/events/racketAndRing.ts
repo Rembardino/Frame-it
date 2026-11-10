@@ -114,6 +114,7 @@ function volleyball(id: string, label: string, hint: string, last: SportAction, 
     : [{ t: 0.6, do: 'sport', action: 'serve', who: 'defender', target: 'receiver' },
       { t: 1.9, do: 'sport', action: 'receive', who: 'receiver', target: 'setter' },
       { t: 3.2, do: 'sport', action: 'set', who: 'setter', target: 'hitter' },
+      ...(last === 'block' ? [{ t: 4.55, do: 'sport', action: 'rallySpike', who: 'hitter', target: 'defender' } as Step] : []),
       { t: 4.6, do: 'sport', action: last, who: last === 'block' ? 'defender' : 'hitter', target: last === 'block' ? 'hitter' : 'defender' }];
   return {
     id, label, hint, category: 'main', weight: 1, importance: 1, ownsBall: true, roles, steps,

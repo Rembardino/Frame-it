@@ -6,16 +6,31 @@ import { createServer } from 'vite';
 const languages = { en: 1, it: 0, es: 2, fr: 3, de: 4 };
 const sports = ['calcio', 'basket', 'boxe', 'tennis', 'pallavolo', 'golf', 'ciclismo', 'vela'];
 const placeholders = value => [...value.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort();
+const teamsOnly=process.argv.includes('--teams');
+function installDocument() {
+  const elements=new Map();
+  const makeElement=()=>({textContent:'',innerHTML:'',style:{},children:[],parentElement:null,
+    classList:{add(){},remove(){},toggle(){}},addEventListener(){},
+    setAttribute(name,value){this[name]=String(value);},
+    append(...nodes){for(const node of nodes){this.children.push(node);node.parentElement=this;}},
+    insertBefore(node){this.append(node);},replaceChildren(...nodes){this.children=[];this.append(...nodes);},
+    querySelector(selector){return this.children.find(node=>selector==='.'+node.className)??null;},
+  });
+  globalThis.document={getElementById:id=>{
+    if(!elements.has(id)){const node=makeElement();node.parentElement=makeElement();elements.set(id,node);}return elements.get(id);
+  },createElement:makeElement};
+  return elements;
+}
 async function withModules(search, saved, callback) {
   globalThis.location = { search };
   globalThis.localStorage = { getItem: () => saved, setItem: () => {} };
-  const server = await createServer({ configFile: false, server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' });
+  const server = await createServer({ configFile: false, cacheDir: 'artifacts/vite-i18n-check', server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true, include: [] }, appType: 'custom', logLevel: 'error' });
   try { await callback(server, await server.ssrLoadModule('/src/i18n/index.ts')); }
   finally { await server.close(); }
 }
 
 for (const [language, column] of Object.entries(languages)) {
-  for (const sport of sports) await withModules(`?sport=${sport}&lang=${language}`, null, async (server, i18n) => {
+  for (const sport of (teamsOnly?['calcio']:sports)) await withModules(`?sport=${sport}&lang=${language}`, null, async (server, i18n) => {
     assert.equal(i18n.LANGUAGE, language);
     const { ROWS } = await server.ssrLoadModule('/src/i18n/catalog.ts');
     const catalog = new Map();
@@ -30,6 +45,25 @@ for (const [language, column] of Object.entries(languages)) {
       assert.equal(i18n.t(row[0]), row[column]);
     }
     const covered = key => { assert(catalog.has(key), `${sport}: missing ${key}`); assert.equal(i18n.t(key), catalog.get(key)[column]); };
+    const { teamCatalog } = await server.ssrLoadModule('/src/teams.ts');
+    for(const rosterSport of (teamsOnly?sports:[sport]))for (const team of teamCatalog(rosterSport)) {
+      if (['boxe', 'tennis', 'golf'].includes(rosterSport)) assert.equal(i18n.t(team.name), team.name, 'Personal names must retain their spelling');
+      else { covered(team.name); covered(team.short); }
+    }
+    if(teamsOnly){
+      const elements=installDocument(),{Hud}=await server.ssrLoadModule('/src/ui/hud.ts'),{CONFIG}=await server.ssrLoadModule('/src/config.ts');
+      const hud=new Hud(false),nodeText=node=>node.textContent+node.children.map(nodeText).join(' ');
+      for(const rosterSport of sports)for(let i=0;i<12;i+=2){
+        CONFIG.teams=teamCatalog(rosterSport).slice(i,i+2);hud.setTeams();
+        CONFIG.teams.forEach((team,index)=>{
+          assert.equal(elements.get(`t${index}`).textContent,i18n.t(team.short));
+          assert.equal(elements.get(`t${index}`).parentElement.title,i18n.t(team.name));
+          assert.equal(elements.get(`t${index}`).parentElement.querySelector('.team-crest').alt,i18n.t(team.name));
+          assert(nodeText(elements.get('match-preview')).includes(i18n.t(team.name)));
+        });
+      }
+      delete globalThis.document;console.log(`${language}: ${ROWS.length} keys, all 96 roster names, localized scoreboard, titles, crests and menu`);return;
+    }
     const { LIBRARY } = await server.ssrLoadModule('/src/events/library.ts');
     const { LINES, ORDERS, VERDICTS } = await server.ssrLoadModule('/src/director/lines.ts');
     const { TUTORIAL_PAGES } = await server.ssrLoadModule('/src/ui/tutorial.ts');
@@ -51,13 +85,18 @@ for (const [language, column] of Object.entries(languages)) {
     assert.equal(i18n.t('Ordine: Arbitro'), i18n.t('Ordine: {label}', { label: i18n.t('Arbitro') }));
     assert.equal(i18n.t('In ritardo di 1,9 s'), i18n.t('In ritardo di {seconds} s', { seconds: language === 'en' ? '1.9' : '1,9' }));
     // Run the actual HUD/album presentation against a small DOM adapter.
-    const elements = new Map();
-    globalThis.document = { getElementById: id => {
-      if (!elements.has(id)) elements.set(id, { textContent: '', innerHTML: '', style: {}, classList: { add() {}, remove() {}, toggle() {} }, addEventListener() {} });
-      return elements.get(id);
-    } };
+    const elements = installDocument();
     const { Hud } = await server.ssrLoadModule('/src/ui/hud.ts');
     const hud = new Hud(false);
+    const { CONFIG: fixtureConfig } = await server.ssrLoadModule('/src/config.ts');
+    const nodeText = node => node.textContent + node.children.map(nodeText).join(' ');
+    if(sport==='ciclismo'){
+      assert.equal(elements.get('t0').parentElement.style.display,'none','Cycling still shows a team scoreboard');
+      assert(nodeText(elements.get('match-preview')).includes(i18n.t('Gara individuale')),'Individual race label was not translated');
+    }else{
+      assert.equal(elements.get('t0').textContent, i18n.t(fixtureConfig.teams[0].short), 'Scoreboard abbreviation was not translated');
+      for (const team of fixtureConfig.teams) assert(nodeText(elements.get('match-preview')).includes(i18n.t(team.name)), 'Menu team name was not translated');
+    }
     const result = { id: 'test', category: 'order', label: 'Ordine: Arbitro', importance: 0.5, points: 150, bonus: 150,
       result: { score: 75, stars: 3, components: { coverage: 75 }, enabled: ['coverage'], reasons: [{ text: 'Giocatore fuori inquadratura', good: false }, { text: 'In ritardo di 1,9 s', good: false }] } };
     hud.showResult(result);
@@ -114,4 +153,4 @@ for (const [search, saved, expected] of [['', null, 'en'], ['', 'it', 'it'], ['?
 }
 delete globalThis.location;
 delete globalThis.localStorage;
-console.log('OK: localization, director messages, default language and saved preference');
+console.log(teamsOnly?'OK: club localization in all five languages, menu, scoreboard, personal names and language preferences':'OK: localization, director messages, default language and saved preference');
