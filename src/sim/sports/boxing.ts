@@ -5,6 +5,8 @@ import { CONFIG } from '../../config';
 
 const AMBIENT_PUNCHES: SportAction[] = ['jab', 'jab', 'hook', 'uppercut'];
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+/** Asciugamano: probabilità già al primo knockdown, attesa prima del lancio, volo e fine dell'incontro (s). */
+export const TOWEL = { firstChance: 0.3, delay: 1.2, flight: 1.1, end: 5.5 };
 
 /** Tre riprese arcade: colpi puliti, difesa, combinazioni e knockdown recuperabili. */
 export class BoxingSimulation implements SportSimulation {
@@ -21,9 +23,18 @@ export class BoxingSimulation implements SportSimulation {
   private slip = false;
   /** Dopo un knockdown chi l'ha messo a terra esulta, con un attimo di ritardo. */
   private cheer: { actor: Actor; in: number } | null = null;
+  /** Chi ha parato o schivato: risponde con uno o due colpi appena finisce la combinazione dell'altro. */
+  private reply: Actor | null = null;
   /** Ripresa in corso; tra una ripresa e l'altra ognuno torna al suo angolo (-1 = si combatte). */
   private round = 1;
   private pause = -1;
+  /** Knockdown subiti da ciascun pugile. */
+  private downs = [0, 0];
+  /**
+   * Asciugamano lanciato dall'angolo di chi è a terra: t = istante del lancio (-1 = nessuno), da dove a dove vola.
+   * Dopo il lancio l'arbitro ferma l'incontro e la partita finisce (TOWEL.end s dopo).
+   */
+  readonly towel = { t: -1, from: new THREE.Vector3(), to: new THREE.Vector3() };
   constructor(private match: Match) {
     match.referee.pos.set(0,0,-2.1);match.referee.target.copy(match.referee.pos);
     match.actors.forEach((a) => {
@@ -43,6 +54,8 @@ export class BoxingSimulation implements SportSimulation {
       // Nello scambio di sottofondo una parte dei colpi finisce sui guantoni: niente punto, reazione breve.
       if (!this.match.ballScripted && hit.kind !== 'knockdown' && hit.opponent.pose === 'guard' && Math.random() < 0.32) {
         this.match.setPose(hit.opponent, 'recoil', 0.28, hit.actor, 'boxingBlock');
+        // Chi para spesso risponde appena l'altro ha finito.
+        if (Math.random() < 0.55) this.reply = hit.opponent;
         this.match.sound('punch', hit.opponent.pos, 0.3);
         this.match.excitement = Math.max(this.match.excitement, 0.45);
         continue;
@@ -59,12 +72,32 @@ export class BoxingSimulation implements SportSimulation {
         ref.target.copy(hit.opponent.pos).add(new THREE.Vector3(0,0,1.25));
         ref.target.x=THREE.MathUtils.clamp(ref.target.x,-2.3,2.3);ref.target.z=THREE.MathUtils.clamp(ref.target.z,-2.3,2.3);
         this.match.setPose(ref,'count',3.6,hit.opponent);
+        // Al secondo knockdown (a volte già al primo) l'angolo getta la spugna: l'asciugamano vola sul ring.
+        const down = hit.opponent.team, corner = this.match.coaches.find((c) => c.team === down);
+        if (corner && this.towel.t < 0 && this.match.actors.includes(hit.opponent) && (++this.downs[down] >= 2 || Math.random() < TOWEL.firstChance)) {
+          this.towel.t = this.match.time + TOWEL.delay;
+          this.towel.from.copy(corner.pos).setY(corner.pos.y + 1.9);
+          this.towel.to.copy(hit.opponent.pos).add(new THREE.Vector3(0.5, 0.03, 0.4));
+          this.match.setPose(corner, 'throw', 0.9);
+          this.match.say(corner, 'protest');
+        }
       }
     }
     this.hits = this.hits.filter(hit => hit.delay > 0);
     if (this.cheer && (this.cheer.in -= dt) <= 0) {
       this.match.setPose(this.cheer.actor, 'celebrate', 1.8);
       this.cheer = null;
+    }
+    if (this.towel.t >= 0) {
+      const since = this.match.time - this.towel.t;
+      // L'arbitro si mette fra i due e incrocia le braccia sopra la testa: incontro finito.
+      if (since > TOWEL.flight && since - dt <= TOWEL.flight) {
+        const ref = this.match.referee, winner = this.match.actors.find((a) => a.team !== this.downs.indexOf(Math.max(...this.downs)))!;
+        this.match.setPose(ref, 'wave', 2.4); this.match.sound('bell', new THREE.Vector3());
+        this.match.setPose(winner, 'celebrate', 3.5); this.match.excitement = 1;
+      }
+      if (since > TOWEL.end) this.match.clock = Math.max(this.match.clock, CONFIG.match.durationSec);
+      if (since > TOWEL.flight) return;
     }
     if (this.betweenRounds(dt)) return;
 
@@ -99,7 +132,7 @@ export class BoxingSimulation implements SportSimulation {
       a.target.z = THREE.MathUtils.clamp(a.target.z, -2.4, 2.4);
     }
 
-    if (this.match.ballScripted) { this.attacker = null; this.combo = []; return; }
+    if (this.match.ballScripted) { this.attacker = null; this.combo = []; this.reply = null; return; }
     if ((this.next -= dt) > 0) return;
     if (!this.attacker) {
       // Nuova combinazione: 1-3 colpi. A volte chi la subisce si abbassa e la schiva.
@@ -118,12 +151,19 @@ export class BoxingSimulation implements SportSimulation {
       this.attacker=null;this.combo=[];this.next=2.4;return;
     }
     if (this.combo.length && a.pose !== 'fall' && opponent.pose !== 'fall') {
-      if (this.slip && this.combo.length === 1) this.match.setPose(opponent, 'crouch', 0.45, a);
+      if (this.slip && this.combo.length === 1) { this.match.setPose(opponent, 'crouch', 0.45, a); if (Math.random() < 0.7) this.reply = opponent; }
       this.action(this.combo.shift()!, a);
       this.next = 0.42;
     } else {
-      this.attacker = null;
-      this.next = rand(0.7, 1.6);
+      const reply = this.reply;
+      this.attacker = this.reply = null;
+      this.next = rand(0.45, 1.3);
+      // Botta e risposta: lo scambio continua finché qualcuno non incassa pulito.
+      if (reply && reply !== a && !['fall', 'getUp', 'recoil'].includes(reply.pose) && !['fall', 'getUp'].includes(a.pose)) {
+        this.attacker = reply;
+        this.combo = Array.from({ length: 1 + Math.floor(Math.random() * 2) }, () => AMBIENT_PUNCHES[Math.floor(Math.random() * AMBIENT_PUNCHES.length)]);
+        this.slip = false; this.next = 0.3;
+      }
     }
   }
 
@@ -162,9 +202,13 @@ export class BoxingSimulation implements SportSimulation {
     actor.target.copy(actor.pos);
     const pose = kind === 'knockdown' ? 'uppercut' : kind === 'counter' ? 'hook' : kind;
     const body = pose === 'jab' && this.jabs++ % 3 === 2;
-    this.match.setPose(actor, pose === 'jab' || pose === 'hook' || pose === 'uppercut' ? pose : 'jab', 0.65, opponent, body ? 'boxingBodyJab' : undefined);
+    // Il montante non ha una ripresa sua: usa quelle del gancio invece di una posa rigida.
+    this.match.setPose(actor, pose === 'jab' || pose === 'hook' || pose === 'uppercut' ? pose : 'jab', 0.65, opponent, body ? 'boxingBodyJab' : pose === 'uppercut' ? 'boxingHook' : undefined);
     this.hits.push({ actor, opponent, kind, delay: 0.65 * 0.32, body });
   }
 
   scoreText() { return `${this.match.score[0]} - ${this.match.score[1]}`; }
+
+  capture() { const { t, from, to } = this.towel; return [t, from.x, from.y, from.z, to.x, to.y, to.z]; }
+  restore(s: number[]) { this.towel.t = s[0] < -0.5 ? -1 : s[0]; this.towel.from.set(s[1], s[2], s[3]); this.towel.to.set(s[4], s[5], s[6]); }
 }

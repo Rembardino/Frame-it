@@ -23,6 +23,9 @@ export const MARKS = {
 };
 /** Bolina: 45° dal vento (nord = −z). */
 const UPWIND = [-Math.PI / 2 + 0.78, -Math.PI / 2 - 0.78];
+/** Poppa: non dritti sottovento ma a zig-zag, strambando (più veloce sui foil). Stesso ordine di UPWIND: 0 = verso est. */
+const DOWNWIND = [Math.PI / 2 - 0.55, Math.PI / 2 + 0.55];
+const GYBE_SEC = 2.4;
 
 export interface Boat {
   team: TeamId; crew: Actor[];
@@ -36,6 +39,8 @@ export interface Boat {
   /** Lato dei velisti (−1..1, cambia durante la virata), sbandamento, altezza sui foil, gennaker aperto. */
   side: number; heel: number; lift: number; gennaker: number;
   capsizeUntil: number; boostUntil: number; lane: number; place: number;
+  /** Quale boa del cancello gira (0/1) e quanto è veloce di suo l'equipaggio (±3%). */
+  gate: number; skill: number;
 }
 
 export class SailingSimulation implements SportSimulation {
@@ -51,8 +56,9 @@ export class SailingSimulation implements SportSimulation {
   constructor(private match: Match) {
     this.boats = [0, 1, 2, 3].map((k) => {
       const team = (k % 2) as TeamId, crew = match.actors.filter((a) => a.team === team).slice(Math.floor(k / 2) * 2, Math.floor(k / 2) * 2 + 2);
-      return { team, crew, pos: new THREE.Vector3(-90 + k * 60, 0, 470 + (k % 2) * 20), heading: rand(-Math.PI, Math.PI), v: 6, rot: 0, leg: 0, tack: k % 2,
-        tackUntil: 0, tackFrom: 0, side: 1, heel: 0, lift: 0, gennaker: 0, capsizeUntil: 0, boostUntil: 0, lane: rand(70, 120), place: 0 };
+      return { team, crew, pos: new THREE.Vector3(-90 + k * 60, 0, 448 + k * 9), heading: k % 2 ? Math.PI : 0, v: 7, rot: 0, leg: 0, tack: k % 2,
+        tackUntil: 0, tackFrom: 0, side: 1, heel: 0, lift: 0, gennaker: 0, capsizeUntil: 0, boostUntil: 0, lane: rand(70, 120), place: 0,
+        gate: k % 2, skill: rand(-0.03, 0.03) };
     });
     match.phase = 'play';
     match.ball.state = 'dead';
@@ -68,7 +74,7 @@ export class SailingSimulation implements SportSimulation {
   boatOf(a: Actor) { return this.boats.find((b) => b.crew.includes(a)) ?? null; }
   /** Prossima boa (o la linea d'arrivo) di una barca. */
   target(b: Boat) {
-    return b.leg <= 1 ? MARKS.windward : b.leg === 2 ? MARKS.gate[b.pos.x < 0 ? 0 : 1] : new THREE.Vector3(MARKS.finish[0].x, 0, b.pos.z);
+    return b.leg <= 1 ? MARKS.windward : b.leg === 2 ? MARKS.gate[b.gate] : new THREE.Vector3(MARKS.finish[0].x, 0, b.pos.z);
   }
   distToTarget(b: Boat) { const t = this.target(b); return Math.hypot(t.x - b.pos.x, t.z - b.pos.z); }
   /** Avanzamento in regata (per la classifica). */
@@ -108,11 +114,12 @@ export class SailingSimulation implements SportSimulation {
       b.pos.addScaledVector(new THREE.Vector3(Math.cos(b.heading), 0, Math.sin(b.heading)), b.v * dt);
       return;
     }
+    const k = this.boats.indexOf(b);
     if (b.leg === 0) {
-      // Pre-partenza: girano piano in tondo dietro la linea.
-      want = b.heading + 0.25; speed = 6;
-      const home = new THREE.Vector3(-90 + this.boats.indexOf(b) * 60, 0, 480);
-      if (b.pos.distanceTo(home) > 50) want = Math.atan2(home.z - b.pos.z, home.x - b.pos.x);
+      // Pre-partenza: avanti e indietro al traverso subito dietro la linea, ognuna nel suo tratto, pronte a orzare al colpo di cannone.
+      const homeX = -90 + k * 60, homeZ = 448 + k * 9;
+      if (Math.abs(b.pos.x - homeX) > 42) b.tack = b.pos.x > homeX ? 1 : 0;
+      want = (b.tack ? Math.PI : 0) + THREE.MathUtils.clamp((homeZ - b.pos.z) * 0.03, -0.4, 0.4) * (b.tack ? -1 : 1); speed = 7.5;
     } else if (b.leg === 1) {
       const w = MARKS.windward, dx = b.pos.x - w.x, dz = b.pos.z - w.z;
       // Sulla layline (la boa entra nel cono dei 45°) si punta dritti alla boa; altrimenti si vira oltre la corsia.
@@ -122,10 +129,20 @@ export class SailingSimulation implements SportSimulation {
         want = fetch ? Math.atan2(w.z - b.pos.z, w.x - b.pos.x) : UPWIND[b.tack];
       } else want = UPWIND[b.tack];
       // Girata la boa (o superata la sua altezza: non si va oltre).
-      if (this.distToTarget(b) < 14 || b.pos.z < w.z + 4) { b.leg = 2; this.match.sound('point', w, 0.6); }
+      if (this.distToTarget(b) < 14 || b.pos.z < w.z + 4) {
+        b.leg = 2; this.match.sound('point', w, 0.6);
+        // Girata la boa si poggia verso la propria boa del cancello.
+        b.tack = MARKS.gate[b.gate].x > b.pos.x ? 0 : 1; b.lane = rand(60, 110);
+      }
     } else if (b.leg === 2) {
-      const g = this.target(b);
-      want = Math.atan2(g.z - b.pos.z, g.x - b.pos.x); speed = c.downwind;
+      const g = this.target(b), dx = b.pos.x - g.x, dz = g.z - b.pos.z;
+      speed = c.downwind;
+      if (time > b.tackUntil) {
+        // Come in bolina ma sottovento: a zig-zag strambando, poi dritti sulla boa quando entra nel cono.
+        const fetch = dz > 0 && Math.abs(dx) < dz * 0.55 && Math.sign(-dx) === (b.tack === 0 ? 1 : -1);
+        if (!fetch && dz > 60 && Math.abs(dx) > b.lane && Math.sign(dx) === (b.tack === 0 ? 1 : -1)) this.startTack(b, time);
+        want = fetch || dz < 60 ? Math.atan2(g.z - b.pos.z, g.x - b.pos.x) : DOWNWIND[b.tack];
+      } else want = DOWNWIND[b.tack];
       if (this.distToTarget(b) < 12 || b.pos.z > g.z - 3) b.leg = 3;
     } else if (b.leg === 3) {
       want = 0; speed = c.reach;
@@ -135,17 +152,28 @@ export class SailingSimulation implements SportSimulation {
       speed = 4; want = b.heading;
     }
     if (time < b.tackUntil) {
-      // Virata: la prua passa nel vento, la barca rallenta, i velisti cambiano scafo.
-      const u = 1 - (b.tackUntil - time) / c.tackSec;
-      b.heading = b.tackFrom + wrap(UPWIND[b.tack] - b.tackFrom) * THREE.MathUtils.smoothstep(u, 0, 1);
-      speed = 6; b.rot = 0;
+      // Virata: la prua passa nel vento, la barca rallenta, i velisti cambiano scafo. Strambata (in poppa): più svelta, si perde meno velocità.
+      const gybe = b.leg === 2, u = 1 - (b.tackUntil - time) / (gybe ? GYBE_SEC : c.tackSec);
+      b.heading = b.tackFrom + wrap((gybe ? DOWNWIND : UPWIND)[b.tack] - b.tackFrom) * THREE.MathUtils.smoothstep(u, 0, 1);
+      speed = gybe ? c.downwind * 0.7 : 6; b.rot = 0;
       b.side = THREE.MathUtils.lerp(b.tack === 0 ? -1 : 1, b.tack === 0 ? 1 : -1, THREE.MathUtils.smoothstep(u, 0.2, 0.8));
     } else {
       // Il timone non gira di colpo: la rotazione cresce e cala piano (la barca ha peso).
       const rate = THREE.MathUtils.clamp(wrap(want - b.heading) * 1.4, -0.9, 0.9);
       b.rot += THREE.MathUtils.clamp(rate - b.rot, -dt * 1.5, dt * 1.5);
       b.heading += b.rot * dt;
-      b.side = b.leg === 1 ? (b.tack === 0 ? 1 : -1) : 1;
+      b.side = b.leg === 1 || b.leg === 2 ? (b.tack === 0 ? 1 : -1) : 1;
+    }
+    if (b.leg >= 1 && b.leg <= 3) {
+      // Nessuna barca va uguale a un'altra: mano dell'equipaggio, raffiche che vanno e vengono, e chi insegue trova un filo di vento in più
+      // (la flotta resta vicina: sorpassi e incroci). Chi ha un'altra barca appena davanti rallenta invece di passarle attraverso.
+      const lead = this.progress(this.lead);
+      speed *= 1 + b.skill + 0.05 * Math.sin(time * 0.13 + k * 2.1) + THREE.MathUtils.clamp((lead - this.progress(b)) / 700, 0, 0.1);
+      for (const other of this.boats) {
+        if (other === b || other.leg >= 4) continue;
+        const ox = other.pos.x - b.pos.x, oz = other.pos.z - b.pos.z, ahead = ox * Math.cos(b.heading) + oz * Math.sin(b.heading);
+        if (ahead > 0 && ahead < 22 && Math.hypot(ox, oz) < 24 && Math.abs(-ox * Math.sin(b.heading) + oz * Math.cos(b.heading)) < 9) speed *= 0.72;
+      }
     }
     if (time < b.boostUntil) speed += 6;
     b.v += THREE.MathUtils.clamp(speed - b.v, -dt * 4, dt * 3);
@@ -158,7 +186,7 @@ export class SailingSimulation implements SportSimulation {
   private startTack(b: Boat, time: number) {
     b.tackFrom = b.heading;
     b.tack = 1 - b.tack;
-    b.tackUntil = time + C().tackSec;
+    b.tackUntil = time + (b.leg === 2 ? GYBE_SEC : C().tackSec);
     this.effect('spray', b.pos);
   }
 
@@ -195,7 +223,7 @@ export class SailingSimulation implements SportSimulation {
     const m = this.match, b = this.boatOf(actor), time = m.time;
     if (kind === 'gun') { if (!this.started) this.gun(); return; }
     if (!b || b.leg === 0 || b.leg >= 4 || time < b.capsizeUntil) return;
-    if (kind === 'tack' && b.leg === 1 && time > b.tackUntil) this.startTack(b, time);
+    if (kind === 'tack' && (b.leg === 1 || (b.leg === 2 && this.distToTarget(b) > 120)) && time > b.tackUntil) this.startTack(b, time);
     if (kind === 'foil') { this.boosts++; b.boostUntil = time + 3; this.effect('spray', b.pos); m.excitement = Math.max(m.excitement, 0.6); }
     if (kind === 'capsize') {
       b.capsizeUntil = time + 7;

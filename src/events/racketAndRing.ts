@@ -23,7 +23,7 @@ function tennis(id: string, label: string, hint: string, actions: [number, strin
 }
 
 export const TENNIS: EventDef[] = [
-  tennis('t-ace', 'Ace!', 'Sta per servire: tieni racchetta e palla!', [[1.6, 'a', 'ace']], 1.6),
+  tennis('t-ace', 'Ace!', 'Sta per servire: tieni racchetta e palla!', [[0.9, 'a', 'ace']], 1.8),
   tennis('t-incrociato', 'Dritto incrociato vincente', 'Scambio da fondo: segui entrambi!',
     [[0.8, 'a', 'forehand'], [2.3, 'b', 'backhand'], [3.8, 'a', 'winner']], 3.8),
   tennis('t-rovescio', 'Rovescio lungolinea', 'Si prepara al rovescio!',
@@ -31,7 +31,7 @@ export const TENNIS: EventDef[] = [
   tennis('t-volée', 'Volée a rete', 'Scende a rete, anticipa lo spostamento!',
     [[0.8, 'a', 'forehand'], [2.3, 'b', 'backhand'], [3.8, 'a', 'volleyWinner']], 3.8),
   tennis('t-smash', 'Smash!', 'Palla alta! Non tagliare la racchetta!',
-    [[0.8, 'a', 'serve'], [2.3, 'b', 'lob'], [3.8, 'a', 'smash']], 3.8),
+    [[0.05, 'a', 'serve'], [2.3, 'b', 'lob'], [3.8, 'a', 'smash']], 3.8),
 ];
 TENNIS[3].steps.splice(2, 0, { t: 2.5, do: 'move', who: 'a', to: { pitch: [-2.2, 1.3] }, speed: 'sprint' });
 

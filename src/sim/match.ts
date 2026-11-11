@@ -11,7 +11,7 @@
  * La squadra 0 attacca verso +x, la squadra 1 verso -x.
  */
 import * as THREE from 'three';
-import { CONFIG, DRONE_ONLY, SPORT } from '../config';
+import { CONFIG, DRONE_ONLY, FLOOR_Y, SPORT } from '../config';
 import { TennisSimulation } from './sports/tennis';
 import { VolleyballSimulation } from './sports/volleyball';
 import { BoxingSimulation } from './sports/boxing';
@@ -191,6 +191,8 @@ const PARKING = new THREE.Vector3(0, 0, -80);
 export const UFO = { height: 10, arrive: 3.5, beamOn: 4, liftFrom: 4.6, liftTo: 7.6, beamOff: 7.9, leave: 8.6, gone: 11 };
 /** Pose durante le quali l'attore non corre (scivola o sta a terra). */
 const LOCKED: Pose[] = ['dive', 'fall', 'tackle'];
+/** Quota dei piedi del giudice di sedia nel tennis: i piedi pendono davanti alla seduta. */
+const TENNIS_UMPIRE_Y = 1.42;
 
 /** Calcio a 7: 1-3-2-1. Metri su un campo 60x40, scalati sulla dimensione reale. */
 const FORMATION: { role: Role; x: number; z: number }[] = SPORT === 'tennis' || SPORT === 'boxe' || GOLF
@@ -381,7 +383,11 @@ export class Match {
     }) : null;
     if (!this.sportSimulation) this.kickoff(0);
     else if (!DRONE_ONLY) {
-      this.referee.pos.set(0, 0, -(W / 2 + 1));
+      // Pallavolo: il primo arbitro sta in piedi sulla pedana del seggiolone (sportCourts.ts refereeChair), guardando la rete.
+      if (SPORT === 'pallavolo') { this.referee.pos.set(0, 1.7, -(W / 2 + 1.1)); this.referee.heading = Math.PI / 2; }
+      // Tennis: il giudice di sedia sta seduto sul seggiolone (seduta a 1,85 m, la ripresa seduta abbassa il bacino di ~0,45 m).
+      else if (SPORT === 'tennis') { this.referee.pos.set(0, TENNIS_UMPIRE_Y, -(W / 2 + 1.1)); this.referee.heading = Math.PI / 2; }
+      else this.referee.pos.set(0, 0, -(W / 2 + 1));
       this.referee.target.copy(this.referee.pos);
     }
   }
@@ -1386,6 +1392,10 @@ export class Match {
 
   private moveActors(dt: number) {
     const all = this.everyone;
+    // Ring rialzato: chi è a terra fuori dalla pedana (angoli, allenatori, chi passa a bordo ring) sta sul pavimento, più in basso.
+    if (FLOOR_Y) for (const a of this.extras) if (a.pos.y === 0 || a.pos.y === FLOOR_Y) {
+      a.pos.y = Math.max(Math.abs(a.pos.x) - CONFIG.pitch.length / 2, Math.abs(a.pos.z) - CONFIG.pitch.width / 2) > 0.55 ? FLOOR_Y : 0;
+    }
     // Ciclisti ed equipaggi li muove la loro simulazione: qui passano solo le pose.
     const driven = (a: Actor) => !!this.sportSimulation?.drives?.(a);
     for (const a of all) {

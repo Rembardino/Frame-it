@@ -12,11 +12,11 @@ import { animalEvent } from './golf';
 const sim = (m: Match) => m.sportSimulation as CyclingSimulation;
 const racing = (m: Match) => !sim(m).finished && sim(m).toFinish > 420;
 /** Vicino a curva, paese o ponte le altre azioni aspettano: così il passaggio non si perde. */
-const free = (m: Match) => racing(m) && Math.min(sim(m).ahead('bend'), sim(m).ahead('bridge'), sim(m).ahead('village')) > 130;
+const free = (m: Match) => racing(m) && Math.min(sim(m).ahead('bend'), sim(m).ahead('bridge'), sim(m).ahead('village'), sim(m).ahead('summit')) > 130;
 const rider = (label = 'Corridore') => ({ label, pick: 'player' as const, side: 'attack' as const });
 
 /** Passaggio del gruppo in un punto della strada: parte quando mancano ~52 m, istante decisivo all'arrivo lì. */
-function passage(id: string, label: string, hint: string, what: 'bend' | 'bridge' | 'village', size: 'medium' | 'wide'): EventDef {
+function passage(id: string, label: string, hint: string, what: 'bend' | 'bridge' | 'village' | 'summit', size: 'medium' | 'wide'): EventDef {
   return {
     id, label, hint, category: 'main', weight: 4, importance: 0.8, once: what !== 'bend',
     when: (m) => racing(m) && sim(m).ahead(what) > 46 && sim(m).ahead(what) < 58,
@@ -45,6 +45,15 @@ export const CYCLING_EVENTS: EventDef[] = [
   passage('c-curva', 'Curva a gomito!', 'Curva secca in arrivo: anticipa la svolta!', 'bend', 'medium'),
   passage('c-paese', 'Il gruppo attraversa il paese', 'Entrano in paese: c’è lo strappo!', 'village', 'wide'),
   passage('c-ponte', 'Sul ponte!', 'Il gruppo arriva al ponte sul fiume!', 'bridge', 'wide'),
+  passage('c-gpm', 'Gran premio della montagna!', 'Ultimi metri di salita: in cima c’è il traguardo della montagna!', 'summit', 'medium'),
+  {
+    id: 'c-foratura', label: 'Foratura!', hint: 'Qualcuno ha un problema alla bici...', category: 'main', weight: 1.5, importance: 0.8, once: true,
+    when: (m) => free(m) && sim(m).toFinish > 700,
+    roles: { a: rider() },
+    steps: [{ t: 1.2, do: 'sport', action: 'puncture', who: 'a' }],
+    cues: [], decisive: 3.8, duration: 8,
+    shots: [{ from: 0, size: 'medium', subjects: ['pack'] }, { from: 1, size: 'medium', subjects: ['a'] }],
+  },
   {
     id: 'c-caduta', label: 'Caduta nel gruppo!', hint: 'Il gruppo è nervoso, occhio!', category: 'main', weight: 1.5, importance: 1, once: true,
     when: (m) => free(m) && sim(m).toFinish > 500,

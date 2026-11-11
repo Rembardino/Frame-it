@@ -25,7 +25,7 @@ export const TUTORIAL_PAGES = [
     'Tennis: largo su giocatori, palla e rete durante gli scambi. Segui il colpo fino alla zona di arrivo, senza perdere la traiettoria.',
     'Pallavolo: includi palla, rete e giocatori coinvolti. Allarga su alzata e schiacciata per tenere dentro anche il muro.',
     'Golf (col drone): parti dietro il golfista, segui la palla in volo fino a dove si ferma, poi vola al colpo successivo. Vicino al green tieni insieme palla e bandiera.',
-    'Ciclismo e vela (col drone): stai sopra il gruppo o le barche e anticipa curve, boe e volata: l’istante decisivo è quando ci passano.',
+    'Ciclismo (col drone): stai sopra il gruppo e anticipa curve e volata: l’istante decisivo è quando ci passano.',
   ] },
   { title: 'Come ottenere più stelle', paragraphs: [
     'Il voto va da 0 a 100, fino a 5 stelle: conta la copertura dei soggetti, lo zoom adatto, la composizione, la fluidità e il tempismo.',

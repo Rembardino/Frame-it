@@ -54,7 +54,7 @@ for (const scene of SCENES.filter((s) => !only || only.includes(s.id))) {
     window.cancelAnimationFrame = () => {};
     performance.now = () => now;
   });
-  await page.goto(`${base}?sport=${scene.sport}&debug&lang=en&autostart${scene.params ?? ''}${scene.secret ? `&secret=${scene.secret}` : ''}`);
+  await page.goto(`${base}?sport=${scene.sport}&debug&fullres&lang=en&autostart${scene.params ?? ''}${scene.secret ? `&secret=${scene.secret}` : ''}`);
   await page.waitForFunction(() => { window.__virtual.step(1000 / 30); return window.frameit?.match; }, null, { timeout: 60000, polling: 100 });
   await page.addStyleTag({ content: '.debug-canvas,.debug-panel,#gyro-controls,#hint,.hint,#fps,#rotate{display:none!important}' + (scene.clean ? '#result{display:none!important}' : '') });
   // Niente replay (rubano tempo allo spot); col drone anche nel calcio e nel basket (come dopo averlo comprato in carriera).

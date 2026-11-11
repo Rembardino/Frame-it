@@ -135,6 +135,31 @@ export function sailingWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
   const sea = groundLayer(new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000).rotateX(-Math.PI / 2), seaMat), 1);
   sea.receiveShadow = true;
   scene.add(sea);
+  // Grafica "da diretta TV" disegnata sull'acqua: confini del campo, linea di partenza, cerchio della boa di bolina,
+  // linea del cancello e arrivo a scacchi. Dal drone si capisce dove va la regata.
+  const overlay = (parts: THREE.BufferGeometry[], opacity: number) => {
+    const mesh = groundLayer(new THREE.Mesh(mergeGeometries(parts)!, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity })), 2);
+    parts.forEach((g) => g.dispose()); scene.add(mesh); return mesh;
+  };
+  const stripe = (into: THREE.BufferGeometry[], a: THREE.Vector3, b: THREE.Vector3, width: number, color: number, dash = 0) => {
+    const d = b.clone().sub(a), length = d.length(), angle = Math.atan2(d.z, d.x);
+    for (let s = 0; s < length; s += dash ? dash * 2 : length) {
+      const l = dash ? Math.min(dash, length - s) : length, m = s + l / 2;
+      into.push(colored(new THREE.PlaneGeometry(l, width).rotateX(-Math.PI / 2).rotateY(-angle).translate(a.x + (d.x / length) * m, 0.05, a.z + (d.z / length) * m), color));
+    }
+  };
+  const course: THREE.BufferGeometry[] = [], HALF = 280, TOP = MARKS.windward.z - 60, BOTTOM = 500;
+  for (const x of [-HALF, HALF]) stripe(course, new THREE.Vector3(x, 0, BOTTOM), new THREE.Vector3(x, 0, TOP), 1.4, 0xffffff, 10);
+  stripe(course, new THREE.Vector3(-HALF, 0, TOP), new THREE.Vector3(HALF, 0, TOP), 1.4, 0xffffff, 10);
+  stripe(course, MARKS.gate[0], MARKS.gate[1], 1.3, 0xffb057);
+  course.push(colored(new THREE.RingGeometry(40.6, 42, 72).rotateX(-Math.PI / 2).translate(MARKS.windward.x, 0.05, MARKS.windward.z), 0xffe066));
+  for (let z = MARKS.finish[0].z, i = 0; z < MARKS.finish[1].z; z += 2.5, i++) for (const row of [0, 1]) {
+    course.push(colored(new THREE.PlaneGeometry(2.5, 2.5).rotateX(-Math.PI / 2).translate(MARKS.finish[0].x - 1.25 + row * 2.5, 0.05, z + 1.25), (i + row) % 2 ? 0xffffff : 0x10141a));
+  }
+  overlay(course, 0.55);
+  const startParts: THREE.BufferGeometry[] = [];
+  stripe(startParts, MARKS.pin, MARKS.committee, 1.6, 0x6dff8a);
+  const startLine = overlay(startParts, 0.8);
   scene.add(layer(BEACH, mat(turf(renderer, '#e3d3a6', null, 0, 0.12, 31)), 6, 3), layer(LAND, mat(world.rough), 9, 4));
   const rnd = seeded(12), trees: Tree[] = [];
   for (let i = 0; i < 2600; i++) {
@@ -160,23 +185,40 @@ export function sailingWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
     parts.push(colored(new THREE.BoxGeometry(24, top, 0.9).applyMatrix4(new THREE.Matrix4().makeBasis(along, new THREE.Vector3(0, 1, 0), f.clone().negate())).translate(c.x, top / 2, c.z), 0xdfe3e6));
     rows.push({ from: c.clone().addScaledVector(along, -11).setY(top), to: c.clone().addScaledVector(along, 11).setY(top), facing: -Math.atan2(f.z, f.x), team: -1 });
   }
-  // Barche degli spettatori all'ancora ai lati del campo.
-  for (const [x, z, a] of [[-320, 120, 0.3], [-300, -60, 2], [330, 40, 1.2], [300, -180, 2.6], [-250, 380, 0.9], [260, 520, 2.2], [420, 160, 1.6]]) {
-    parts.push(colored(new THREE.SphereGeometry(1, 10, 6).scale(5, 0.9, 1.8).rotateY(a).translate(x, 0.3, z), 0xf4f4f2));
-    parts.push(colored(new THREE.BoxGeometry(3, 1.6, 2.2).rotateY(a).translate(x, 1.4, z), 0x3d6f8f));
+  // Flotta degli spettatori all'ancora lungo i confini del campo e davanti all'arrivo: barche a vela con le vele ammainate e yacht a motore.
+  const fleet = seeded(77), hulls = [0xf4f4f2, 0x1f3a5c, 0xf4f4f2, 0xb3262e, 0xe9e2cf, 0x2f6f6a];
+  for (let i = 0; i < 34; i++) {
+    const nearFinish = i >= 26, side = i % 2 ? 1 : -1;
+    const x = nearFinish ? 440 + fleet() * 70 : side * (300 + fleet() * 70), z = nearFinish ? (i % 2 ? 215 + fleet() * 20 : 365 + fleet() * 25) : -400 + fleet() * 880;
+    if (LAND.some((p) => inside(p, x, z)) || BEACH.some((p) => inside(p, x, z))) continue;
+    const a = fleet() * Math.PI * 2, at = (g: THREE.BufferGeometry, color: number, top?: number) => parts.push(colored(g.rotateY(a).translate(x, 0, z), color, top));
+    if (i % 3) {
+      at(new THREE.SphereGeometry(1, 12, 6).scale(5.5, 1, 1.7).translate(0, 0.35, 0), hulls[i % hulls.length], 0xd8c9a6);
+      at(new THREE.BoxGeometry(2.6, 0.8, 1.8).translate(-0.4, 1.5, 0), 0xf1f1ec);
+      at(new THREE.CylinderGeometry(0.07, 0.09, 10.5, 6).translate(0.9, 6.3, 0), 0xc9ced2);
+      at(new THREE.CylinderGeometry(0.16, 0.16, 4.2, 6).rotateZ(Math.PI / 2).translate(-1.3, 2.4, 0), 0xf4f1e6);
+    } else {
+      at(new THREE.SphereGeometry(1, 12, 6).scale(8, 1.5, 2.6).translate(0, 0.5, 0), 0xf6f6f3, 0xe3d6b8);
+      at(new THREE.BoxGeometry(6, 1.6, 3.4).translate(-0.6, 2.2, 0), 0xf1f1ec); at(new THREE.BoxGeometry(5.6, 0.5, 3.1).translate(-0.6, 2.4, 0), 0x24323f);
+      at(new THREE.BoxGeometry(3.2, 1.3, 2.6).translate(-1.2, 3.6, 0), 0xf6f6f3); at(new THREE.CylinderGeometry(0.05, 0.05, 2.2, 5).translate(-1.6, 5.3, 0), 0x2b2f36);
+    }
   }
-  // Barca giuria sulla linea di partenza.
+  // Barca giuria sulla linea di partenza, con l'albero dei segnali e la bandiera arancione.
   const cm = MARKS.committee;
   parts.push(colored(new THREE.SphereGeometry(1, 12, 6).scale(9, 1.4, 3).translate(cm.x + 6, 0.4, cm.z), 0xf4f4f2), colored(new THREE.BoxGeometry(6, 2.6, 4).translate(cm.x + 6, 2.6, cm.z), 0xe6e9ec),
-    colored(new THREE.CylinderGeometry(0.08, 0.08, 7, 6).translate(cm.x + 3, 5, cm.z), 0x2b2f36));
+    colored(new THREE.BoxGeometry(5.6, 0.7, 3.7).translate(cm.x + 6, 3, cm.z), 0x24323f),
+    colored(new THREE.CylinderGeometry(0.08, 0.08, 9, 6).translate(cm.x + 3, 6, cm.z), 0x2b2f36), colored(new THREE.BoxGeometry(2.2, 1.4, 0.06).translate(cm.x + 4.15, 9.6, cm.z), 0xff7a1a),
+    colored(new THREE.BoxGeometry(1.4, 0.9, 0.06).translate(cm.x + 3.75, 8, cm.z), 0x2f6fde));
   const town = new THREE.Mesh(mergeGeometries(parts)!, painted);
   town.castShadow = town.receiveShadow = true;
   scene.add(town, stadiumSeats(rows));
   // Boe gonfiabili (ondeggiano).
   const buoys: THREE.Object3D[] = [];
   const buoy = (at: THREE.Vector3, color: number) => {
-    const b = new THREE.Mesh(colored(new THREE.CylinderGeometry(1.1, 1.4, 3.4, 12).translate(0, 1.4, 0), color), painted);
-    b.add(new THREE.Mesh(colored(new THREE.ConeGeometry(1.1, 1.2, 12).translate(0, 3.7, 0), color), painted));
+    // Boe gonfiabili alte, da regata: si devono vedere da lontano.
+    const b = new THREE.Mesh(colored(new THREE.CylinderGeometry(1.7, 2.1, 5.4, 14).translate(0, 2.4, 0), color), painted);
+    b.add(new THREE.Mesh(colored(new THREE.ConeGeometry(1.7, 1.7, 14).translate(0, 5.95, 0), color), painted),
+      new THREE.Mesh(colored(new THREE.CylinderGeometry(1.95, 2, 0.9, 14).translate(0, 2.2, 0), 0x15181d), painted));
     b.position.copy(at); b.castShadow = true;
     scene.add(b); buoys.push(b);
   };
@@ -213,6 +255,8 @@ export function sailingWorld(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
       const time = match.time, s = match.sportSimulation as SailingSimulation;
       ripples.offset.set(time * 0.004, time * 0.0025);
       buoys.forEach((b, i) => { b.position.y = Math.sin(time * 1.3 + i) * 0.12; b.rotation.z = Math.sin(time * 0.9 + i) * 0.05; });
+      // La linea di partenza resta accesa fino a qualche secondo dopo il via.
+      startLine.visible = time < s.gunAt + 8;
       // Seconda barca di ogni squadra: punta dell'ala scura, per distinguerle.
       boats ??= s.boats.map((b, i) => ({ ...catamaran(CONFIG.teams[b.team].shirt, i < 2 ? 0xf2f4f6 : 0x22262e),
         wakes: [new Ribbon(scene, 110, true, foam), new Ribbon(scene, 110, true, foam)], trails: [[], []] as THREE.Vector3[][] }));

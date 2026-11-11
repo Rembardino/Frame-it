@@ -45,7 +45,7 @@ for (const lang of langs) {
       localStorage.setItem('frameit.tutorial.v2', 'done');
       localStorage.setItem('frameit.sound', 'off');
     });
-    await page.goto(`${base}?sport=${shot.sport}&debug&lang=${lang}&autostart`);
+    await page.goto(`${base}?sport=${shot.sport}&debug&fullres&lang=${lang}&autostart`);
     await page.waitForFunction(() => window.frameit?.match, null, { timeout: 60000 });
     await page.addStyleTag({ content: '.debug-canvas,.debug-panel,#gyro-controls,#hint,.hint,#fps{display:none!important}' + (shot.wait === 'result' ? '' : '#result{display:none!important}') });
     await page.waitForTimeout(1500);

@@ -8,11 +8,13 @@ export class NetBall {
   private flight: { from: THREE.Vector3; to: THREE.Vector3; elapsed: number; duration: number;
     arc: number; bounce: boolean; next: Actor | null; scored: TeamId | null;
     actor: Actor; delay: number; contact: THREE.Vector3; prepared: boolean; bounced: boolean;
-    nextPose: Pose | null; arrival: THREE.Vector3; contactTime: number } | null = null;
+    nextPose: Pose | null; arrival: THREE.Vector3; contactTime: number; toss: boolean } | null = null;
   private heldHeight = 1;
   private catchFrom = new THREE.Vector3();
   private catchTime = 1;
   private catchDuration = 0.16;
+  /** Tennis: la palla tenuta in mano sta nel palmo libero. */
+  private palm = false;
   private target = new THREE.Vector3();
   constructor(private match: Match) {}
 
@@ -33,6 +35,7 @@ export class NetBall {
     b.state = 'held';
     b.flight = null;
     this.heldHeight = height;
+    this.palm = SPORT === 'tennis';
     this.catchFrom.copy(b.pos); this.catchTime = 0;
     // Da lontano (fine punto: la palla torna a chi batte) il raccordo dura di più, così non "spara" attraverso il campo.
     const distance = b.pos.distanceTo(actor.pos);
@@ -40,17 +43,26 @@ export class NetBall {
     b.vel.set(0, 0, 0);
   }
 
+  /** strike = secondi dall'inizio del gesto all'impatto (servizio del tennis: la palla viene prima lanciata in aria dalla mano libera). */
   launch(actor: Actor, to: THREE.Vector3, duration: number, arc: number,
-    bounce = false, next: Actor | null = null, scored: TeamId | null = null, nextPose: Pose | null = null) {
+    bounce = false, next: Actor | null = null, scored: TeamId | null = null, nextPose: Pose | null = null, strike?: number) {
     const b = this.match.ball;
-    const strikeTime = Number.isFinite(actor.poseDur) ? Math.min(0.24, actor.poseDur * 0.32) : 0.16;
+    const strikeTime = strike ?? (Number.isFinite(actor.poseDur) ? Math.min(0.24, actor.poseDur * 0.32) : 0.16);
     const delay = Math.max(0, strikeTime - actor.poseTime);
     const contactTime = actor.poseTime + delay;
     const contact = netContactPoint(actor, this.match.time + delay, contactTime);
     // The wind-up/toss reaches the contact point before the flight begins.
     this.flight = { from: b.pos.clone(), to: to.clone(), elapsed: 0, duration, arc, bounce, next, scored,
-      actor, delay, contact, prepared: false, bounced: false, nextPose, arrival: to.clone(), contactTime };
+      actor, delay, contact, prepared: false, bounced: false, nextPose, arrival: to.clone(), contactTime, toss: strike !== undefined };
     b.state = 'held'; b.holder = actor; b.flight = null;
+  }
+
+  /** La palla raggiunge il palmo libero e lo segue, senza scatti quando il gesto cambia (al massimo 22 m/s). */
+  private toPalm(actor: Actor, dt: number) {
+    const b = this.match.ball;
+    this.target.copy(netContactPoint(actor, this.match.time, actor.poseTime, actor.pose, actor.poseDur, true)).sub(b.pos);
+    const distance = this.target.length();
+    if (distance > 1e-4) b.pos.addScaledVector(this.target, Math.min(1, dt * 12, (22 * dt) / distance));
   }
 
   update(dt: number): TeamId | null {
@@ -61,7 +73,9 @@ export class NetBall {
         this.catchTime += dt;
         const u = Math.min(1, this.catchTime / this.catchDuration), smooth = u * u * (3 - 2 * u);
         this.target.set(b.holder.pos.x, this.heldHeight, b.holder.pos.z);
-        b.pos.lerpVectors(this.catchFrom, this.target, smooth);
+        // Tennis: la palla aspetta nella mano libera di chi serve, non in mezzo al corpo.
+        if (this.palm) this.toPalm(b.holder, dt);
+        else b.pos.lerpVectors(this.catchFrom, this.target, smooth);
       }
       return null;
     }
@@ -71,7 +85,15 @@ export class NetBall {
       const remaining = Math.max(0, f.delay - f.elapsed);
       f.contact.copy(netContactPoint(f.actor, this.match.time + remaining, f.contactTime));
       const u = f.elapsed / f.delay;
-      b.pos.lerpVectors(f.from, f.contact, u * u * (3 - 2 * u));
+      if (f.toss) {
+        // Fino al rilascio la palla sta nel palmo che sale; poi vola sopra il punto d'impatto e ci ricade mentre arriva la racchetta.
+        const release = 0.62;
+        if (u < release) { this.toPalm(f.actor, dt); f.from.copy(b.pos); }
+        else {
+          const v = (u - release) / (1 - release);
+          b.pos.lerpVectors(f.from, f.contact, v); b.pos.y += 4 * 0.45 * v * (1 - v);
+        }
+      } else b.pos.lerpVectors(f.from, f.contact, u * u * (3 - 2 * u));
       b.vel.copy(b.pos).sub(old).divideScalar(Math.max(dt, 0.001));
       return null;
     }
@@ -132,7 +154,7 @@ export class NetBall {
     if (f.next && f.nextPose) {
       b.state = 'held'; b.holder = f.next; b.vel.set(0, 0, 0);
       this.heldHeight = b.pos.y; this.catchFrom.copy(b.pos); this.catchTime = 0;
-      this.catchDuration = 0.16;
+      this.catchDuration = 0.16; this.palm = false;
     } else if (f.next) this.hold(f.next, f.to.y);
     else { b.state = 'dead'; b.vel.set(0, 0, 0); }
     return f.scored;

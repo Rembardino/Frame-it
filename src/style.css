@@ -115,16 +115,6 @@ html, body {
 /* Stacco TV: nero di colpo, poi dissolvenza. */
 #cut { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.6s; }
 #cut.on { opacity: 1; transition: none; }
-@media (max-height: 450px) {
-  #start .logo { font-size: clamp(34px, 7vw, 58px); }
-  #start .tag { margin-top: 10px; font-size: 13px; }
-  .language-picker { margin-top: 10px; }
-  .sports { margin-top: 12px; gap: 7px; }
-  .sports button { padding: 8px 14px; font-size: 13px; }
-  .cta-row { margin-top: 12px; }
-  .cta-row .primary { min-height: 42px; min-width: 180px; font-size: 13px; }
-  #start button.ghost { margin-top: 12px; }
-}
 
 #rotate { display: none; z-index: 10; font-size: 18px; font-weight: 700; padding: 24px; gap: 16px; }
 #rotate::before { content: "\1F4F1"; font-size: 54px; animation: turn 2s ease-in-out infinite; }
@@ -477,14 +467,33 @@ body.practicing #gyro-controls { top: auto; bottom: 58px; left: auto; right: 10p
   .practice-actions button { min-height: 32px; padding: 6px 8px; font-size: 11px; }
   body.practicing #gyro-controls { bottom: 52px; }
 }
-@media (max-height: 450px) {
-  #start { padding: 12px max(16px, var(--safe-left), var(--safe-right)); }
-  #start .logo { font-size: 34px; padding: 8px 22px 10px; }
-  #start .logo::before, #start .logo::after { width: 14px; height: 14px; }
-  #start .tag { display: none; }
-  #start .language-picker { margin-top: 8px; }
+/* Home menu: language in the corner, game HUD hidden behind it, everything compact on phones. */
+body:has(#start:not(.hidden)) #hud { visibility: hidden; }
+.language-picker { position: absolute; top: 10px; right: max(12px, var(--safe-right)); margin: 0; }
+.language-picker label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.language-picker select { padding: 5px 8px; font-size: 12px; }
+.gyro-status:empty { display: none; }
+.cta-row { align-items: center; }
+.cta-row .modes { margin: 0; }
+#sports { display: grid; grid-template-columns: repeat(4, auto); justify-content: center; }
+.match-preview { width: auto; }
+.match-preview .club { flex: none; }
+@media (max-height: 520px) {
+  #start { padding: 10px max(16px, var(--safe-left), var(--safe-right)); }
+  #start .logo { font-size: 30px; padding: 6px 18px 8px; }
+  #start .logo small { margin-top: 5px; }
+  #start .logo::before, #start .logo::after { width: 12px; height: 12px; }
+  .sports { margin-top: 10px; gap: 6px; max-width: min(720px, 96vw); }
+  .sports button { padding: 6px 11px; font-size: 11px; letter-spacing: 0.05em; }
+  .cta-row { margin-top: 10px; gap: 8px; }
+  .cta-row .primary { min-width: 140px; min-height: 40px; font-size: 12px; }
+  .modes button { padding: 6px 12px; font-size: 11px; }
   .menu-actions { margin-top: 8px; gap: 6px; }
+  .menu-actions .secondary { min-height: 32px; padding: 5px 10px; font-size: 11px; }
   .gyro-status { margin-top: 6px; font-size: 11px; }
+}
+@media (max-height: 300px) { .match-preview { display: none; } }
+@media (max-height: 450px) {
   .primary, .secondary, .text-button { min-height: 36px; padding: 7px 12px; font-size: 12px; }
   .tutorial-card { padding: 10px 18px; }
   .tutorial-card h2 { margin-bottom: 8px; font-size: 22px; }

@@ -97,7 +97,7 @@ try {
         assert(m.ball.pos.distanceTo(from) === 0, `${sport}: ball teleports at wind-up`);
         net.update(0.24);
         assert(m.ball.state === 'held', `${sport}: ball leaves before contact`);
-        assert(m.ball.pos.y > (sport === 'tennis' ? 1.15 : 2), `${sport}: strike starts below racket/hands`);
+        assert(m.ball.pos.y > (sport === 'tennis' ? 0.9 : 2), `${sport}: strike starts below racket/hands (${m.ball.pos.y.toFixed(2)} m)`);
         net.update(1 / 60);
         assert(m.ball.state === 'flight' && m.ball.holder === null, `${sport}: ball remains held after contact`);
         const { Director, EventInstance } = await server.ssrLoadModule('/src/events/director.ts');

@@ -8,7 +8,7 @@
  * Per aggiungerne una: un oggetto in PLANS. I numeri da regolare stanno in CONFIG.secrets.
  */
 import * as THREE from 'three';
-import { CONFIG, DRONE_ONLY, SPORT, type SportId } from '../config';
+import { CONFIG, DRONE_ONLY, FLOOR_Y, SPORT, type SportId } from '../config';
 import { UFO, type Actor, type Match, type Pose } from '../sim/match';
 import type { SeatRow } from '../render/stage';
 import { MomentTracker, actorSubject, frameInput } from '../scoring/moment';
@@ -294,7 +294,7 @@ export class SecretMoments {
   get gaps(): THREE.Vector3[] {
     // Chi è salito sulla navicella non torna: il suo posto resta vuoto.
     const taken = this.match.sky.ufo.seat;
-    return [...this.match.extras.filter((e) => e.role === 'spectator' && e.active && e.pos.y > 0.2).map((e) => e.pos), ...(taken && taken.y > 0.2 ? [taken] : [])];
+    return [...this.match.extras.filter((e) => e.role === 'spectator' && e.active && e.pos.y > FLOOR_Y + 0.2).map((e) => e.pos), ...(taken && taken.y > FLOOR_Y + 0.2 ? [taken] : [])];
   }
 
   update(view: View) {
@@ -331,7 +331,7 @@ export class SecretMoments {
     const want = (a: Actor) => look === 'plain' ? a.look === 'plain' : look === 'mascot' ? a.look === 'mascot' : a.look !== 'plain' && a.look !== 'mascot';
     // Sport col drone: una tribuna vicina all'azione, senza apparizioni lontane centinaia di metri.
     const nearby = DRONE_ONLY ? this.rows.filter((r) => Math.hypot(r.from.x - m.ball.pos.x, r.from.z - m.ball.pos.z) < 120) : this.rows;
-    const elevated = nearby.filter(row => !row.standing && row.from.y > 0.25);
+    const elevated = nearby.filter(row => !row.standing && row.from.y > FLOOR_Y + 0.25);
     let rows = elevated.length ? elevated : nearby;
     if (c.openSky && !DRONE_ONLY) {
       const uncovered = rows.filter(row => Math.abs((row.from.x + row.to.x) / 2) > CONFIG.pitch.length / 2);

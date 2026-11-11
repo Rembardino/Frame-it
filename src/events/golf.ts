@@ -145,7 +145,6 @@ export const GOLF_EVENTS: EventDef[] = [
   },
   // Animali nel bosco e uccelli in volo, lungo la buca che si sta giocando.
   animalEvent('g-cervi', 'Cervi al limitare del bosco', 'Qualcosa si muove tra gli alberi!', 'deer', 'peek', 3, 4.5, 8.5, () => true),
-  animalEvent('g-volpe', 'Una volpe attraversa il fairway', 'Guarda il fairway, laggiù!', 'fox', 'cross', 1, 3, 6, () => true),
   animalEvent('g-lepri', 'Lepri sul fairway', 'C’è qualcosa che salta nell’erba!', 'rabbit', 'cross', 2, 3, 6, () => true),
   animalEvent('g-anatre', 'Anatre in volo dallo stagno', 'Movimento sull’acqua!', 'duck', 'takeoff', 5, 3.5, 9, () => true),
   animalEvent('g-stormo', 'Stormo in volo!', 'Guarda il cielo sopra la buca!', 'birds', 'sky', 22, 5, 10, () => true),

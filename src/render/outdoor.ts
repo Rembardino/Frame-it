@@ -13,6 +13,7 @@ import { seeded, type Poly, type Tree } from '../sim/sports/shapes';
 import { radialTexture } from './stage';
 import { surfaceGrain } from './surfaces';
 import { FaunaViews } from './fauna';
+import { propMaterial, withProps } from './props';
 
 const DEG = Math.PI / 180;
 /** Direzione del sole: basso, da ovest-sud-ovest. */
@@ -96,39 +97,39 @@ function skyDome(radius: number) {
   return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
 }
 
-/** Alberi a centinaia: pini e latifoglie, ognuno con la sua altezza e sfumatura di verde. */
-export function forest(scene: THREE.Scene, trees: Tree[], elevation = (_x: number, _z: number) => 0) {
-  const unit = (parts: THREE.BufferGeometry[]) => { const g = mergeGeometries(parts.map((p) => p.toNonIndexed()))!; parts.forEach((p) => p.dispose()); return g; };
-  const kinds = [
-    { pine: true, trunk: new THREE.CylinderGeometry(0.018, 0.028, 0.32, 6).translate(0, 0.16, 0),
-      top: unit([new THREE.ConeGeometry(0.3, 0.55, 8).translate(0, 0.45, 0), new THREE.ConeGeometry(0.21, 0.45, 8).translate(0, 0.74, 0)]) },
-    { pine: false, trunk: new THREE.CylinderGeometry(0.025, 0.04, 0.5, 6).translate(0, 0.25, 0),
-      top: unit([new THREE.IcosahedronGeometry(0.3, 1).translate(0, 0.62, 0), new THREE.IcosahedronGeometry(0.22, 1).translate(0.13, 0.74, 0.06),
-        new THREE.IcosahedronGeometry(0.2, 1).translate(-0.12, 0.72, -0.09)]) },
-  ];
-  const bark = new THREE.MeshStandardMaterial({ color: 0x5b4532, roughness: 1 });
-  const leaves = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true });
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), color = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
+/**
+ * Alberi a centinaia, modellati in Blender (chioma con le ombre interne già cotte): abeti, due latifoglie e,
+ * dove cypress > 0 (quota di latifoglie sostituite), cipressi. Ognuno ha la sua altezza, larghezza e sfumatura di verde.
+ */
+export function forest(scene: THREE.Scene, trees: Tree[], elevation = (_x: number, _z: number) => 0, cypress = 0, only?: 'bush') {
+  const kindOf = (tr: Tree) => only ?? tr.pine ? 'tree_pine' : (tr.tint * 7) % 1 < cypress ? 'tree_cypress' : (tr.tint * 13) % 1 < 0.45 ? 'tree_round' : 'tree_oak';
   // A riquadri di 400 m: camera e ombra disegnano solo i boschi inquadrati, non migliaia di alberi a ogni fotogramma.
   const tiles = new Map<string, Tree[]>();
   for (const tr of trees) {
-    const key = `${Math.floor(tr.x / 400)},${Math.floor(tr.z / 400)}`;
+    const key = `${Math.floor(tr.x / 400)},${Math.floor(tr.z / 400)},${kindOf(tr)}`;
     if (!tiles.has(key)) tiles.set(key, []);
     tiles.get(key)!.push(tr);
   }
-  for (const tile of tiles.values()) for (const k of kinds) {
-    const list = tile.filter((tr) => tr.pine === k.pine);
-    if (!list.length) continue;
-    const trunks = new THREE.InstancedMesh(k.trunk, bark, list.length), tops = new THREE.InstancedMesh(k.top, leaves, list.length);
-    list.forEach((tr, i) => {
-      const h = k.pine ? tr.h : tr.h * 0.8;
-      q.setFromAxisAngle(up, tr.tint * 40);
-      m4.compose(new THREE.Vector3(tr.x, elevation(tr.x, tr.z), tr.z), q, new THREE.Vector3(h, h, h));
-      trunks.setMatrixAt(i, m4); tops.setMatrixAt(i, m4);
-      tops.setColorAt(i, color.setHSL(k.pine ? 0.33 + tr.tint * 0.04 : 0.24 + tr.tint * 0.09, k.pine ? 0.42 : 0.45, k.pine ? 0.17 + tr.tint * 0.05 : 0.22 + tr.tint * 0.1));
-    });
-    for (const mesh of [trunks, tops]) { mesh.castShadow = true; mesh.computeBoundingSphere(); scene.add(mesh); }
-  }
+  withProps('country', (props) => {
+    const bark = propMaterial('trunk'), leaves = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), color = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
+    for (const [key, list] of tiles) {
+      const kind = key.split(',')[2], parts = props[kind];
+      const tops = new THREE.InstancedMesh(parts.leaf, leaves, list.length), trunks = parts.trunk ? new THREE.InstancedMesh(parts.trunk, bark, list.length) : null;
+      list.forEach((tr, i) => {
+        const h = kind === 'tree_pine' ? tr.h : kind === 'tree_cypress' ? tr.h * 1.05 : tr.h * 0.8, wide = h * (0.85 + ((tr.tint * 29) % 1) * 0.3);
+        q.setFromAxisAngle(up, tr.tint * 40);
+        m4.compose(new THREE.Vector3(tr.x, elevation(tr.x, tr.z), tr.z), q, new THREE.Vector3(wide, h, wide));
+        trunks?.setMatrixAt(i, m4); tops.setMatrixAt(i, m4);
+        if (kind === 'tree_pine') color.setHSL(0.33 + tr.tint * 0.04, 0.42, 0.22 + tr.tint * 0.07);
+        else if (kind === 'tree_cypress') color.setHSL(0.31 + tr.tint * 0.03, 0.4, 0.17 + tr.tint * 0.05);
+        else color.setHSL(0.24 + tr.tint * 0.09, 0.46, 0.28 + tr.tint * 0.13);
+        tops.setColorAt(i, color);
+      });
+      tops.name = kind;
+      for (const mesh of trunks ? [trunks, tops] : [tops]) { mesh.castShadow = true; mesh.computeBoundingSphere(); scene.add(mesh); }
+    }
+  });
 }
 
 /**

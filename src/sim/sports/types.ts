@@ -9,7 +9,7 @@ export type SportAction = 'serve' | 'forehand' | 'backhand' | 'volley' | 'smash'
   | 'approach' | 'approachClose' | 'approachShort' | 'approachBunker' | 'approachWater'
   | 'chip' | 'chipIn' | 'bunkerShot' | 'bunkerIn' | 'puttShort' | 'putt' | 'puttLong' | 'puttLag' | 'puttLip'
   /** Ciclismo. */
-  | 'attack' | 'catch' | 'crash' | 'sprintFinish' | 'runAlong'
+  | 'attack' | 'catch' | 'crash' | 'puncture' | 'sprintFinish' | 'runAlong'
   /** Vela. */
   | 'gun' | 'tack' | 'foil' | 'capsize';
 
@@ -25,6 +25,8 @@ export interface SportSimulation {
   update(dt: number): void;
   action(kind: SportAction, actor: Actor, target?: Actor): void;
   scoreText(): string;
+  /** Maxischermo, quando il punteggio non è un solo numero (tennis: main = game vinti, extra = punti del game in corso). */
+  board?(): { main: [string, string]; extra: [string, string] };
   /** Scritta al posto del cronometro (golf: buca e par). */
   clockText?(): string;
   /** Punto notevole per i copioni, con uno scarto [avanti, di lato] (golf: tribuna, bandiera, bunker). */

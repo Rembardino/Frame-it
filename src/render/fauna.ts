@@ -192,7 +192,7 @@ export class FaunaViews {
       const q = fauna.at(a, i, time + 0.08).pos, moving = q.distanceTo(p.pos) > 0.01;
       const pitch = b.fly || b.swim ? Math.atan2(q.y - p.pos.y, Math.max(0.01, Math.hypot(q.x - p.pos.x, q.z - p.pos.z))) : 0;
       v.root.rotation.set(0, -p.heading, THREE.MathUtils.clamp(pitch, -1.2, 1.2));
-      if(v.asset){v.asset.sample(time-a.t0+i*.37,p.gait,moving);continue;}
+      if(v.asset){v.asset.sample(time-a.t0+i*.37,p.gait,moving,p.pos.y>.4&&moving);continue;}
       const phase = p.gait * Math.PI * 2;
       const hop = a.species === 'rabbit';
       // Zampe: oscillano solo quando l'animale cammina (da fermo stanno dritte).

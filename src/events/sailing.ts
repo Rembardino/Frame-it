@@ -55,6 +55,13 @@ export const SAILING_EVENTS: EventDef[] = [
     cues: [], decisive: 2.1, duration: 7,
     shots: [{ from: 0, size: 'medium', subjects: ['a', 'b'] }],
   },
+  {
+    id: 'r-strambata', label: 'Strambata!', hint: 'Una barca sta per strambare!', category: 'main', weight: 3, importance: 1,
+    when: (m) => free(m) && sim(m).boats.every((b) => b.leg === 2),
+    roles: crew, steps: [{ t: 1.5, do: 'sport', action: 'tack', who: 'a' }],
+    cues: [], decisive: 2.7, duration: 6,
+    shots: [{ from: 0, size: 'medium', subjects: ['a', 'b'] }],
+  },
   mark('r-boa', 'Giro di boa!', 'La prima barca arriva alla boa di bolina!', 1, S.upwind),
   mark('r-cancello', 'Al cancello di poppa!', 'Si arriva al cancello: tieni barca e boa!', 2, S.downwind),
   { ...mark('r-arrivo', 'Arrivo!', 'Ultimi metri: l’arrivo!', 3, S.reach, 106), weight: 50, exclusive: true },

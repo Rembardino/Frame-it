@@ -5,7 +5,7 @@
  * Un solo sistema di punti con shader minimo: dimensione e colore per particella, nessuna texture.
  */
 import * as THREE from 'three';
-import { CONFIG, SPORT } from '../config';
+import { CONFIG, FLOOR_Y, SPORT } from '../config';
 import { BALL_RADIUS, type Cue, type Match, type Pose } from '../sim/match';
 import { radialTexture } from './stage';
 import type { ActorViews } from './actors';
@@ -103,6 +103,8 @@ export class Effects {
         case 'punch': this.burst(SWEAT, at, Math.round(8 * power), 0.05); break;
         case 'knockdown': this.burst(SWEAT, at, 24, 0.1); break;
         case 'goal': if (SPORT === 'calcio') this.confetti(Math.sign(at.x) || 1); break;
+        // Triplice fischio: coriandoli da tutte e due le curve, in ogni sport da stadio.
+        case 'whistleEnd': this.confetti(1); this.confetti(-1); break;
       }
     }
   }
@@ -210,7 +212,7 @@ export class Effects {
   private confetti(side: number) {
     const { length: L, width: W } = CONFIG.pitch;
     const x = side * (L / 2 + 6 + CONFIG.crowd.rowsEnd * 0.9 - 1);
-    const top = 0.6 + (CONFIG.crowd.rowsEnd - 1) * 0.5 + 1.6;
+    const top = FLOOR_Y + 0.6 + (CONFIG.crowd.rowsEnd - 1) * 0.5 + 1.6;
     for (let n = 0; n < 110; n++) {
       this.burst(CONFETTI_BURST, this.tmp.set(x, top, (Math.random() - 0.5) * (W + 2)), 1, 0.6);
       const i = (this.next + MAX - 1) % MAX;
