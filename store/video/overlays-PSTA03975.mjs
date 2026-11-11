@@ -8,18 +8,18 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const out = `${root}artifacts/video-frames/overlays/`;
 mkdirSync(out, { recursive: true });
 export const TEXTS = {
-  'h1-rigore': { head: 'YOU ARE THE <y>CAMERAMAN</y>', sub: 'Frame the action, live 🎥', tag: 'CAMERA MODE' },
-  'c1-pallavolo': { head: 'EVERY SHOT <y>RATED</y> ⭐', sub: 'Zoom in · follow the ball', tag: 'CAMERA MODE' },
-  'c2-boxe': { head: 'KEEP BOTH IN <y>FRAME</y>', sub: 'Every punch · every knockdown 🥊', tag: 'CAMERA MODE' },
-  's1-angolo-drone': { head: 'CORNER <y>KICK!</y> ⚽', sub: 'Start on the sideline camera', tag: 'CAMERA MODE',
-    switch: { head: 'SWITCH TO <y>DRONE</y> 🚁', sub: 'Same action · now from the sky', tag: 'DRONE MODE' } },
-  'd1-golf': { head: 'CHASE EVERY <y>SHOT</y>', sub: 'Golf, filmed by drone ⛳', tag: 'DRONE MODE' },
-  's2-pallavolo-drone': { head: 'CAMERA… <y>OR DRONE?</y>', sub: 'Switch any time, mid-play', tag: 'CAMERA MODE',
-    switch: { head: 'SWITCH TO <y>DRONE</y> 🚁', sub: 'Circle the rally from above', tag: 'DRONE MODE' } },
+  'h1-rigore': { head: 'YOU ARE THE <y>CAMERAMAN</y>', sub: 'Live sports · you frame it 🎥', tag: 'CAMERA MODE' },
+  'd0-calcio-drone': { head: 'NOW FLY THE <y>DRONE</y> 🚁', sub: 'Counter-attack · from the sky', tag: 'DRONE MODE' },
+  'c2-boxe': { head: 'KNOCK<y>DOWN!</y> 🥊', sub: 'Keep both fighters in frame', tag: 'CAMERA MODE' },
+  'b2-boxe-drone': { head: 'INSIDE THE <y>RING</y>', sub: 'Drone over every punch', tag: 'DRONE MODE' },
+  'd1-golf': { head: 'CHASE EVERY <y>SHOT</y> ⛳', sub: 'Golf, filmed by drone', tag: 'DRONE MODE' },
+  'g3-golf-cervi': { head: 'WILD <y>VISITORS</y> 🦌', sub: 'Wildlife on the course', tag: 'SPECIAL EVENT' },
+  'c1-ciclismo': { head: 'RIDE WITH THE <y>PELOTON</y> 🚴', sub: 'Drone over the race', tag: 'DRONE MODE' },
   'm1-basket': { head: 'AND <y>MORE</y>…', sub: 'Basketball 🏀', tag: 'CAMERA MODE' },
   'm2-tennis': { head: 'AND <y>MORE</y>…', sub: 'Tennis 🎾', tag: 'DRONE MODE' },
-  'm3-ciclismo': { head: 'AND <y>MORE</y>…', sub: 'Cycling 🚴', tag: 'DRONE MODE' },
-  'e1-golf-ace': { head: 'HOLE IN <y>ONE!</y> 🏆', sub: 'Rare moments · huge bonus', tag: 'DRONE MODE' },
+  'm4-pallavolo': { head: 'AND <y>MORE</y>…', sub: 'Volleyball 🏐', tag: 'CAMERA MODE' },
+  'm3-ciclismo': { head: 'WAIT… AN <y>EAGLE?!</y> 🦅', sub: 'Look up · catch the rare ones', tag: 'RARE EVENT' },
+  'e1-golf-ace': { head: 'HOLE IN <y>ONE!</y> 🏆', sub: 'Rare moments · huge bonus', tag: 'RARE EVENT' },
 };
 const icon = `data:image/png;base64,${readFileSync(`${root}public/icons/frame-it-icon-concept-v3-action.png`).toString('base64')}`;
 const css = `
@@ -54,7 +54,7 @@ await shot(`<div style="width:1080px;height:1920px;display:flex;flex-direction:c
     <svg width="70" height="78" viewBox="0 0 70 78"><path d="M6 4 L64 39 L6 74 Z" fill="#ffd23f"/></svg>
     <div style="text-align:left"><div style="font-size:30px;font-weight:600;opacity:.85;letter-spacing:.08em">NOW ON</div><div style="font-size:58px;font-weight:800;line-height:1">Google Play</div></div>
   </div>
-  <div style="margin-top:10px;font-size:36px;font-weight:700;opacity:.85">Camera mode · drone mode · <span class="rec"></span> LIVE</div>
+  <div style="margin-top:10px;font-size:36px;font-weight:700;opacity:.85">Camera · drone · special events · <span class="rec"></span> LIVE</div>
 </div>`, 'end', 1920, false);
 await browser.close();
 console.log('overlays ok');

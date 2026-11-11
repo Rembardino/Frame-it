@@ -3,13 +3,13 @@
  */
 import './style.css';
 import * as THREE from 'three';
-import { CAREER, CONFIG, DRONE_ONLY, SPORT, SPORT_LIST } from './config';
+import { CAREER, CONFIG, DRONE_ONLY, HIDDEN_SPORTS, SPORT, SPORT_LIST } from './config';
 import { createStage } from './render/stage';
 import { ActorViews } from './render/actors';
 import { Crowd, type CrowdState } from './render/crowd';
 import { SkyEffects } from './render/skyEffects';
 import { Effects } from './render/effects';
-import { Match } from './sim/match';
+import { Match, type Pose } from './sim/match';
 import { Director, type DirectorResult } from './events/director';
 import { SecretMoments, isSecretCaptured } from './events/secrets';
 import { DirectorVoice } from './director/voice';
@@ -40,6 +40,7 @@ import { LANGUAGE, LANGUAGES, isLanguage, localizePage, numberText, saveLanguage
 import { teamCatalog, type TeamKit } from './teams';
 import { terrainHeight } from './sim/sports/cyclingRoute';
 import { loadAnimalModels } from './render/animalModels';
+import { propsLoaded } from './render/props';
 
 const params = new URLSearchParams(location.search);
 const debug = CONFIG.debug.enabled || params.has('debug');
@@ -146,7 +147,7 @@ for (const [id, on] of [['mode-assist', true], ['mode-expert', false]] as const)
 }
 let seenCuts = 0;
 // In debug gli oggetti di gioco sono raggiungibili dalla console del browser (e dai test automatici).
-if (debug) Promise.all([views.ready,crowd.ready,loadAnimalModels()]).then(()=>Object.assign(window, { frameit: { match, director, voice, cam, gyro, recorder, replay, stage, views, hud, practice, drone, audio, secrets, crowd } })).catch(()=>{});
+if (debug) Promise.all([views.ready,crowd.ready,loadAnimalModels(),propsLoaded()]).then(()=>Object.assign(window, { frameit: { match, director, voice, cam, gyro, recorder, replay, stage, views, hud, practice, drone, audio, secrets, crowd } })).catch(()=>{});
 
 function resize() {
   stage.renderer.setSize(innerWidth, innerHeight);
@@ -154,6 +155,28 @@ function resize() {
 }
 addEventListener('resize', resize);
 resize();
+
+/**
+ * Fluidità prima della nitidezza: se il telefono non tiene il ritmo, la ripresa si disegna con meno pixel.
+ * Ogni 2 secondi di gioco si misura il ritmo; sotto la soglia si scende di un gradino. Se scendere non aiuta
+ * (ritmo bloccato dal telefono, non dalla grafica) si torna alla nitidezza di prima e non si riprova.
+ */
+// ?fullres la spegne (registrazioni dei video promozionali, che girano a tempo virtuale).
+const sharp = { scale: 1, frames: 0, time: 0, before: 0, probing: false, done: !CONFIG.render.adaptive || params.has('fullres') };
+function adaptResolution(dt: number) {
+  if (sharp.done) return;
+  sharp.frames++; sharp.time += dt;
+  if (sharp.time < 2) return;
+  const fps = sharp.frames / sharp.time, R = CONFIG.render;
+  sharp.frames = sharp.time = 0;
+  if (sharp.probing) {
+    sharp.probing = false;
+    if (fps < sharp.before * 1.1) { sharp.scale += R.adaptiveStep; sharp.done = true; }
+  } else if (fps < R.adaptiveFps && sharp.scale - R.adaptiveStep >= R.adaptiveMin - 1e-6) {
+    sharp.before = fps; sharp.scale -= R.adaptiveStep; sharp.probing = true;
+  } else return;
+  stage.renderer.setPixelRatio(Math.min(devicePixelRatio, R.maxPixelRatio) * sharp.scale);
+}
 
 /** Nel debug, quando non c'è un momento: "segui l'azione" (largo su chi ha palla), non valutato. */
 function ambientInput() {
@@ -167,7 +190,13 @@ function ambientInput() {
 const worldNow = (): WorldFrame => ({
   excitement: match.excitement, hotX: director.crowdHot.x, hotLevel: director.crowdHot.level, lookUp: Math.max(director.crowdLookUp, match.ufoPose().look),
 });
-const crowdState = (w: WorldFrame): CrowdState => ({ excitement: w.excitement, hot: { x: w.hotX, level: w.hotLevel }, lookUp: w.lookUp });
+/** Gesti degli spettatori "veri" che fanno girare e applaudire chi sta loro intorno (letti dagli attori: valgono anche nei replay). */
+const SHOW_POSES = new Set<Pose>(['kneel', 'kiss', 'dance', 'fall', 'celebrate', 'argue', 'protest', 'wave', 'float']);
+const crowdState = (w: WorldFrame): CrowdState => ({
+  excitement: w.excitement, hot: { x: w.hotX, level: w.hotLevel }, lookUp: w.lookUp,
+  focus: cam.autoTarget?.() ?? match.ball.pos,
+  spots: match.extras.filter((e) => e.role === 'spectator' && e.active && SHOW_POSES.has(e.pose)).map((e) => ({ x: e.pos.x, y: e.pos.y, z: e.pos.z, level: 1 })),
+});
 const camNow = (): CameraFrame => ({
   rx: stage.camera.rotation.x, ry: stage.camera.rotation.y, fov: stage.camera.fov,
   // La posizione serve solo a chi ha il drone (nel replay la camera torna dov'era in volo).
@@ -502,7 +531,10 @@ const failedText={en:'Characters could not load. Please retry.',it:'Impossibile 
 assetStatus.textContent=loadingText[LANGUAGE];$('start-btn').insertAdjacentElement('afterend',assetStatus);
 const modelButtons=['start-btn','tutorial-btn','practice-btn'].map(id=>$(id) as HTMLButtonElement);
 modelButtons.forEach(b=>b.disabled=true);
-Promise.all([views.ready,crowd.ready,loadAnimalModels()]).then(()=>{
+Promise.all([views.ready,crowd.ready,loadAnimalModels(),propsLoaded()]).then(()=>{
+  // Shader di tutto, anche di ciò che è ancora nascosto (spettatori dei momenti segreti, animali, telefoni, navicella):
+  // compilati adesso, dietro il menu, non al primo fotogramma in cui compaiono (era uno scatto proprio sugli eventi speciali).
+  stage.renderer.compile(stage.scene,stage.camera);
   modelsReady=true;assetStatus.remove();modelButtons.forEach(b=>b.disabled=false);
   if(pendingStart)start();
 }).catch(error=>{
@@ -543,6 +575,7 @@ $('practice-btn').addEventListener('click', () => practice.open(() => {}));
 // (In modalità libera si provano tutti gli sport; in Carriera quelli col drone si sbloccano più avanti.)
 if (DRONE_ONLY) { $('tutorial-btn').classList.add('hidden'); $('practice-btn').classList.add('hidden'); }
 for (const s of SPORT_LIST) {
+  if (HIDDEN_SPORTS.includes(s.id)) continue;
   const b = document.createElement('button');
   b.textContent = t(s.name);
   b.className = s.id === SPORT ? 'on' : '';
@@ -641,7 +674,7 @@ stage.renderer.setAnimationLoop((now) => {
     return;
   }
 
-  if (running && !ended) drone.update(dt);
+  if (running && !ended) { drone.update(dt); adaptResolution(dt); }
   gyro.update(dt);
   cam.update(dt);
   const view = cam.view();

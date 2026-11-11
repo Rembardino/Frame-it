@@ -109,11 +109,12 @@ export class GyroscopeController {
     this.enabled = enabled;
     this.camera.sensorControlled = enabled && this.active;
     this.center();
-    this.status.textContent = t(enabled ? 'Ruota il telefono per inquadrare. Ricentra quando cambi posizione.'
-      : reason === 'denied' ? 'Permesso negato. Puoi continuare a trascinare per inquadrare.'
-      : reason ? 'Giroscopio non disponibile. Puoi continuare a trascinare per inquadrare.'
-      : 'Giroscopio opzionale: attivalo per muovere la camera con il telefono.');
-    if (document.getElementById('start')!.classList.contains('hidden')) {
+    // Menu stays clean: the hint only appears after the player touches the gyroscope button.
+    this.status.textContent = enabled ? t('Ruota il telefono per inquadrare. Ricentra quando cambi posizione.')
+      : reason === 'denied' ? t('Permesso negato. Puoi continuare a trascinare per inquadrare.')
+      : reason ? t('Giroscopio non disponibile. Puoi continuare a trascinare per inquadrare.')
+      : '';
+    if (this.status.textContent && document.getElementById('start')!.classList.contains('hidden')) {
       this.feedback.textContent = this.status.textContent;
       this.feedback.classList.remove('hidden');
       clearTimeout(this.feedbackTimer);

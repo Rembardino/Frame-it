@@ -3,7 +3,7 @@ import type { Actor, Match, TeamId } from '../match';
 import type { SportAction, SportSimulation } from './types';
 import { NetBall } from './netBall';
 import { CONFIG } from '../../config';
-import { netContactPoint } from '../../animation/motion';
+import { netContactPoint, TENNIS_SERVE } from '../../animation/motion';
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -27,6 +27,11 @@ export class TennisSimulation implements SportSimulation {
     if (this.match.isStopped) return;
     const winner = this.ball.update(dt);
     if (winner !== null) this.award(winner);
+    // Palla in arrivo: chi deve colpire apre il colpo mentre corre (poseDir: +1 dritto, −1 rovescio; lo legge la posa 'normal').
+    for (const a of this.match.actors) {
+      const pose = this.ball.receiver === a && a.pose === 'normal' && this.ball.remaining < 0.85 ? this.ball.receivingPose : null;
+      a.poseDir += ((pose === 'racket' ? 1 : pose === 'backhand' ? -1 : 0) - a.poseDir) * Math.min(1, dt * 7);
+    }
     // Mentre un copione ha la palla, comanda lui; la pausa tra i punti riprende dopo.
     if (this.between >= 0 && !this.match.ballScripted) return this.betweenPoints(dt);
     for (const a of this.match.actors) {
@@ -52,8 +57,8 @@ export class TennisSimulation implements SportSimulation {
     // Errore non forzato: raro all'inizio dello scambio, sempre più probabile man mano che si allunga.
     if (this.rally >= 3 && Math.random() < 0.035 + this.rally * 0.012) this.unforcedError(a, opponent);
     else {
-      // Dritto o rovescio a seconda del lato da cui arriva la palla.
-      const forehand = a.pose === 'racket' || (a.pose !== 'backhand' && (this.match.ball.pos.z - a.pos.z) * (a.team === 0 ? 1 : -1) >= 0);
+      // Dritto se la palla è dal lato della racchetta, altrimenti rovescio.
+      const forehand = a.pose === 'racket' || (a.pose !== 'backhand' && (this.match.ball.pos.z - a.pos.z) * (a.team === 0 ? -1 : 1) >= 0);
       this.action(forehand ? 'forehand' : 'backhand', a, opponent);
     }
   }
@@ -65,26 +70,39 @@ export class TennisSimulation implements SportSimulation {
     const side = opponent.team === 0 ? -1 : 1;
     // Scambio di sottofondo: profondità, angolo e velocità cambiano a ogni colpo (corta, lunga, incrociata).
     const ambient = !this.match.ballScripted && !finishing && !serve && kind !== 'lob';
-    const depth = ambient ? rand(7, 10.8) : 9.6;
-    const to = new THREE.Vector3(side * (serve ? 5.6 : depth), finishing ? 0.12 : 1,
-      finishing ? (actor.pos.z > 0 ? -3.6 : 3.6)
-        : ambient ? THREE.MathUtils.clamp(-actor.pos.z * 0.4 + rand(-2.9, 2.9), -3.6, 3.6)
-        : THREE.MathUtils.clamp(-actor.pos.z * 0.5 + Math.sin(this.match.time * 0.73) * 2.4, -3.4, 3.4));
+    const cross = -Math.sign(actor.pos.z || 1);
+    // Ogni tanto una palla corta, se l'avversario è rimasto a fondo campo.
+    const short = ambient && this.rally >= 2 && Math.abs(opponent.pos.x) > 9.5 && Math.random() < 0.1;
+    // Dove l'avversario colpirà. Il servizio va in diagonale: rimbalza nel rettangolo di battuta e arriva a fondo campo.
+    const to = serve ? new THREE.Vector3(side * rand(9.9, 10.7), 1, cross * rand(1.2, 3.3))
+      : new THREE.Vector3(side * (short ? rand(3.2, 4.6) : ambient ? rand(7, 10.8) : 9.6), short ? 0.7 : 1,
+        ambient ? THREE.MathUtils.clamp(-actor.pos.z * 0.4 + rand(-2.9, 2.9), -3.6, 3.6)
+          : THREE.MathUtils.clamp(-actor.pos.z * 0.5 + Math.sin(this.match.time * 0.73) * 2.4, -3.4, 3.4));
     // A player approaching the net receives in front, rather than catching a ball behind them.
     if (!finishing && opponent.scripted) {
       to.x = opponent.target.x - side * 0.45;
       to.z = THREE.MathUtils.clamp(opponent.target.z, -3.8, 3.8);
     }
     this.strikePose(actor, serve ? 'serve' : kind === 'smash' ? 'spike' : kind === 'backhand' || kind === 'backhandWinner' ? 'backhand' : 'racket', opponent);
+    const from = this.match.ball.pos;
+    let duration = ambient ? Math.max(0.8, to.distanceTo(from) / rand(16, 23)) : serve && !finishing ? Math.max(0.75, to.distanceTo(actor.pos) / rand(24, 30)) : finishing ? 1.1 : 1.25;
+    // Tempo che serve all'avversario per arrivarci. Se la palla è più veloce di lui, nello scambio libero è un vincente:
+    // niente più palle che rallentano in aria per farsi raggiungere.
+    const need = Math.hypot(to.x - opponent.pos.x, to.z - opponent.pos.z) / CONFIG.match.sprintSpeed + 0.28;
+    const winner = finishing || (ambient && this.rally >= 2 && need > duration * 1.2 && (need > duration * 1.6 || Math.random() < 0.5));
+    if (winner) {
+      // Rimbalza in campo (per i colpi del regista nell'angolo lontano) e prosegue verso il fondo: l'avversario la rincorre invano.
+      const bounce = finishing ? new THREE.Vector3(side * (serve ? 5.6 : 9.6), 0, serve ? cross * 3.4 : actor.pos.z > 0 ? -3.6 : 3.6) : to.clone();
+      to.copy(serve ? actor.pos : from).lerp(bounce, 1 / 0.78).setY(0.7);
+    } else duration = Math.max(duration, need);
     if (!opponent.scripted) opponent.target.copy(to).setY(0);
-    let duration = ambient ? Math.max(0.8, to.distanceTo(this.match.ball.pos) / rand(15, 22)) : finishing ? 1.1 : 1.25;
-    if (!finishing) duration = Math.max(duration, Math.hypot(to.x - opponent.pos.x, to.z - opponent.pos.z) / CONFIG.match.sprintSpeed + 0.28);
-    const nextPose = kind === 'lob' ? 'spike' : (to.z - opponent.pos.z) * side < 0 ? 'racket' : 'backhand';
-    this.ball.launch(actor, to, duration, kind === 'lob' ? 3.5 : serve ? 1.3 : kind === 'smash' ? 0.35 : ambient ? rand(0.6, 1.1) : 0.85,
-      kind !== 'lob' && !(opponent.scripted && Math.abs(to.x) < 4), finishing ? null : opponent, finishing ? actor.team : null, finishing ? null : nextPose);
+    const nextPose = kind === 'lob' ? 'spike' : (to.z - opponent.pos.z) * side > 0 ? 'racket' : 'backhand';
+    this.ball.launch(actor, to, duration, kind === 'lob' ? 3.5 : serve ? 0.4 : kind === 'smash' ? 0.35 : ambient ? rand(0.6, 1.1) : 0.85,
+      kind !== 'lob' && !(opponent.scripted && Math.abs(to.x) < 4), winner ? null : opponent, winner ? actor.team : null, winner ? null : nextPose,
+      serve ? TENNIS_SERVE.duration * TENNIS_SERVE.contact : undefined);
     this.between = -1;
     this.match.phase = 'play';
-    this.match.excitement = finishing ? 0.95 : 0.5;
+    this.match.excitement = finishing ? 0.95 : winner ? 0.8 : 0.5;
   }
 
   /** Palla in rete o lunga: lo scambio finisce e il punto va all'avversario. */
@@ -94,7 +112,7 @@ export class TennisSimulation implements SportSimulation {
     const to = long
       ? new THREE.Vector3(side * rand(12.4, 13.2), CONFIG.visuals.ballRadius * CONFIG.visuals.ballScale, THREE.MathUtils.clamp(-actor.pos.z * 0.4 + rand(-3, 3), -4, 4))
       : new THREE.Vector3(-side * 0.25, 0.75, THREE.MathUtils.clamp(actor.pos.z * 0.3 + rand(-1.5, 1.5), -3, 3));
-    const forehand = actor.pose === 'racket' || (actor.pose !== 'backhand' && (this.match.ball.pos.z - actor.pos.z) * (actor.team === 0 ? 1 : -1) >= 0);
+    const forehand = actor.pose === 'racket' || (actor.pose !== 'backhand' && (this.match.ball.pos.z - actor.pos.z) * (actor.team === 0 ? -1 : 1) >= 0);
     this.strikePose(actor, forehand ? 'racket' : 'backhand', opponent);
     if (!opponent.scripted) opponent.target.set(side * 10.2, 0, THREE.MathUtils.clamp(to.z, -3.8, 3.8));
     this.ball.launch(actor, to, long ? to.distanceTo(this.match.ball.pos) / 19 : 0.6, long ? 1.3 : 0.4, false, null, opponent.team);
@@ -105,7 +123,7 @@ export class TennisSimulation implements SportSimulation {
     const prepared = this.match.ball.holder === actor && ['racket', 'backhand', 'spike'].includes(actor.pose) && actor.poseTime <= 0.4;
     if (actor.pose !== pose || !prepared) {
       const time = prepared ? actor.poseTime : 0;
-      this.match.setPose(actor, pose, 0.55, opponent);
+      this.match.setPose(actor, pose, pose === 'serve' ? TENNIS_SERVE.duration : 0.55, opponent);
       actor.poseTime = time;
     } else actor.faceTarget = opponent;
     actor.target.copy(actor.pos);
@@ -149,10 +167,15 @@ export class TennisSimulation implements SportSimulation {
     this.match.phase = 'reset';
   }
 
-  scoreText() {
-    const p = (t: TeamId) => this.points[0] >= 3 && this.points[1] >= 3
+  /** Punti del game come si dicono nel tennis. */
+  private called(t: TeamId) {
+    return this.points[0] >= 3 && this.points[1] >= 3
       ? this.points[t] > this.points[1 - t] ? 'AD' : '40'
       : ['0', '15', '30', '40'][Math.min(3, this.points[t])];
-    return `${this.match.score[0]}–${this.match.score[1]} · ${p(0)}–${p(1)}`;
   }
+
+  scoreText() { return `${this.match.score[0]}–${this.match.score[1]} · ${this.called(0)}–${this.called(1)}`; }
+
+  /** Maxischermo: game vinti e punti del game in corso, come nel punteggio in alto. */
+  board() { return { main: this.match.score.map(String) as [string, string], extra: [this.called(0), this.called(1)] as [string, string] }; }
 }

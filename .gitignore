@@ -9,3 +9,5 @@ artifacts/
 *.jks
 *.keystore
 credentials.json
+
+__pycache__/

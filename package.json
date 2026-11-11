@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "props": "node scripts/prepare-props.mjs",
+    "clips": "node scripts/prepare-blender-clips.mjs",
     "check": "node scripts/check.mjs",
     "check:motion": "node scripts/check-motion.mjs",
     "check:volleyball": "node scripts/check-volleyball-flow.mjs",
@@ -34,6 +36,7 @@
     "check:audio": "node scripts/check-audio.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:stands": "node scripts/check-stands-ui.mjs",
+    "check:crowd": "node scripts/check-crowd.mjs",
     "check:difficulty": "node scripts/check-difficulty.mjs"
   },
   "dependencies": {

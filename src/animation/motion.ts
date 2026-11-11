@@ -10,6 +10,11 @@ export interface MotionPose {
   tiltSide: number; lean: number; lift: number; headUp: number; bodyWeight: number;
 }
 
+/** Dal polso al centro del piatto corde della racchetta (m): lì si colpisce la palla. */
+export const RACKET_REACH = 0.46;
+/** Durata del servizio nel tennis e frazione in cui la racchetta incontra la palla (prima: lancio di palla e caricamento). */
+export const TENNIS_SERVE = { duration: 1.5, contact: 0.6 };
+
 const clamp = THREE.MathUtils.clamp;
 const ease = (u: number) => { const t = clamp(u, 0, 1); return t * t * (3 - 2 * t); };
 type Key = [number, number];
@@ -19,6 +24,38 @@ function curve(u: number, keys: Key[]) {
   }
   return keys[keys.length - 1][1];
 }
+
+/**
+ * Dritto e rovescio del tennis (il braccio "R" tiene la racchetta, dal lato −z): u = 0 apertura con le spalle girate,
+ * 0,32 impatto davanti e di fianco al corpo, poi il finale sopra la spalla opposta e il ritorno in posizione.
+ * La stessa funzione dà la preparazione mentre la palla arriva (u = 0), così il colpo parte senza scatti.
+ */
+function tennisStroke(p: MotionPose, backhand: boolean, u: number) {
+  const knee = curve(u, [[0, -0.5], [0.32, -0.32], [0.62, -0.22], [1, -0.2]]);
+  p.legSwing *= 0.12; p.strideSide *= 0.12; p.legSpread = 0.17; p.kneeL = p.kneeR = knee; p.legL = p.legR = -knee * 0.5;
+  p.lean = curve(u, [[0, -0.1], [0.32, -0.17], [0.62, -0.08], [1, -0.06]]);
+  p.wristR = 0; p.lift = 0;
+  if (!backhand) {
+    p.turn = curve(u, [[0, 0.95], [0.32, 0.05], [0.62, -0.75], [1, 0]]);
+    p.armR = curve(u, [[0, -0.35], [0.2, 0.15], [0.32, 0.8], [0.62, 1.9], [1, 0.5]]);
+    p.raiseR = curve(u, [[0, 0.95], [0.32, 0.6], [0.62, -0.35], [1, 0.08]]);
+    p.elbowR = curve(u, [[0, 0.75], [0.32, 0.3], [0.62, 1.7], [1, 1.15]]);
+    p.wristFlexR = curve(u, [[0, 0.5], [0.2, -0.35], [0.32, -0.12], [0.62, 0.3], [1, 0]]);
+    // Il braccio libero punta la palla, poi si chiude sul petto.
+    p.armL = curve(u, [[0, 1.25], [0.32, 0.6], [0.62, 0.45], [1, 0.55]]);
+    p.raiseL = curve(u, [[0, 0.45], [0.32, 0.5], [1, 0.02]]); p.elbowL = curve(u, [[0, 0.25], [0.4, 1], [1, 1.05]]);
+  } else {
+    // Rovescio a due mani: la racchetta parte dal lato opposto, le due braccia attraversano insieme.
+    p.turn = curve(u, [[0, -1], [0.32, -0.15], [0.62, 0.65], [1, 0]]);
+    p.armR = curve(u, [[0, 0.35], [0.32, 0.85], [0.62, 1.7], [1, 0.5]]);
+    p.raiseR = curve(u, [[0, -1], [0.32, -0.75], [0.62, 0.45], [1, 0.08]]);
+    p.elbowR = curve(u, [[0, 0.9], [0.32, 0.25], [0.62, 1.25], [1, 1.15]]);
+    p.wristFlexR = curve(u, [[0, 0.45], [0.2, -0.3], [0.32, -0.1], [0.62, 0.3], [1, 0]]);
+    p.armL = curve(u, [[0, 0.75], [0.32, 1.1], [0.62, 1.75], [1, 0.55]]);
+    p.raiseL = curve(u, [[0, 0.55], [0.32, 0.1], [0.62, -0.6], [1, 0.02]]); p.elbowL = curve(u, [[0, 1.1], [0.32, 0.55], [0.62, 1.2], [1, 1.05]]);
+  }
+}
+const UPPER: (keyof MotionPose)[] = ['armL', 'armR', 'raiseL', 'raiseR', 'elbowL', 'elbowR', 'wristL', 'wristR', 'wristFlexL', 'wristFlexR', 'turn', 'lean'];
 
 /** Shared animation sampling keeps live gestures and replay timing identical. */
 export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.poseTime, duration = a.poseDur, carrying = false): MotionPose {
@@ -72,6 +109,18 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
         p.armL += 0.35; p.armR += SPORT === 'tennis' ? 0.65 : 0.35;
         p.elbowL += 0.22; p.elbowR += 0.22;
         if (sp < 0.8) { p.legSpread = 0.1; p.kneeL = p.kneeR = -0.2; p.lean = -0.06; }
+        if (SPORT === 'tennis') {
+          // In attesa: racchetta davanti al corpo, sulle punte. Palla in arrivo (poseDir: +1 dritto, −1 rovescio): si apre il colpo.
+          if (sp < 0.8) { p.legSpread = 0.15; p.kneeL = p.kneeR = -0.34; p.legL = p.legR = 0.17; p.lean = -0.12; p.lift += Math.abs(Math.sin(time * 5 + a.id)) * 0.02; }
+          // Racchetta tenuta davanti al petto con i gomiti piegati (da fermi); in corsa le braccia seguono la corsa.
+          if (sp < 0.8) { p.armR = 0.5; p.elbowR = 1.15; p.armL = 0.55; p.elbowL = 1.05; p.raiseR = 0.08; p.raiseL = 0.02; }
+          const prep = clamp(Math.abs(a.poseDir), 0, 1);
+          if (prep > 0.001) {
+            const open = { ...p }; tennisStroke(open, a.poseDir < 0, 0);
+            for (const key of UPPER) p[key] = THREE.MathUtils.lerp(p[key], open[key], prep);
+            if (sp < 0.8) for (const key of ['legSpread', 'kneeL', 'kneeR', 'legL', 'legR'] as const) p[key] = THREE.MathUtils.lerp(p[key], open[key], prep);
+          }
+        }
       } else if (SPORT === 'basket' && carrying) {
         // The hand follows the existing dribble instead of swinging through the ball.
         const bounce = Math.abs(Math.sin(time * 6 + a.seed));
@@ -89,14 +138,23 @@ export function samplePose(a: Actor, time: number, pose: Pose = a.pose, pt = a.p
     case 'recoil':
       guard(); p.lean += jump * 0.28; p.turn += jump * 0.18;
       p.tiltSide = jump * 0.06; break;
-    case 'racket': case 'backhand':
-      p.armR = 0.85 + hit * 0.9; p.elbowR = 0.75 - hit * 0.65;
-      p.raiseR = pose === 'backhand' ? -hit * 0.42 : hit * 0.38;
-      p.turn = (pose === 'backhand' ? -1 : 1) * curve(u, [[0, -0.28], [0.32, 0.38], [0.65, 0.2], [1, 0]]);
-      p.wristR = (pose === 'backhand' ? -1 : 1) * hit * 0.65;
-      p.wristFlexR = -Math.max(0, hit) * 1.4;
-      p.armL = 0.55; p.raiseL = 0.2; p.lean = -0.08; break;
+    case 'racket': case 'backhand': tennisStroke(p, pose === 'backhand', u); break;
     case 'serve':
+      if (SPORT === 'tennis') {
+        // Lancio di palla col braccio libero, racchetta dietro la testa a gambe piegate, spinta in alto e impatto a braccio teso, poi la chiusura.
+        const knee = curve(u, [[0, -0.15], [0.42, -0.7], [0.52, -0.75], [0.6, -0.1], [0.75, -0.42], [1, -0.34]]);
+        p.legSwing *= 0.12; p.strideSide *= 0.12; p.legSpread = 0.12; p.kneeL = p.kneeR = knee; p.legL = p.legR = -knee * 0.5;
+        p.armL = curve(u, [[0, 0.9], [0.2, 0.85], [0.42, 2.95], [0.54, 2.7], [0.68, 0.7], [0.88, 0.55], [1, 0.55]]);
+        p.elbowL = curve(u, [[0, 0.5], [0.3, 0.1], [0.6, 0.15], [0.88, 1.05], [1, 1.05]]); p.raiseL = 0.06;
+        p.armR = curve(u, [[0, 0.9], [0.2, 0.7], [0.42, 2.2], [0.52, 2.45], [0.6, 3], [0.75, 1.1], [0.9, 0.5], [1, 0.5]]);
+        p.elbowR = curve(u, [[0, 0.6], [0.2, 0.5], [0.42, 1.9], [0.52, 2.1], [0.6, 0.1], [0.75, 0.5], [0.9, 1.15], [1, 1.15]]);
+        p.raiseR = curve(u, [[0, 0.1], [0.42, 0.45], [0.6, 0.12], [0.75, -0.45], [1, 0.05]]);
+        p.wristFlexR = curve(u, [[0, 0], [0.5, 0.6], [0.6, -0.15], [0.75, -0.9], [1, 0]]);
+        p.lean = curve(u, [[0, -0.05], [0.42, 0.14], [0.52, 0.1], [0.6, -0.12], [0.75, -0.4], [1, -0.06]]);
+        p.turn = curve(u, [[0, 0.5], [0.45, 0.75], [0.6, 0.05], [0.75, -0.5], [1, 0]]);
+        p.lift = curve(u, [[0, 0], [0.52, 0], [0.6, 0.2], [0.72, 0], [1, 0]]);
+        break;
+      }
       plant(); p.armL = curve(u, [[0, 0.7], [0.2, 2.75], [0.5, 2.3], [1, 0.45]]);
       p.armR = curve(u, [[0, 1.2], [0.16, 2.4], [0.32, 2.95], [0.65, 1.2], [1, 0.7]]);
       p.elbowL = 0.15; p.elbowR = curve(u, [[0, 1.2], [0.18, 1.55], [0.32, 0.12], [1, 0.5]]);
@@ -292,13 +350,13 @@ export function stanceOffset(p: MotionPose) {
     footY(-p.legSwing + p.legR, p.kneeR, p.legSpread - p.strideSide));
 }
 
-/** Sample the same articulated hand/racket chain used by the athlete rig. */
-export function netContactPoint(a: Actor, time: number, poseTime = a.poseTime, pose: Pose = a.pose, duration = a.poseDur) {
+/** Sample the same articulated hand/racket chain used by the athlete rig. free = il palmo della mano libera (la palla prima del servizio). */
+export function netContactPoint(a: Actor, time: number, poseTime = a.poseTime, pose: Pose = a.pose, duration = a.poseDur, free = false) {
   const p = samplePose(a, time, pose, poseTime, duration);
   const hand = (side: number) => {
     const right = side < 0;
     // Racchetta, testa del bastone da golf, o il palmo.
-    const point = new THREE.Vector3(0, SPORT === 'tennis' ? -0.57 : SPORT === 'golf' ? -0.98 : -0.04, 0);
+    const point = new THREE.Vector3(0, free ? -0.06 : SPORT === 'tennis' ? -RACKET_REACH : SPORT === 'golf' ? -0.98 : -0.04, 0);
     point.applyEuler(new THREE.Euler(0, right ? p.wristR : p.wristL, right ? p.wristFlexR : p.wristFlexL));
     point.y -= 0.27;
     point.applyAxisAngle(new THREE.Vector3(0, 0, 1), right ? p.elbowR : p.elbowL);
@@ -311,6 +369,7 @@ export function netContactPoint(a: Actor, time: number, poseTime = a.poseTime, p
     point.y += 0.94 + p.lift + stanceOffset(p);
     return point.multiplyScalar(CONFIG.visuals.playerScale).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a.heading).add(a.pos);
   };
+  if (free) return hand(1);
   const contact = hand(-1);
   if ((SPORT === 'pallavolo' && (pose === 'set' || pose === 'receive')) || SPORT === 'basket') contact.add(hand(1)).multiplyScalar(0.5);
   return contact;

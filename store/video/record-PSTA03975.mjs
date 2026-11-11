@@ -3,7 +3,7 @@
 // (niente scatti anche se il PC è lento). Gioco in 4:5 (1080×1350) con i comandi touch; un "cameraman robot" segue
 // l'inquadratura ideale della regia, col drone vola vicino all'azione e muove le leve a schermo come farebbe il pollice.
 // Fotogrammi JPEG in artifacts/video-frames/<scena>/; poi store/video/compose.py monta il video verticale con le scritte.
-// Spot 3 (48 s): le due modalità, telecamera e drone; il drone parte a metà della stessa azione (switchAt). Versione 1.0.10, niente vela.
+// Spot 4 (50 s): calcio, boxe e golf con telecamera, drone ed eventi speciali; qualche secondo degli altri sport. Niente vela.
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -18,18 +18,21 @@ const FPS = 30;
  * clean = nasconde la scheda del voto (parlerebbe di un'altra azione e copre la leva sinistra).
  * force = calcio piazzato messo in scena dalla partita (penalty, freeKick, corner). switchAt = secondi di registrazione
  * dopo cui si passa al drone nella stessa azione ('kick' = appena il pallone parte); il fotogramma finisce in switch.txt.
- * goal = rifà la ripresa finché qualcuno segna.
+ * goal = rifà la ripresa finché qualcuno segna. look = il drone vola verso il soggetto dell'evento (animali) e lo inquadra.
+ * front = il drone vola davanti all'azione e guarda indietro verso chi attacca (si vede il giocatore che arriva).
  */
 export const SCENES = [
   { id: 'h1-rigore', sport: 'calcio', mode: 'camera', seconds: 4.5, force: 'penalty', events: ['rigore'], at: 3.0, wide: 0.8, goal: true, clean: true },
-  { id: 'c1-pallavolo', sport: 'pallavolo', mode: 'camera', seconds: 6.5, events: ['v-spike'], at: 0.8 },
+  { id: 'd0-calcio-drone', sport: 'calcio', mode: 'drone', seconds: 7.5, events: ['contropiede'], at: 0.5, wide: 1.3, front: true, clean: true },
   { id: 'c2-boxe', sport: 'boxe', mode: 'camera', seconds: 5.5, events: ['x-knockdown'], at: 0.3 },
-  { id: 's1-angolo-drone', sport: 'calcio', mode: 'camera', seconds: 7, force: 'corner', events: ['angolo'], at: 3.9, switchAt: 'kick', goal: true, clean: true },
+  { id: 'b2-boxe-drone', sport: 'boxe', mode: 'drone', seconds: 5, events: ['x-uppercut', 'x-hook', 'x-counter'], at: 0.3, wide: 1.2, clean: true },
   { id: 'd1-golf', sport: 'golf', mode: 'drone', seconds: 6.5, events: ['g-drive', 'g-wood'], at: 1.9, clean: true },
-  { id: 's2-pallavolo-drone', sport: 'pallavolo', mode: 'camera', seconds: 6, events: ['v-spike'], at: 0, switchAt: 1.6, wide: 1.2, clean: true },
+  { id: 'g3-golf-cervi', sport: 'golf', mode: 'drone', seconds: 4, events: ['g-cervi'], at: 3, look: true, clean: true },
+  { id: 'c1-ciclismo', sport: 'ciclismo', mode: 'drone', seconds: 6.5, events: ['c-scatto', 'c-volata', 'c-caduta'], at: 0.5, clean: true },
   { id: 'm1-basket', sport: 'basket', mode: 'camera', seconds: 2.5, events: ['b-contropiede', 'b-tripla', 'b-penetrazione'], at: 0.5 },
   { id: 'm2-tennis', sport: 'tennis', mode: 'drone', seconds: 2.5, events: ['t-'], at: 0.3, clean: true },
-  { id: 'm3-ciclismo', sport: 'ciclismo', mode: 'drone', seconds: 2.5, events: ['c-'], at: 0.5, clean: true },
+  { id: 'm4-pallavolo', sport: 'pallavolo', mode: 'camera', seconds: 2.5, events: ['v-spike'], at: 1 },
+  { id: 'm3-ciclismo', sport: 'ciclismo', mode: 'drone', seconds: 3, params: '&rare', events: ['c-aquila'], at: 2, wide: 1.5, clean: true },
   { id: 'e1-golf-ace', sport: 'golf', mode: 'drone', seconds: 9.8, params: '&rare', events: ['g-ace'], at: 2.9 },
 ];
 const only = process.argv[2]?.split(',');
@@ -71,8 +74,9 @@ for (const scene of SCENES.filter((s) => !only || only.includes(s.id))) for (let
     if (mode === 'drone' && !drone.active) drone.toggle();
     drone.box.min.set(-5000, 1, -5000); drone.box.max.set(5000, 3000, 5000);
   }, scene.mode);
+  await page.evaluate(async () => { window.__terrain = (await import('/src/sim/sports/cyclingRoute.ts')).terrainHeight; });
   // Il cameraman robot: gira a ogni fotogramma (anche lui sul requestAnimationFrame finto).
-  await page.evaluate(({ sport, secret, events, wide = 1 }) => {
+  await page.evaluate(({ sport, secret, events, look, front, wide = 1 }) => {
     const { director, secrets, cam, stage, drone, match: m } = window.frameit, V = stage.camera.position.constructor, sim = m.sportSimulation;
     const pos = stage.camera.position, want = pos.clone(), last = pos.clone(), wrap = (a) => ((a % 360) + 540) % 360 - 180;
     const pack = m.ball.pos.clone(), heading = new V(1, 0, 0);
@@ -93,9 +97,15 @@ for (const scene of SCENES.filter((s) => !only || only.includes(s.id))) for (let
         // Stella cadente: largo, verso dove passerà, con la tribuna (il pubblico a naso in su) in basso.
         const s = m.sky.star;
         ideal = { yaw: cam.anglesTo(s.from.clone().lerp(s.to, 0.5)).yaw, pitch: 14, fov: 50 };
+      } else if (look && ev?.focus) {
+        // Evento speciale: il drone si avvicina al soggetto restando dal suo lato, un po' in alto, e usa l'inquadratura della regia.
+        const f = ev.focus, d = new V(pos.x - f.x, 0, pos.z - f.z).normalize();
+        want.set(f.x + d.x * 16, f.y + 6, f.z + d.z * 16); follow = 0.05;
+        ideal = ev.tracker.last?.ideal;
       } else if (sport === 'ciclismo') {
         // Ciclismo: il "pallone" è il centro del gruppo (sotto terra). Il drone vola di lato, un po' avanti e in alto.
-        const p = new V(b.x, 1, b.z), v = p.clone().sub(pack);
+        // Il percorso sale e scende: quota del drone e del gruppo misurate sul terreno, se no il drone finisce dentro la collina.
+        const ground = window.__terrain(b.x, b.z), p = new V(b.x, ground + 1, b.z), v = p.clone().sub(pack).setY(0);
         if (v.length() > 0.01 && v.length() < 5) heading.lerp(v.normalize(), 0.05).normalize();
         pack.copy(p);
         // Con l'aquila in volo: il drone la insegue da dietro, un po' più in alto (lei davanti, la campagna sotto).
@@ -105,7 +115,8 @@ for (const scene of SCENES.filter((s) => !only || only.includes(s.id))) for (let
           want.copy(e.pos).addScaledVector(f, -7).setY(e.pos.y + 2);
           subject = e.pos.clone().addScaledVector(f, 12).setY(e.pos.y - 4); fov = 45; follow = 0.15;
         } else {
-          want.set(p.x + heading.z * 22 + heading.x * 8, 11, p.z - heading.x * 22 + heading.z * 8);
+          const wx = p.x + heading.z * 22 + heading.x * 8, wz = p.z - heading.x * 22 + heading.z * 8;
+          want.set(wx, Math.max(ground + 11, window.__terrain(wx, wz) + 5), wz);
           subject = p.clone().addScaledVector(heading, 4); fov = 34; follow = 0.06;
         }
       } else if (sport === 'golf') {
@@ -117,15 +128,23 @@ for (const scene of SCENES.filter((s) => !only || only.includes(s.id))) for (let
         else if (sim.shot) { want.set(b.x - d.x * 18, Math.max(5, b.y + 4), b.z - d.z * 18); follow = 0.12; }
         else { want.set(b.x - d.x * 10 + d.z * 3, 4, b.z - d.z * 10 - d.x * 3); follow = 0.03; subject = b.clone().addScaledVector(d, 20).setY(3); }
         if (!(sim.shot && close)) fov = 40;
+      } else if (drone.active && front) {
+        // Davanti all'azione: direzione del pallone (smorzata), drone 13 m avanti e 6 m su, guarda indietro verso chi attacca.
+        const v = new V(b.x - pack.x, 0, b.z - pack.z);
+        pack.copy(b);
+        if (v.length() > 0.02 && v.length() < 3) { heading.lerp(v.normalize(), 0.04); if (heading.length() < 0.2) heading.copy(v); heading.normalize(); }
+        want.set(b.x + heading.x * 13, 6, b.z + heading.z * 13); follow = 0.05;
+        // Inquadra sempre il pallone (e chi lo porta), non l'inquadratura della regia: dal davanti tagliava il giocatore.
+        ideal = { ...cam.anglesTo(b.clone().setY(1)), fov: 34 };
       } else if (drone.active) {
         // Sopra l'azione, dal lato della camera, con un lento giro attorno.
-        const r = sport === 'basket' ? 9 : 16, h = sport === 'basket' ? 6 : 11, a = Math.sin(t * 0.35) * 0.6;
+        const r = sport === 'boxe' ? 6.5 : sport === 'basket' ? 9 : 16, h = sport === 'boxe' ? 4.2 : sport === 'basket' ? 6 : 11, a = Math.sin(t * 0.35) * 0.6;
         want.set(b.x + Math.sin(a) * r, h, b.z + Math.cos(a) * r);
       }
       if (drone.active) pos.lerp(want, follow);
       // Inquadratura: quella ideale (del segreto, dell'evento cercato o dell'azione della regia), un po' più larga se serve.
       // Nel golf e nel ciclismo il robot inquadra da sé (palla, aquila); senza un'inquadratura ideale, il soggetto.
-      if (sport !== 'golf' && sport !== 'ciclismo') ideal ??= ev?.tracker.last?.ideal ?? director.focusTracker()?.last?.ideal;
+      if (look || (sport !== 'golf' && sport !== 'ciclismo')) ideal ??= ev?.tracker.last?.ideal ?? director.focusTracker()?.last?.ideal;
       ideal = ideal ? { ...ideal, fov: ideal.fov * wide } : { ...cam.anglesTo(subject), fov };
       const k = 0.12;
       cam.setView({ yaw: cam.yaw + wrap(ideal.yaw - cam.yaw) * k, pitch: cam.pitch + (ideal.pitch - cam.pitch) * k, fov: cam.fov * (ideal.fov / cam.fov) ** k });

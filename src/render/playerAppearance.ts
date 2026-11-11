@@ -10,7 +10,10 @@ const hash = (n: number) => { n = Math.imul(n ^ (n >>> 16), 0x45d9f3b); n = Math
 
 export function playerLook(actor: Actor) {
   const seed = hash(actor.id * 101 + (actor.appearance ?? 0) * 131 + actor.team * 977);
-  return { style: styleOrder[actor.id % styleOrder.length], skin: skinColours[seed % skinColours.length], hair: hairColours[(seed >>> 8) % hairColours.length] };
+  // Arbitro: rasato, grigio, con la barba. Allenatori: capelli lunghi tirati indietro, scuri, senza barba. Non si confondono più.
+  if (actor.role === 'ref') return { style: 1, skin: skinColours[seed % skinColours.length], hair: 0x9c9b97, beard: true };
+  if (actor.role === 'coach') return { style: 4, skin: skinColours[seed % skinColours.length], hair: hairColours[(seed >>> 8) % 3], beard: false };
+  return { style: styleOrder[actor.id % styleOrder.length], skin: skinColours[seed % skinColours.length], hair: hairColours[(seed >>> 8) % hairColours.length], beard: actor.id % 3 === 1 };
 }
 
 /** The fringe stays above the eyebrows; the sides and back reach lower around the skull. */
@@ -125,7 +128,8 @@ export class PlayerAppearance {
       const isBeard = /Beard/.test(part.mesh.name);
       const suppliedVariant = !/Hair_(Buzzed|SimpleParted)/.test(part.mesh.name)
         || part.mesh.name === (look.style === 1 ? 'Hair_Buzzed' : 'Hair_SimpleParted');
-      part.mesh.visible = helmetColour === undefined && (isBeard ? actor.id % 3 === 1 : suppliedVariant);
+      // Arbitro calvo (solo barba grigia): la sagoma della testa è diversa da quella di allenatori e secondi.
+      part.mesh.visible = helmetColour === undefined && (isBeard ? look.beard : suppliedVariant && actor.role !== 'ref');
     }
     if (helmetColour !== undefined) {
       const frame = new THREE.Group(); frame.name = 'fitted-headwear'; frame.scale.setScalar(1 / norm); head.add(frame);
@@ -144,7 +148,8 @@ export class PlayerAppearance {
   apply(actor: Actor) {
     const appearance = actor.appearance ?? 0; if (this.current === appearance) return; this.current = appearance;
     const look = playerLook(actor);
-    for (const { mesh } of this.hair) (mesh.material as THREE.MeshStandardMaterial).color.setHex(look.hair);
+    // Rasato: capelli cortissimi, lasciano intravedere la pelle.
+    for (const { mesh } of this.hair) (mesh.material as THREE.MeshStandardMaterial).color.setHex(look.hair).lerp(new THREE.Color(look.skin), /Buzzed/.test(mesh.name) ? .3 : 0);
     for (const material of this.skin) { material.color.setHex(look.skin); material.userData.beardColor?.setHex(look.hair); }
     for (const material of this.brows) material.color.setHex(look.hair);
     this.model.userData.hairstyle = PLAYER_HAIRSTYLES[look.style];

@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG, SPORT } from '../config';
 import { courtSurface, surfaceGrain, rod } from './surfaces';
+import { propObject, withProps } from './props';
 
 /** Clay, sports flooring and a padded competition ring, generated entirely offline. */
 export function sportCourt(renderer: THREE.WebGLRenderer) {
   const { length: L, width: W } = CONFIG.pitch;
   const group = new THREE.Group();
   const canvas = document.createElement('canvas');
-  const ppm = 60, margin = SPORT === 'boxe' ? 0.32 : 3;
+  const ppm = 60, margin = SPORT === 'boxe' ? RING_APRON : 3;
   canvas.width = Math.ceil((L + 2 * margin) * ppm);
   canvas.height = Math.ceil((W + 2 * margin) * ppm);
   const ctx = canvas.getContext('2d')!;
@@ -60,46 +61,36 @@ export function sportCourt(renderer: THREE.WebGLRenderer) {
     ctx.fillText('LIVE SPORTS', X(L * 0.28), Z(-W / 2 - 1.3));
   }
   group.add(courtSurface(canvas, L + 2 * margin, W + 2 * margin, renderer));
-  if (SPORT === 'boxe') group.add(boxingRing(L, W));
+  if (SPORT === 'boxe') group.add(boxingRing(L, renderer));
   else group.add(courtNet(W), refereeChair(W));
   return group;
 }
 
-function boxingRing(L: number, W: number) {
+/** Dal quadrato delle corde al bordo della pedana (m): lo stesso del modello scripts/blender/arena.py. */
+const RING_APRON = 0.55;
+
+/**
+ * Ring rialzato, modellato in Blender: pedana con la gonna fino a terra, pali, tenditori, cuscini d'angolo, corde,
+ * scalette, tavoli dei giudici e l'americana delle luci. Il tappeto resta la superficie disegnata qui sopra.
+ */
+function boxingRing(L: number, renderer: THREE.WebGLRenderer) {
   const group = new THREE.Group();
-  const platform = new THREE.Mesh(new THREE.BoxGeometry(L + 0.64, 0.6, W + 0.64),
-    new THREE.MeshStandardMaterial({ color: 0x122943, roughness: 0.82 }));
-  platform.position.y = -0.32; group.add(platform);
-  const silver = new THREE.MeshStandardMaterial({ color: 0x97a8ba, roughness: 0.34, metalness: 0.65 });
-  for (const x of [-L / 2, L / 2]) for (const z of [-W / 2, W / 2]) {
-    group.add(rod(new THREE.Vector3(x, 0, z), new THREE.Vector3(x, 1.75, z), 0.075, silver));
-    const color = x < 0 ? (z > 0 ? 0xcb3c4d : 0xe9e6dc) : (z < 0 ? 0x387cdc : 0xe9e6dc);
-    const pad = new THREE.Mesh(new THREE.CapsuleGeometry(0.135, 0.95, 4, 12),
-      new THREE.MeshStandardMaterial({ color, roughness: 0.68 }));
-    pad.position.set(x - Math.sign(x) * 0.075, 1, z - Math.sign(z) * 0.075); group.add(pad);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 6), silver);
-    cap.position.set(x, 1.75, z); group.add(cap);
+  withProps('arena', (props) => group.add(propObject(props.ring), propObject(props.ring_rig)));
+  // Scritte sulla gonna, una per lato.
+  const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#e8c15a'; ctx.font = 'italic bold 92px Arial'; ctx.fillText('FRAME IT', 330, 68);
+  ctx.fillStyle = '#eef2f6'; ctx.font = 'bold 54px Arial'; ctx.fillText('LIVE SPORTS', 780, 70);
+  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const material = new THREE.MeshStandardMaterial({ map: texture, transparent: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  for (let side = 0; side < 4; side++) {
+    const banner = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 0.55), material);
+    banner.rotation.y = side * Math.PI / 2;
+    banner.position.set(Math.sin(side * Math.PI / 2), 0, Math.cos(side * Math.PI / 2)).multiplyScalar(L / 2 + RING_APRON - 0.01).setY(-0.62);
+    group.add(banner);
   }
-  [0xd53e50, 0xf5f0e4, 0x427fc4, 0xf5f0e4].forEach((color, index) => {
-    const y = 0.4 + index * 0.35;
-    const geometries: THREE.BufferGeometry[] = [];
-    const rope = (from: THREE.Vector3, to: THREE.Vector3) => {
-      const middle = from.clone().lerp(to, 0.5); middle.y -= 0.035;
-      geometries.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([from, middle, to]), 16, 0.026, 6, false));
-    };
-    for (const z of [-W / 2, W / 2]) rope(new THREE.Vector3(-L / 2, y, z), new THREE.Vector3(L / 2, y, z));
-    for (const x of [-L / 2, L / 2]) rope(new THREE.Vector3(x, y, -W / 2), new THREE.Vector3(x, y, W / 2));
-    group.add(new THREE.Mesh(mergeGeometries(geometries)!, new THREE.MeshStandardMaterial({ color, roughness: 0.72 })));
-    geometries.forEach(geometry => geometry.dispose());
-  });
-  const ties: THREE.BufferGeometry[] = [];
-  for (const side of [-1, 1]) for (const offset of [-L * 0.25, L * 0.25]) {
-    const tie = new THREE.BoxGeometry(0.045, 1.1, 0.045);
-    ties.push(tie.clone().translate(offset, 0.925, side * W / 2));
-    ties.push(tie.clone().translate(side * L / 2, 0.925, offset)); tie.dispose();
-  }
-  group.add(new THREE.Mesh(mergeGeometries(ties)!, new THREE.MeshStandardMaterial({ color: 0xf6eee1, roughness: 0.9 })));
-  ties.forEach(geometry => geometry.dispose());
   return group;
 }
 
@@ -149,7 +140,7 @@ function courtNet(W: number) {
 
 function refereeChair(W: number) {
   const group = new THREE.Group(), z = -W / 2 - 1.1;
-  const height = SPORT === 'tennis' ? 1.85 : 1.65;
+  const height = SPORT === 'tennis' ? 1.85 : 1.665;
   const steel = new THREE.MeshStandardMaterial({ color: 0xb7c5cf, roughness: 0.4, metalness: 0.55 });
   const bars: THREE.BufferGeometry[] = [];
   const addBar = (from: THREE.Vector3, to: THREE.Vector3, radius = 0.028) => {

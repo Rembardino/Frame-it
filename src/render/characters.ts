@@ -10,6 +10,7 @@ import { assetMotion, type AssetMotion } from '../animation/assetMotion';
 import { netContactPoint } from '../animation/motion';
 import { dressUniform, changeUniform } from './uniforms';
 import { boxingBoot } from './boxingBoots';
+import { boxingGlove } from './equipment';
 import type { TeamKit } from '../teams';
 import { styleSkin } from './skin';
 import {CarolAppearance} from './carolAppearance';
@@ -76,13 +77,17 @@ export function characterTemplate(name: string) {
   return promise;
 }
 
-const SKIN = [0xffffff,0xdab392,0xa87958,0xe5b38c,0x78513d,0xf8d9bc,0x916345];
-const HAIR = [0x281e19,0x553524,0x17191e,0x956236,0xc69c58,0x6b6461];
 const SHOES = [0xf4efdb,0x20273a,0xff5a1f,0x3ddc84,0xffe14a,0x1fa7ff,0xff3b9a];
 const FANTASY = Array.from({length:14},(_,i)=>`human-${i}`);
 const facing = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.PI/2);
 const inverseFacing = facing.clone().invert();
 const down = new THREE.Vector3(0,-1,0);
+/** Fascia dei pantaloncini da boxe: chiara sui colori scuri, scura su quelli chiari. */
+const bandColour=(shorts: number,gloves?: number)=>{
+  const far=gloves!==undefined&&Math.abs((gloves>>16)-(shorts>>16))+Math.abs(((gloves>>8)&255)-((shorts>>8)&255))+Math.abs((gloves&255)-(shorts&255))>90;
+  // Del colore dei guantoni quando si stacca dai pantaloncini; altrimenti chiara sugli scuri e scura sui chiari.
+  return far?gloves!:((shorts>>16)*.3+((shorts>>8)&255)*.59+(shorts&255)*.11)>150?0x1b1e26:0xf3f0e6;
+};
 const physiques=new Map<string,THREE.BufferGeometry>();
 
 interface Joint { bone: THREE.Bone; name: string; rest: THREE.Quaternion; world: THREE.Quaternion; parent: THREE.Quaternion;
@@ -168,6 +173,8 @@ export class Character {
     this.style(actor);
     if(isHumanModel(name)&&name!=='athlete-carol')this.appearance=new PlayerAppearance(this.model,this.norm,actor,
       player&&SPORT==='ciclismo'?riderKit(actor,CONFIG.teams[actor.team]).shirt:undefined);
+    // La calotta rasata del modello semplificato affondava a chiazze nella testa: la rasatura è dipinta sul cuoio capelluto (skin.ts).
+    if(name==='rpg-boxer')this.model.traverse(o=>{if(/Hair_Buzzed/.test(o.name))o.visible=false;});
     if(name.startsWith('rpg-'))this.model.traverse(o=>{
       if(!(o as THREE.SkinnedMesh).isSkinnedMesh||!o.visible||!/Shoes/.test(o.name))return;
       const mesh=o as THREE.SkinnedMesh,positions=mesh.geometry.getAttribute('position');let lowest=Infinity;
@@ -230,6 +237,18 @@ export class Character {
     mesh.geometry=geometry;
   }
 
+  /** Fascia in vita e gamba dei pantaloncini da boxe, dipinte sul corpo attorno ai pantaloncini (corti e a vita bassa) del modello. */
+  private trunks(kit: TeamKit) {
+    let top=1.02;
+    this.model.updateWorldMatrix(true,true);
+    this.model.traverse(o=>{
+      if(!(o as THREE.Mesh).isMesh||!/Shorts/.test(o.name))return;
+      const mesh=o as THREE.Mesh;mesh.geometry.computeBoundingBox();
+      top=mesh.geometry.boundingBox!.clone().applyMatrix4(new THREE.Matrix4().copy(this.model.matrixWorld).invert().multiply(mesh.matrixWorld)).max.y*this.norm;
+    });
+    return {top,color:new THREE.Color(kit.shorts),band:new THREE.Color(bandColour(kit.shorts,kit.shirt))};
+  }
+
   async setKit(kit: TeamKit, actor: Actor) {
     kit=riderKit(actor,kit);
     const updates: Promise<void>[]=[];
@@ -237,6 +256,7 @@ export class Character {
       if(!(o as THREE.Mesh).isMesh)return;const mesh=o as THREE.Mesh,mat=mesh.material as THREE.MeshStandardMaterial;
       if(mat.userData.club)updates.push(changeUniform(mat,kit));
       if(mesh.name==='team-glove')mat.color.setHex(kit.shirt);
+      if(mat.userData.trunks){mat.userData.trunks.color.setHex(kit.shorts);mat.userData.trunks.band.setHex(bandColour(kit.shorts,kit.shirt));}
       if(mesh.name==='cycling-helmet-shell')mat.color.setHex(kit.shirt);
       if(/Socks/.test(mesh.name)&&actor.role!=='ref')mat.color.setHex(kit.socks);
     });
@@ -248,6 +268,7 @@ export class Character {
     const kit=riderKit(a,CONFIG.teams[a.team]), id=a.id;
     const look=playerLook(a);
     const player=!['ref','coach','fan','steward','spectator'].includes(a.role);
+    const boxer=player&&SPORT==='boxe';
     const costume=a.role==='spectator'&&a.look?({banana:0xffd83a,dino:0x3fa34d,clown:0xff3b3b,astronaut:0xeef0f2} as Record<string,number>)[a.look]:undefined;
     const shirt=a.role==='ref'?CONFIG.visuals.referee.shirt:a.role==='steward'?CONFIG.visuals.steward.shirt
       :a.role==='fan'?CONFIG.visuals.fan.shirt:a.role==='gk'?kit.keeper:a.role==='coach'?kit.socks
@@ -269,7 +290,10 @@ export class Character {
         mesh.visible=this.name==='athlete-carol';
       }
       if(/Eyelashes/i.test(mesh.name)){mat.alphaTest=.4;mat.transparent=false;}
-      if(this.name!=='athlete-carol'&&/Body|Hair/.test(mesh.name))styleSkin(mat,mesh,this.model,this.norm,id,look.hair);
+      // Capelli e barba dei pugili sono geometria piena: col ritaglio alfa restavano a chiazze sulla testa.
+      if(this.name==='rpg-boxer'&&/Hair|Beard/.test(mesh.name))mat.alphaTest=0;
+      if(this.name!=='athlete-carol'&&/Body|Hair/.test(mesh.name))styleSkin(mat,mesh,this.model,this.norm,id,look.hair,
+        boxer&&/Body/.test(mesh.name)?this.trunks(kit):undefined,this.name==='rpg-boxer'&&/Body/.test(mesh.name)?(look.style===1?.82:.55):0);
       if(player&&/Shirt/.test(mesh.name))this.wardrobe.push(dressUniform(mesh,this.model,kit,
         ['calcio','basket','pallavolo','ciclismo'].includes(SPORT)?id%99+1:0,['basket','pallavolo'].includes(SPORT),a.role==='gk'));
       if(player&&/Shorts/.test(mesh.name))this.wardrobe.push(dressUniform(mesh,this.model,kit,0,false,false,true));
@@ -295,6 +319,13 @@ export class Character {
         helmet.position.y=.08;hat.add(helmet);part(new THREE.TorusGeometry(.13,.025,7,14).rotateX(Math.PI/2),0xeef0f2,0,-.05,0);
       }
     }
+    if(a.role==='ref'&&SPORT==='boxe'){
+      // Arbitro del ring: camicia azzurra (config), capelli grigi (playerLook) e papillon nero, come in TV.
+      const tie=new THREE.Group(),black=new THREE.MeshStandardMaterial({color:0x111111,roughness:.6});
+      for(const s of [-1,1]){const wing=new THREE.Mesh(new THREE.ConeGeometry(.032,.06,4).rotateZ(s*Math.PI/2),black);wing.position.x=s*.03;tie.add(wing);}
+      tie.add(new THREE.Mesh(new THREE.SphereGeometry(.014,6,4),black));
+      tie.position.set(0,-.01,.075);this.accessory('Neck',tie,true);
+    }
     if(a.role==='coach'){
       this.phone=new THREE.Mesh(new THREE.BoxGeometry(.065,.12,.012),new THREE.MeshStandardMaterial({color:0x101827,roughness:.35}));
       this.phone.position.set(0,.07,.02);this.phone.visible=false;this.accessory('LeftHand',this.phone);
@@ -303,11 +334,14 @@ export class Character {
     if(visor)visor.visible=player||a.role==='spectator';
     if((SPORT==='boxe'&&!['ref','coach','fan','steward','spectator'].includes(a.role))||a.role==='gk') {
       const boxing=SPORT==='boxe';
-      const mat=new THREE.MeshStandardMaterial({color:boxing?kit.shirt:0xe4f349,roughness:.7});
+      const mat=new THREE.MeshStandardMaterial({color:boxing?kit.shirt:0xe4f349,roughness:boxing?.42:.7});
       const wrap=new THREE.MeshStandardMaterial({color:0xf4f0dd,roughness:.9});
       for(const name of ['LeftHand','RightHand']) {
         const hand=this.joints.find(j=>j.name===name)?.bone;if(!hand)continue;
-        const glove=new THREE.Mesh(new THREE.SphereGeometry(1,10,8).scale(boxing?.09:.065,boxing?.145:.11,boxing?.08:.04),mat);
+        if(boxing){
+          const glove=boxingGlove(mat,wrap,name==='LeftHand'?1:-1);glove.traverse(o=>{o.castShadow=true;});this.accessory(name,glove);continue;
+        }
+        const glove=new THREE.Mesh(new THREE.SphereGeometry(1,10,8).scale(.065,.11,.04),mat);
         glove.name='team-glove';glove.position.y=.08;glove.castShadow=true;this.accessory(name,glove);
         const cuff=new THREE.Mesh(new THREE.CylinderGeometry(.045,.04,.05,10),wrap);cuff.position.y=-.015;this.accessory(name,cuff);
       }
@@ -414,6 +448,21 @@ export class Character {
     this.reach(`${side}Arm`,`${side}ForeArm`,`${side}Hand`,from.lerp(point,w));
   }
 
+  /**
+   * Clips keyed in Blender give the body; the simulation still decides where the ball is. So the hands go to the wrists of the
+   * procedural rig (the points the ball is tied to): both hands until the release of a jump shot, the striking hand around a spike.
+   */
+  private touchBall(m: AssetMotion, driver: Athlete) {
+    const contact=m.contact*m.duration,hold=m.group==='basketShoot';
+    const w=hold?1-THREE.MathUtils.smoothstep(m.time,contact+.02,contact+.16):1-THREE.MathUtils.smoothstep(Math.abs(m.time-contact),.05,.2);
+    if(w<=0)return;
+    for(const [side,wrist]of (hold?[['Left',driver.wristR],['Right',driver.wristL]]:[['Left',driver.wristR]]) as [string,THREE.Object3D][]){
+      const hand=this.joints.find(j=>j.name===`${side}Hand`)?.bone;if(!hand)continue;
+      this.model.updateWorldMatrix(true,true);
+      this.reach(`${side}Arm`,`${side}ForeArm`,`${side}Hand`,hand.getWorldPosition(new THREE.Vector3()).lerp(wrist.getWorldPosition(new THREE.Vector3()),w));
+    }
+  }
+
   /** Procedural pose: hands and feet on the choreography's contact points (ball, bike, racket). */
   private fitLimbs(actor: Actor, driver: Athlete, actorRoot: THREE.Group) {
     for(const [side,wrist,knee]of [['Left',driver.wristR,driver.kneeR],['Right',driver.wristL,driver.kneeL]] as const){
@@ -448,7 +497,9 @@ export class Character {
     const share=(m: AssetMotion|null)=>m?m.weight??1:0;
     // Every target is a cross-fade over the procedural pose: previous gesture -> current gesture, gait -> nearby gait.
     const procHip=(driver.body.position.y-.94)/this.norm;
-    if(share(current)<1||(blend<1&&share(previous)<1)){
+    // Tennis: l'apertura del colpo (busto e braccia, procedurali) si vede anche mentre le gambe corrono su una ripresa.
+    const upper=SPORT==='tennis'&&actor.pose==='normal'?Math.min(1,Math.abs(actor.poseDir)):0;
+    if(share(current)<1||(blend<1&&share(previous)<1)||upper>0){
       if(this.hip)this.hip.bone.position.copy(this.hip.position).addScaledVector(this.hipUp,procHip);
       this.fitLimbs(actor,driver,actorRoot);
     }
@@ -458,6 +509,7 @@ export class Character {
       let hip=procHip;const s=share(m);if(!m)return hip;
       const y=this.sample(m,target,s);if(y!==null)hip=THREE.MathUtils.lerp(hip,y*this.hipHeight,s);
       if(m.mix){const y2=this.sample(m.mix.motion,target,s*m.mix.weight);if(y2!==null)hip=THREE.MathUtils.lerp(hip,y2*this.hipHeight,s*m.mix.weight);}
+      if(upper>0&&m===current)for(let i=0;i<target.length;i++)if(/Spine|Neck|Head|Shoulder|Arm|Hand/.test(this.joints[i].name))target[i].slerp(this.procQ[i],upper);
       return hip;
     };
     const planted=(m: AssetMotion|null)=>m?share(m)*((PLANTED.test(m.group)?1:0)*(1-(m.mix?.weight??0))+(m.mix&&PLANTED.test(m.mix.motion.group)?m.mix.weight:0)):0;
@@ -485,6 +537,7 @@ export class Character {
       this.root.updateWorldMatrix(true,true);
     }
     if(current&&/^boxing(Jab|BodyJab|Hook)$/.test(current.group))this.landPunch(current,actor);
+    if(current&&/^(basketShoot|volleySpike)$/.test(current.group)&&blend>=1)this.touchBall(current,driver);
     if(current&&/^golf(Drive|Chip|Putt)$/.test(current.group))this.calibrateGolf(current,actor,time,actorRoot);
     else if(!current&&this.golfSocket&&this.defaultGrip){this.golfSocket.quaternion.copy(this.defaultGrip);this.golfClub!.scale.y=1;}
     if(this.phone)this.phone.visible=actor.gesture==='phone';
@@ -496,7 +549,17 @@ export class Character {
 
 export const animationStats = () => ({ clips:manifest.clips.length, groups:Object.fromEntries([...pools].map(([k,v])=>[k,v.length])) });
 
-/** Bake six poses of the supplied human once. Thousands of spectators share these GPU buffers. */
+/** Colori dei tifosi: carnagioni (moltiplicano la pelle normalizzata), capelli, pantaloni, calze e scarpe. */
+const FAN_SKIN = [0xe0b08a,0xc99670,0xb07c56,0x8f6243,0x6e4a33,0xd9a47c,0x553828,0xbd8a62];
+const FAN_LEGS = [0x2f4368,0x1d2330,0x4a5568,0x6b5a45,0x243b55,0x8a8f98,0x3d4a3a,0x1b2a4a,0x7a6a58];
+const FAN_SOCKS = [0xe8e8e2,0x23262e,0xcfd4d6,0x3a4660];
+const FAN_SHOES = [0xf1ede0,0x20232b,0xb23b3b,0x2f5fa8,0x5b5e66,0xd9d2c0];
+
+/**
+ * Sette pose del tifoso cotte una volta sola: migliaia di spettatori condividono gli stessi buffer.
+ * fanState per tifoso: x = in piedi (0..1), y = braccia alzate, z = applauso (parte intera, sedicesimi) + chiacchiera (decimali),
+ * w = verso dell'alzata (segno) e braccio usato (1 = tutte e due, 2 = destro, 3 = sinistro).
+ */
 export async function createCrowdHumans(count: number, shirts: number[]) {
   const [template]=await Promise.all([characterTemplate('crowd'),loadAnimations()]);
   const model=clone(template) as THREE.Group;
@@ -521,23 +584,37 @@ export async function createCrowdHumans(count: number, shirts: number[]) {
     const world=b.getWorldQuaternion(new THREE.Quaternion()).premultiply(new THREE.Quaternion().setFromAxisAngle(axis,angle));
     b.quaternion.copy(parent).multiply(world);model.updateMatrixWorld(true);
   }
+  /** Punta un osso verso una direzione del modello (x = sinistra del tifoso, y = su, z = avanti). */
+  function aim(name: string, child: string, x: number, y: number, z: number) {
+    const b=bones.get(name),c=bones.get(child);if(!b||!c)return;
+    model.updateMatrixWorld(true);
+    const from=c.getWorldPosition(new THREE.Vector3()).sub(b.getWorldPosition(new THREE.Vector3())).normalize();
+    const world=b.getWorldQuaternion(new THREE.Quaternion()).premultiply(new THREE.Quaternion().setFromUnitVectors(from,new THREE.Vector3(x,y,z).normalize()));
+    b.quaternion.copy(b.parent!.getWorldQuaternion(new THREE.Quaternion()).invert()).multiply(world);model.updateMatrixWorld(true);
+  }
   const z=new THREE.Vector3(0,0,1), x=new THREE.Vector3(1,0,0);
+  // 0 seduto, 1 in piedi, 2 braccia al cielo, 3 seduto che chiacchiera, 4-5 mentre ci si alza o ci si siede, 6 applauso.
   function pose(state: number) {
     for(const [name,b] of bones){b.quaternion.copy(rest.get(name)!);b.position.copy(importedRest.get(name)!.position);}
     model.updateMatrixWorld(true);
-    const motion=state===0?['crowdSit',.35]:state===1?['sidelineIdle',.1]:state===3?['crowdSitTalk',.5]:state===4?['crowdSitIn',.5]:state===5?['crowdSitOut',.5]:null;
-    const captured=motion?importedPose(motion[0] as string,motion[1] as number):false;
-    if(!captured){
-      turn('LeftArm',z,state===2?.9:-1.4);turn('RightArm',z,state===2?-.9:1.4);
+    const motion=state===0?['crowdSit',.35]:state===3?['crowdSitTalk',.5]:state===4?['crowdSitIn',.5]:state===5?['crowdSitOut',.5]:['sidelineIdle',.1];
+    if(!importedPose(motion[0] as string,motion[1] as number)){
+      turn('LeftArm',z,-1.4);turn('RightArm',z,1.4);
       if(state===0){turn('LeftUpLeg',x,-1.35);turn('RightUpLeg',x,-1.35);turn('LeftLeg',x,1.5);turn('RightLeg',x,1.5);}
+    }
+    // Braccia: gomiti un po' piegati, non due aste a V; l'applauso porta le mani davanti al petto.
+    for(const [side,s] of [['Left',1],['Right',-1]] as const){
+      if(state===2){aim(side+'Arm',side+'ForeArm',.5*s,.82,.18);aim(side+'ForeArm',side+'Hand',.1*s,.97,.14);}
+      if(state===6){aim(side+'Arm',side+'ForeArm',.3*s,-.8,.5);aim(side+'ForeArm',side+'Hand',-.66*s,.22,.72);}
     }
     model.updateMatrixWorld(true);
     model.traverse(o=>{if((o as THREE.SkinnedMesh).isSkinnedMesh)(o as THREE.SkinnedMesh).skeleton.update();});
   }
-  const skinned: THREE.SkinnedMesh[]=[];model.traverse(o=>{if((o as THREE.SkinnedMesh).isSkinnedMesh)skinned.push(o as THREE.SkinnedMesh);});
+  // Capelli e occhi sono dipinti nello shader della testa (le ciocche del modello semplificato erano macchie nere): due disegni in meno per tribuna.
+  const skinned: THREE.SkinnedMesh[]=[];model.traverse(o=>{if((o as THREE.SkinnedMesh).isSkinnedMesh&&!/Eyelash|Hair/.test(o.name))skinned.push(o as THREE.SkinnedMesh);});
   const positions=skinned.map(()=>[] as Float32Array[]);
   const box=new THREE.Box3().setFromObject(model), scale=.85/(box.max.y-box.min.y), v=new THREE.Vector3();
-  for(const state of [0,1,2,3,4,5]) {
+  for(const state of [0,1,2,3,4,5,6]) {
     pose(state);
     skinned.forEach((mesh,i)=>{
       const attr=mesh.geometry.getAttribute('position'), points=new Float32Array(attr.count*3);
@@ -547,7 +624,19 @@ export async function createCrowdHumans(count: number, shirts: number[]) {
       positions[i][state]=points;
     });
   }
+  // Mano destra a braccio alzato (z locale positiva): lì sta il telefono di chi riprende il cielo.
+  const hand=new THREE.Vector3(0,-1,0);
+  positions.forEach(states=>{const p=states[2];for(let n=0;n<p.length;n+=3)if(p[n+2]>0&&p[n+1]>hand.y)hand.set(p[n],p[n+1],p[n+2]);});
+  // Viso misurato sulla posa in piedi: x = dove comincia la faccia, y = altezza degli occhi, z = mezza distanza fra gli occhi.
+  const bodyIndex=skinned.findIndex(mesh=>/Body/.test(mesh.name)),face=new THREE.Vector3(0,.79,.016);
+  if(bodyIndex>=0){
+    const p=positions[bodyIndex][1];let top=0,front=-1;
+    for(let n=0;n<p.length;n+=3)top=Math.max(top,p[n+1]);
+    for(let n=0;n<p.length;n+=3)if(p[n+1]>top-.09)front=Math.max(front,p[n]);
+    face.set(front-.03,top-.057,.017);
+  }
   const fanState=new THREE.InstancedBufferAttribute(new Float32Array(count*4),4);
+  const pick=(palette: number[],n: number,step: number)=>palette[(n*step+(n>>3))%palette.length];
   const meshes=skinned.map((source,i)=>{
     const geo=source.geometry.clone();geo.deleteAttribute('skinIndex');geo.deleteAttribute('skinWeight');
     geo.setAttribute('position',new THREE.BufferAttribute(positions[i][1],3));geo.computeVertexNormals();
@@ -556,18 +645,50 @@ export async function createCrowdHumans(count: number, shirts: number[]) {
     geo.setAttribute('talkingPosition',new THREE.BufferAttribute(positions[i][3],3));
     geo.setAttribute('enterPosition',new THREE.BufferAttribute(positions[i][4],3));
     geo.setAttribute('exitPosition',new THREE.BufferAttribute(positions[i][5],3));
+    geo.setAttribute('clapPosition',new THREE.BufferAttribute(positions[i][6],3));
     const mat=(source.material as THREE.MeshStandardMaterial).clone();
+    const isBody=/Body/.test(source.name),isSocks=/Socks/.test(source.name);
+    if(isBody||isSocks)mat.map=null;
     mat.onBeforeCompile=shader=>{
-      shader.vertexShader='attribute vec3 seatedPosition; attribute vec3 cheeringPosition; attribute vec3 talkingPosition; attribute vec3 enterPosition; attribute vec3 exitPosition; attribute vec4 fanState;\n'+shader.vertexShader;
-      shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',
-        'vec3 seated = mix(seatedPosition,talkingPosition,fanState.z); vec3 middle = fanState.w > 0.0 ? exitPosition : enterPosition; vec3 transformed = fanState.x < 0.5 ? mix(seated,middle,fanState.x*2.0) : mix(middle,position,(fanState.x-0.5)*2.0); transformed = mix(transformed, cheeringPosition, fanState.y);');
+      shader.vertexShader='attribute vec3 seatedPosition; attribute vec3 cheeringPosition; attribute vec3 talkingPosition; attribute vec3 enterPosition; attribute vec3 exitPosition; attribute vec3 clapPosition; attribute vec4 fanState;\n'+shader.vertexShader;
+      // Braccia come spostamenti rispetto alla posa in piedi: valgono anche da seduti. L'alzata fa un arco in avanti,
+      // così a metà strada il braccio non si accorcia.
+      shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`
+        float fanClap = floor(fanState.z) / 16.0, fanTalk = fract(fanState.z), fanArm = abs(fanState.w);
+        vec3 seated = mix(seatedPosition, talkingPosition, fanTalk);
+        vec3 middle = fanState.w > 0.0 ? exitPosition : enterPosition;
+        vec3 transformed = fanState.x < 0.5 ? mix(seated, middle, fanState.x * 2.0) : mix(middle, position, (fanState.x - 0.5) * 2.0);
+        vec3 lift = cheeringPosition - position;
+        float raise = fanState.y * (fanArm < 1.5 ? 1.0 : fanArm < 2.5 ? step(0.0, position.z) : step(position.z, 0.0));
+        transformed += lift * raise + (clapPosition - position) * fanClap * (1.0 - raise);
+        transformed.x += length(lift) * 0.3 * sin(raise * 3.14159);`);
+      if(isBody){
+        // seed per tifoso: calvo, corto o lungo, e il colore dei capelli. L'attaccatura scende verso la nuca e le tempie.
+        const hairline=`uniform vec3 fanFace; varying vec3 vFan; varying float vFanSeed;
+          float fanHair(vec3 p) {
+            float back = clamp((fanFace.x - 0.006 - p.x) / 0.05, 0.0, 1.0);
+            return step(fanFace.y + 0.026 - back * (0.064 + 0.035 * step(0.7, vFanSeed)) - abs(p.z) * 0.25, p.y) * step(0.08, vFanSeed);
+          }\n`;
+        shader.uniforms.fanFace={value:face};
+        shader.vertexShader=hairline+shader.vertexShader.replace('vec3 lift =',`vFan = position; vFanSeed = fract(sin(float(gl_InstanceID) * 12.9898) * 43758.5453);
+          transformed += normal * 0.008 * fanHair(position) * (0.6 + step(0.45, vFanSeed));
+          vec3 lift =`);
+        shader.fragmentShader=hairline+shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+          float fanHead = fanHair(vFan);
+          vec3 fanHairColor = vFanSeed < 0.34 ? vec3(0.02, 0.017, 0.015) : vFanSeed < 0.58 ? vec3(0.09, 0.05, 0.03) : vFanSeed < 0.74 ? vec3(0.22, 0.13, 0.06)
+            : vFanSeed < 0.87 ? vec3(0.5, 0.38, 0.17) : vec3(0.35, 0.34, 0.33);
+          float fanEye = (1.0 - smoothstep(0.0048, 0.0076, length(vec2((vFan.y - fanFace.y) * 1.5, abs(vFan.z) - fanFace.z)))) * step(fanFace.x, vFan.x);
+          diffuseColor.rgb = mix(mix(diffuseColor.rgb, vec3(0.03), fanEye), fanHairColor, fanHead);`);
+      }
     };
-    mat.customProgramCacheKey=()=> 'human-crowd-poses-v2';
-    if(/Hair|Eyelash/.test(source.name)){mat.alphaTest=.45;mat.transparent=false;}
-    const mesh=new THREE.InstancedMesh(geo,mat,count);mesh.frustumCulled=false;
+    mat.customProgramCacheKey=()=>'human-crowd-poses-v4'+(isBody?'-head':'');
+    const mesh=new THREE.InstancedMesh(geo,mat,count);mesh.frustumCulled=false;mesh.name='crowd-'+source.name;
     const color=new THREE.Color();
-    for(let n=0;n<count;n++)mesh.setColorAt(n,color.setHex(/Shirt/.test(source.name)?shirts[n]:/Body/.test(source.name)?SKIN[n%SKIN.length]:/Hair/.test(source.name)?HAIR[n%HAIR.length]:/Shorts/.test(source.name)?0x334257:/Socks/.test(source.name)?0xcbd0cf:0x555966));
+    for(let n=0;n<count;n++)mesh.setColorAt(n,color.setHex(/Shirt/.test(source.name)?shirts[n]:isBody?pick(FAN_SKIN,n,7)
+      :/Shorts/.test(source.name)?pick(FAN_LEGS,n,11)
+      // Calzettoni del colore dei pantaloni = pantaloni lunghi; del colore della pelle = gambe nude; gli altri restano calze.
+      :isSocks?(n%7<4?pick(FAN_LEGS,n,11):n%7<6?pick(FAN_SKIN,n,7):pick(FAN_SOCKS,n,3)):pick(FAN_SHOES,n,13)));
     return mesh;
   });
-  return {meshes,fanState};
+  return {meshes,fanState,hand};
 }

@@ -5,9 +5,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { CONFIG, SPORT } from '../config';
+import { CONFIG, FLOOR_Y, SPORT } from '../config';
 import type { Match } from '../sim/match';
 import { sportCourt } from './sportCourts';
+import { propObject, withProps } from './props';
 import { courtSurface, surfaceGrain, rod, reliefTile } from './surfaces';
 import { golfCourse } from './golf';
 import { cyclingWorld } from './cycling';
@@ -78,17 +79,50 @@ export function createStage(container: HTMLElement) {
 
   const boards = adBoards();
   const screen = bigScreen();
-  scene.add(sky(), stars(), clouds(), moon(), ground(), floodlights(), boards.group, screen.group, venueDetails(), broadcastGear());
-  if (SPORT === 'basket') scene.add(court(renderer), hoop(1), hoop(-1));
+  // Tutto ciò che sta attorno al campo poggia sul pavimento dell'impianto (FLOOR_Y: nella boxe un metro sotto il ring).
+  const venue = new THREE.Group(); venue.position.y = FLOOR_Y;
+  scene.add(sky(), stars(), clouds(), moon(), skyline(), venue);
+  venue.add(ground(), floodlights(), boards.group, screen.group, venueDetails(), broadcastGear());
+  if (SPORT === 'basket') {
+    scene.add(court(renderer));
+    // Canestri modellati in Blender: base imbottita, braccio, tabellone di vetro, ferro e retina.
+    withProps('arena', (props) => {
+      for (const side of [1, -1]) {
+        const hoop = propObject(props.hoop);
+        hoop.position.x = side * L / 2; hoop.rotation.y = side > 0 ? 0 : Math.PI;
+        scene.add(hoop);
+      }
+    });
+  }
   else if (SPORT === 'boxe' || SPORT === 'tennis' || SPORT === 'pallavolo') scene.add(sportCourt(renderer));
   else scene.add(pitch(renderer), goal(1), goal(-1), cornerFlags());
-  const { mesh: stands, rows: seatRows } = standsAndSeats();
-  scene.add(stands);
-  scene.add(stadiumSeats(seatRows), grandstandRoof());
+  const { mesh: stands, rows } = standsAndSeats();
+  venue.add(stands, stadiumSeats(rows), grandstandRoof());
+  // Le file di posti nel mondo: pubblico e momenti segreti le leggono già alla quota giusta.
+  const seatRows: SeatRow[] = rows.map((row) => ({ ...row, from: row.from.clone().setY(row.from.y + FLOOR_Y), to: row.to.clone().setY(row.to.y + FLOOR_Y) }));
 
+  // Boxe: l'asciugamano che l'angolo getta sul ring (stato nella simulazione, quindi anche nei replay).
+  const towel = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.025, 0.42, 6, 1, 4), new THREE.MeshStandardMaterial({ color: 0xf6f4ee, roughness: 1 }));
+  towel.castShadow = true; towel.visible = false; scene.add(towel);
   // Animali dei momenti segreti (il gabbiano in tribuna, il cane a bordo campo).
   const fauna = new FaunaViews(scene);
-  const update = (match: Match) => { fauna.update(match); boards.update(match.time); screen.update(match); };
+  // Gol o punto: per qualche secondo i cartelloni passano ai colori di chi ha segnato (anche nel replay, che torna indietro nel tempo).
+  const scored = { team: -1, from: 0, score: [0, 0] };
+  const update = (match: Match) => {
+    for (const team of [0, 1]) if (match.score[team] > scored.score[team]) Object.assign(scored, { team, from: match.time });
+    scored.score = [...match.score];
+    const party = match.time - scored.from;
+    fauna.update(match); screen.update(match);
+    const thrown = (match.sportSimulation as { towel?: { t: number; from: THREE.Vector3; to: THREE.Vector3 } } | null)?.towel;
+    towel.visible = !!thrown && thrown.t >= 0 && match.time >= thrown.t;
+    if (towel.visible && thrown) {
+      const u = Math.min(1, (match.time - thrown.t) / 1.1);
+      towel.position.lerpVectors(thrown.from, thrown.to, u).y += Math.sin(Math.PI * u) * 1.6;
+      towel.rotation.set(u < 1 ? u * 9 : 0, u * 2.5, u < 1 ? Math.sin(u * 12) * 0.6 : 0);
+    }
+    // Nella boxe il punteggio conta i colpi a segno: i cartelloni lampeggerebbero senza sosta.
+    boards.update(match.time, scored.team >= 0 && SPORT !== 'boxe' && party >= 0 && party < (SPORT === 'calcio' ? 6 : 2.5) ? scored.team : -1);
+  };
   return { renderer, scene, camera, seatRows, update: update as ((match: Match) => void) | undefined };
 }
 
@@ -100,7 +134,7 @@ function sky() {
   const colors: number[] = [];
   const zenith = new THREE.Color(0x070f24);
   const mid = new THREE.Color(0x1f3a5c);
-  const haze = new THREE.Color(0x6d7f99); // foschia illuminata dalla cittÃ  e dai fari
+  const haze = new THREE.Color(0x6d7f99); // foschia illuminata dalla città e dai fari
   const horizon = new THREE.Color(0xd99a6c); // ultimo bagliore del tramonto
   const below = new THREE.Color(0x0e1522);
   const c = new THREE.Color();
@@ -116,7 +150,7 @@ function sky() {
   return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
 }
 
-/** Velature sottili: macchie morbide su un disco alto, tinte dal bagliore della cittÃ . */
+/** Velature sottili: macchie morbide su un disco alto, tinte dal bagliore della città. */
 function clouds() {
   const c = document.createElement('canvas');
   c.width = c.height = 512;
@@ -135,6 +169,38 @@ function clouds() {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200).rotateX(Math.PI / 2),
     new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide }));
   mesh.position.y = 170;
+  return mesh;
+}
+
+/** Città all'orizzonte: sagome di palazzi con le finestre accese, dietro le tribune. Un solo cilindro con una texture. */
+function skyline() {
+  const c = document.createElement('canvas');
+  c.width = 2048; c.height = 256;
+  const g = c.getContext('2d')!;
+  let seed = 31;
+  const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  // Due file di palazzi: quelli lontani più chiari (foschia), quelli vicini scuri con le finestre.
+  for (const layer of [0, 1]) {
+    for (let x = 0; x < 2048;) {
+      const w = 18 + random() * 46, h = (layer ? 26 : 50) + random() * random() * (layer ? 120 : 170);
+      const shade = g.createLinearGradient(0, 256 - h, 0, 256);
+      shade.addColorStop(0, layer ? '#141b2c' : '#3b3c55'); shade.addColorStop(1, layer ? '#2a3348' : '#86707a');
+      g.fillStyle = shade; g.fillRect(x, 256 - h, w, h);
+      if (random() < 0.18) g.fillRect(x + w * 0.4, 256 - h - 10 - random() * 14, 2, 26);
+      if (layer) for (let wy = 256 - h + 5; wy < 250; wy += 7) for (let wx = x + 3; wx < x + w - 4; wx += 6) {
+        if (random() > 0.3) continue;
+        g.fillStyle = random() < 0.8 ? 'rgba(255,214,140,0.85)' : 'rgba(190,225,255,0.8)';
+        g.fillRect(wx, wy, 3, 4);
+        g.fillStyle = shade;
+      }
+      x += w + (random() < 0.25 ? random() * 30 : 0);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(2, 1);
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(390, 390, 64, 48, 1, true),
+    new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.BackSide, fog: false }));
+  mesh.position.y = 27;
   return mesh;
 }
 
@@ -175,7 +241,7 @@ function pitch(renderer: THREE.WebGLRenderer) {
   const X = (x: number) => (x + L / 2 + margin) * ppm;
   const Y = (z: number) => (z + W / 2 + margin) * ppm;
 
-  // Strisce del taglio dell'erba, con un secondo taglio incrociato piÃ¹ tenue (effetto a scacchi dei campi veri).
+  // Strisce del taglio dell'erba, con un secondo taglio incrociato più tenue (effetto a scacchi dei campi veri).
   const stripes = 14;
   for (let i = 0; i < stripes; i++) {
     g.fillStyle = i % 2 ? '#2f6b42' : '#3a7d4b';
@@ -188,7 +254,7 @@ function pitch(renderer: THREE.WebGLRenderer) {
   }
   grassBlades(g, 0.1);
   surfaceGrain(g, 0.05);
-  // Fuori dal rettangolo di gioco l'erba Ã¨ meno curata: piÃ¹ scura e irregolare.
+  // Fuori dal rettangolo di gioco l'erba è meno curata: più scura e irregolare.
   g.save(); g.beginPath(); g.rect(0, 0, cw, ch); g.rect(X(-L / 2), Y(-W / 2), L * ppm, W * ppm); g.clip('evenodd');
   g.fillStyle = 'rgba(20,40,20,0.22)'; g.fillRect(0, 0, cw, ch); g.restore();
   const shade = g.createLinearGradient(0, 0, 0, ch);
@@ -332,45 +398,6 @@ function court(renderer: THREE.WebGLRenderer) {
   g.fillText('FI', X(0), Y(0));
   // Parquet lucidato: le linee e la vernice riflettono i fari.
   return courtSurface(canvas, L + 2 * margin, W + 2 * margin, renderer, 0.38, { canvas: reliefTile('wood'), scale: 0.004 });
-}
-
-/** Canestro: palo dietro la linea di fondo, braccio, tabellone trasparente, ferro arancione e retina. */
-function hoop(side: 1 | -1) {
-  const P = CONFIG.pitch;
-  const g = new THREE.Group();
-  const rim = P.rimHeight;
-  const boardX = L / 2 - 1.2;
-  const hx = L / 2 - P.hoopFromBaseline;
-  const grey = new THREE.MeshStandardMaterial({ color: 0x657888, roughness: 0.38, metalness: 0.6 });
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.17, rim + 0.6, 12), grey);
-  pole.position.set(L / 2 + 1.2, (rim + 0.6) / 2, 0);
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.4, 12).rotateZ(Math.PI / 2), grey);
-  arm.position.set(L / 2, rim + 0.5, 0);
-  const pad = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.4, 1.2), new THREE.MeshLambertMaterial({ color: 0x1f3d7a }));
-  pad.position.set(L / 2 + 1.2, 0.7, 0);
-  const brace = rod(new THREE.Vector3(L / 2 + 1.2, rim - 0.8, 0), new THREE.Vector3(boardX, rim + 0.5, 0), 0.055, grey);
-
-  const board = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.8, 1.05).rotateY(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0xe8f0ff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
-  );
-  board.position.set(boardX, rim - 0.15 + 0.525, 0);
-  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.8, 1.05).rotateY(-Math.PI / 2)), new THREE.LineBasicMaterial({ color: 0xffffff }));
-  edge.position.copy(board.position);
-  const square = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.59, 0.45).rotateY(-Math.PI / 2)), new THREE.LineBasicMaterial({ color: 0xff3b30 }));
-  square.position.set(boardX - 0.01, rim + 0.2, 0);
-
-  const ringRadius = 0.23;
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(ringRadius, 0.02, 6, 20).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xff6a1a }));
-  ring.position.set(hx, rim, 0);
-  const net = new THREE.Mesh(
-    new THREE.CylinderGeometry(ringRadius, ringRadius * 0.61, 0.42, 12, 1, true),
-    new THREE.MeshBasicMaterial({ map: netTexture(6, 2), transparent: true, side: THREE.DoubleSide, depthWrite: false }),
-  );
-  net.position.set(hx, rim - 0.21, 0);
-  g.add(pole, arm, brace, pad, board, edge, square, ring, net);
-  if (side < 0) g.rotation.y = Math.PI;
-  return g;
 }
 
 function ground() {
@@ -541,15 +568,38 @@ function adBoards() {
   for (let x = 0; x < 1024; x += 3) g.fillRect(x, 0, 1, 64);
   for (let y = 0; y < 64; y += 3) g.fillRect(0, y, 1024, 1);
 
+  // Secondo disegno, per i festeggiamenti: nome e colori della squadra che ha segnato.
+  const partyCanvas = document.createElement('canvas');
+  partyCanvas.width = 1024; partyCanvas.height = 64;
+  const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
+  const drawParty = (team: number) => {
+    const p = partyCanvas.getContext('2d')!, kit = CONFIG.teams[team];
+    const bright = ((kit.shirt >> 16) * 0.3 + ((kit.shirt >> 8) & 255) * 0.59 + (kit.shirt & 255) * 0.11) > 150;
+    for (let i = 0; i < 4; i++) {
+      p.fillStyle = i % 2 ? '#0b0e16' : hex(kit.shirt); p.fillRect(i * 256, 0, 256, 64);
+      p.font = 'bold 38px system-ui, sans-serif'; p.textBaseline = 'middle'; p.textAlign = 'center';
+      p.fillStyle = i % 2 ? (bright ? hex(kit.shirt) : '#ffffff') : bright ? '#0b0e16' : '#ffffff';
+      p.fillText(`★ ${t(kit.short)} ★`, i * 256 + 128, 34);
+    }
+    p.fillStyle = 'rgba(0,0,0,0.22)';
+    for (let x = 0; x < 1024; x += 3) p.fillRect(x, 0, 1, 64);
+    for (let y = 0; y < 64; y += 3) p.fillRect(0, y, 1024, 1);
+  };
   const textures: THREE.CanvasTexture[] = [];
+  const partyTextures: THREE.CanvasTexture[] = [];
+  const materials: THREE.MeshBasicMaterial[] = [];
   const casing = new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.8 });
   const board = (len: number, x: number, z: number, rotY: number) => {
-    const t = new THREE.CanvasTexture(canvas);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.wrapS = THREE.RepeatWrapping;
-    t.repeat.set(len / 16, 1);
-    textures.push(t);
+    const [t, party] = [canvas, partyCanvas].map((source) => {
+      const texture = new THREE.CanvasTexture(source);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.repeat.set(len / 16, 1);
+      return texture;
+    });
+    textures.push(t); partyTextures.push(party);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.9), new THREE.MeshBasicMaterial({ map: t }));
+    materials.push(m.material);
     m.position.set(x, 0.5, z);
     // Prima la rotazione verso il campo, poi la leggera inclinazione all'indietro (sul proprio asse, non su quello del mondo).
     m.rotation.order = 'YXZ';
@@ -562,7 +612,20 @@ function adBoards() {
   group.add(board(L + 10, 0, -(W / 2 + 3), 0));
   group.add(board(W + 6, -(L / 2 + 3), 0, Math.PI / 2));
   group.add(board(W + 6, L / 2 + 3, 0, -Math.PI / 2));
-  return { group, update: (time: number) => { for (const t of textures) t.offset.x = -time * 0.045; } };
+  let shown = -1;
+  return {
+    group,
+    /** team = chi ha appena segnato (-1 = pubblicità normale): scritta più veloce e luce che pulsa. */
+    update: (time: number, team = -1) => {
+      if (team !== shown) {
+        shown = team;
+        if (team >= 0) { drawParty(team); for (const texture of partyTextures) texture.needsUpdate = true; }
+        materials.forEach((material, i) => { material.map = team >= 0 ? partyTextures[i] : textures[i]; material.color.setScalar(1); });
+      }
+      for (const texture of team >= 0 ? partyTextures : textures) texture.offset.x = -time * (team >= 0 ? 0.22 : 0.045);
+      if (team >= 0) for (const material of materials) material.color.setScalar(0.78 + 0.22 * Math.sin(time * 14));
+    },
+  };
 }
 
 /** Maxischermo sopra la tribuna: squadre, punteggio e minuto, ridisegnati solo quando cambiano. */
@@ -586,7 +649,9 @@ function bigScreen() {
   const colour = (c: number) => '#' + c.toString(16).padStart(6, '0');
   const update = (match: Match) => {
     const mins = Math.min(CONFIG.match.clockMinutes, Math.floor((match.clock / CONFIG.match.durationSec) * CONFIG.match.clockMinutes));
-    const key = `${match.score[0]}-${match.score[1]}-${mins}`;
+    // Tennis: game e punti del game, gli stessi del punteggio in alto (prima il maxischermo mostrava solo i game).
+    const board = match.sportSimulation?.board?.();
+    const key = `${match.score[0]}-${match.score[1]}-${mins}-${board?.extra.join('-') ?? ''}`;
     if (key === shown) return;
     shown = key;
     ctx.fillStyle = '#05070c'; ctx.fillRect(0, 0, 512, 256);
@@ -596,11 +661,14 @@ function bigScreen() {
       ctx.fillStyle = colour(team.shirt); ctx.fillRect(x, 60, 188, 70);
       ctx.fillStyle = '#ffffff'; ctx.font = 'bold 44px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(t(team.short), x + 94, 96);
-      ctx.font = 'bold 96px system-ui, sans-serif'; ctx.fillText(String(match.score[i]), x + 94, 190);
+      if (board) {
+        ctx.font = 'bold 88px system-ui, sans-serif'; ctx.fillText(board.main[i], x + 50, 190);
+        ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 56px system-ui, sans-serif'; ctx.fillText(board.extra[i], x + 138, 194);
+      } else { ctx.font = 'bold 96px system-ui, sans-serif'; ctx.fillText(String(match.score[i]), x + 94, 190); }
     });
     ctx.fillStyle = '#ffd23f'; ctx.font = 'bold 40px system-ui, sans-serif'; ctx.textAlign = 'center';
     ctx.fillText(`${mins}'`, 256, 96);
-    ctx.fillStyle = '#4fd1ff'; ctx.font = 'bold 22px system-ui, sans-serif'; ctx.fillText('FRAME IT Â· LIVE', 256, 36);
+    ctx.fillStyle = '#4fd1ff'; ctx.font = 'bold 22px system-ui, sans-serif'; ctx.fillText('FRAME IT · LIVE', 256, 36);
     // Griglia dei LED.
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     for (let x = 0; x < 512; x += 4) ctx.fillRect(x, 0, 1, 256);
@@ -617,17 +685,18 @@ function floodlights() {
   const steel = new THREE.MeshStandardMaterial({ color: 0x7d858f, roughness: 0.5, metalness: 0.6 });
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xfffbe8 });
   const glowMat = new THREE.SpriteMaterial({ map: radialTexture(), color: 0xfff1c4, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, transparent: true, opacity: 0.9 });
-  // Griglia 4Ã—3 di proiettori su un telaio.
+  // Griglia 4×3 di proiettori su un telaio.
   const lamps: THREE.BufferGeometry[] = [];
   for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) lamps.push(new THREE.BoxGeometry(0.75, 0.5, 0.3).translate(-1.4 + i * 0.93, -0.6 + j * 0.6, 0));
   const lampGeo = mergeGeometries(lamps)!; lamps.forEach(l => l.dispose());
   const frameGeo = new THREE.BoxGeometry(4.2, 2.1, 0.12).translate(0, 0, -0.2);
   // Cono di luce: luminoso alla sorgente, nero (invisibile) a terra, in additivo. Solo dalle torri di fronte alla
   // camera: quelle alle sue spalle lo proietterebbero attraverso l'obiettivo, sbiancando tutta l'inquadratura.
-  const cone = new THREE.CylinderGeometry(0.5, 8, 1, 24, 1, true).translate(0, -0.5, 0);
+  // Il fascio si spegne a metà strada: a terra arriva la luce vera, non un triangolo chiaro disegnato sul prato.
+  const cone = new THREE.CylinderGeometry(0.5, 8, 1, 24, 8, true).translate(0, -0.5, 0);
   const colors = new Float32Array(cone.attributes.position.count * 3);
   for (let i = 0; i < cone.attributes.position.count; i++) {
-    const k = cone.attributes.position.getY(i) > -0.5 ? 0.04 : 0;
+    const k = 0.05 * Math.max(0, 1 + cone.attributes.position.getY(i) / 0.55) ** 2.2;
     colors[i * 3] = k; colors[i * 3 + 1] = k * 0.95; colors[i * 3 + 2] = k * 0.8;
   }
   cone.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -686,8 +755,9 @@ export function stadiumSeats(rows: SeatRow[]) {
     const count = Math.floor(row.from.distanceTo(row.to) / CONFIG.crowd.spacing);
     for (let i = 0; i <= count; i++) positions.push({ point: new THREE.Vector3().lerpVectors(row.from, row.to, i / count), facing: row.facing, index: i });
   }
-  const cushion = new RoundedBoxGeometry(0.44, 0.055, 0.5, 1, 0.022).translate(-0.03, 0.05, 0);
-  const back = new RoundedBoxGeometry(0.065, 0.38, 0.5, 1, 0.022).translate(-0.23, 0.27, 0);
+  // Seduta all'altezza del sedere dei tifosi (vedi SEAT_BACK in crowd.ts), schienale fino a terra: chi è in piedi sta davanti.
+  const cushion = new RoundedBoxGeometry(0.3, 0.05, 0.5, 1, 0.02).translate(-0.25, 0.23, 0);
+  const back = new RoundedBoxGeometry(0.06, 0.56, 0.5, 1, 0.02).translate(-0.41, 0.28, 0);
   const seats = new THREE.InstancedMesh(mergeGeometries([cushion, back])!,
     new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.05 }), positions.length);
   cushion.dispose(); back.dispose();
@@ -732,16 +802,21 @@ function venueDetails() {
   const apron = new THREE.Mesh(new THREE.PlaneGeometry(L + 12, W + 10).rotateX(-Math.PI / 2),
     new THREE.MeshStandardMaterial({ color: 0x334752, roughness: 0.95 }));
   apron.position.y = -0.025; apron.receiveShadow = true; group.add(apron);
-  const metal = new THREE.MeshStandardMaterial({ color: 0x748a9a, roughness: 0.38, metalness: 0.6 });
-  const benchWidth = Math.min(5, L * 0.25);
-  for (const side of [-1, 1]) {
-    const x = side * L * 0.3, z = -W / 2 - 4;
-    const seat = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, benchWidth, 3, 12).rotateZ(Math.PI / 2),
-      new THREE.MeshStandardMaterial({ color: CONFIG.teams[side < 0 ? 0 : 1].shirt, roughness: 0.65 }));
-    seat.scale.z = 2; seat.position.set(x, 0.5, z); group.add(seat);
-    for (const offset of [-benchWidth * 0.35, benchWidth * 0.35]) {
-      group.add(rod(new THREE.Vector3(x + offset, 0, z), new THREE.Vector3(x + offset, 0.5, z), 0.06, metal));
+  // Nella boxe a bordo ring ci sono i tavoli dei giudici (nel modello del ring), non le panchine.
+  if (SPORT === 'boxe') return group;
+  const benchWidth = Math.min(5, L * 0.25), z = -W / 2 - 4;
+  // Panchine (due file di sedie imbottite nel colore della squadra) e tavolo dei giudici: modelli di Blender.
+  withProps('arena', (props) => {
+    for (const side of [-1, 1]) for (const half of [-1.45, 1.45]) {
+      const bench = propObject(props.bench, { tint: CONFIG.teams[side < 0 ? 0 : 1].shirt });
+      bench.position.set(side * L * 0.3 + half, 0, z); group.add(bench);
     }
+    if (SPORT === 'basket' || SPORT === 'pallavolo') {
+      const table = propObject(props.scorer_table); table.position.set(0, 0, z); group.add(table);
+    }
+  });
+  for (const side of [-1, 1]) {
+    const x = side * L * 0.3;
     if (SPORT === 'calcio') {
       const shelter = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, benchWidth + 0.6, 16, 1, true, 0, Math.PI).rotateZ(Math.PI / 2),
         new THREE.MeshStandardMaterial({ color: 0x8bb1c8, roughness: 0.35, metalness: 0.15, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));

@@ -1,8 +1,9 @@
 import { CONFIG, SPORT } from '../config';
 import type { Actor, Pose } from '../sim/match';
 
-/** Recordings store this: catalog 2 = original clips, 3 = RPG additions, 4 = head/body hits and stride-matched locomotion pools. */
-export const ANIMATION_CATALOG = 4;
+/** Recordings store this: catalog 2 = original clips, 3 = RPG additions, 4 = head/body hits and stride-matched locomotion pools,
+ * 5 = raised boxing ring (venue floor one metre lower) and the court-sport clips keyed in Blender. */
+export const ANIMATION_CATALOG = 5;
 
 /**
  * travel = metres covered (from the simulated gait phase), so in-place loops can keep the planted foot still.
@@ -40,7 +41,9 @@ export function assetMotion(a: Actor, time: number, carrying: boolean, previous 
     if (modern && pose === 'normal' && !athlete && sp < .3) return 'sidelineIdle';
     if (SPORT === 'boxe' && athlete && pose === 'guard' && sp < 0.35) return 'idle';
     if (sp <= 0.3) return a.role === 'gk' && SPORT === 'calcio' ? modern&&carrying&&a.previousGesture==='keeperCatch'?'keeperCarry':'keeperIdle'
-      : SPORT === 'calcio' && athlete ? 'footballIdle' : SPORT === 'boxe' && athlete ? 'idle' : undefined;
+      : SPORT === 'calcio' && athlete ? 'footballIdle' : SPORT === 'boxe' && athlete ? 'idle'
+      // Basket e pallavolo (dal catalogo 5): da fermi, in posizione d'attesa sulle gambe piegate, non dritti come pali.
+      : (a.animationCatalog ?? 3) >= 5 && athlete && pose === 'normal' && !carrying && (SPORT === 'basket' || SPORT === 'pallavolo') ? 'keeperIdle' : undefined;
     const forward = Math.cos(angle - a.heading), side = Math.sin(angle - a.heading);
     let g = forward < -0.35 ? 'backward' : Math.abs(side) > 0.65 ? (side > 0 ? 'stepRight' : 'stepLeft')
       : SPORT === 'boxe' && athlete ? (sp > 1 ? 'boxingWalk' : 'boxingStep')
@@ -55,6 +58,8 @@ export function assetMotion(a: Actor, time: number, carrying: boolean, previous 
     return g;
   };
   let walking = false;
+  // Tennis: il giudice di sedia resta seduto sul seggiolone per tutta la partita.
+  if (SPORT === 'tennis' && a.role === 'ref' && (a.animationCatalog ?? 3) >= 5) group = 'crowdSit';
   if (!group) {
     if(modern&&a.look==='mascot'&&['argue','wave'].includes(pose))group='mascotReact';
     else if(modern&&(pose==='argue'||pose==='protest'))group=a.role==='ref'?'officialYes':'talk';
@@ -81,6 +86,10 @@ export function assetMotion(a: Actor, time: number, carrying: boolean, previous 
     } else if (SPORT === 'golf' && athlete) {
       if (pose === 'swing' || pose === 'practice') group = 'golfDrive';
       else if (pose === 'putt') group = 'golfPutt';
+    } else if (athlete && (a.animationCatalog ?? 3) >= 5) {
+      // Gesti animati a mano in Blender (scripts/blender/clips.py): il corpo viene dalla ripresa, le mani restano sulla palla (Character.touchBall).
+      if (SPORT === 'basket' && pose === 'shoot') group = 'basketShoot';
+      else if (SPORT === 'pallavolo' && pose === 'spike') group = 'volleySpike';
     }
     if (!group && (pose === 'normal' || pose === 'guard' || pose === 'sprint' || party)) {
       if (athlete && (SPORT === 'ciclismo' || SPORT === 'vela') && a.look !== 'mascot') return null;

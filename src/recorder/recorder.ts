@@ -3,7 +3,7 @@
  * in un buffer circolare degli ultimi secondi. Serve al replay e, in futuro, all'esportazione delle clip
  * da condividere: clip() restituisce dati semplici, serializzabili in JSON.
  */
-import { CONFIG, SPORT } from '../config';
+import { CONFIG, FLOOR_Y, SPORT } from '../config';
 import type { Match, Pose, Ball } from '../sim/match';
 import type { MotionPose } from '../animation/motion';
 import type { Speech } from '../audio/speech';
@@ -114,6 +114,8 @@ export class Recorder {
       actor.pos.x = lerp(fa.x, fb.x, u);
       actor.pos.y = lerp(fa.y, fb.y, u);
       actor.pos.z = lerp(fa.z, fb.z, u);
+      // Clip salvate prima del ring rialzato (catalogo < 5): chi stava fuori dalla pedana era registrato un metro più su.
+      if (FLOOR_Y && (fa.animationCatalog ?? 2) < 5 && Math.max(Math.abs(actor.pos.x) - CONFIG.pitch.length / 2, Math.abs(actor.pos.z) - CONFIG.pitch.width / 2) > 0.55) actor.pos.y += FLOOR_Y;
       actor.vel.x = lerp(fa.vx, fb.vx, u);
       actor.vel.z = lerp(fa.vz, fb.vz, u);
       (actor.gaitVel ??= actor.vel.clone()).set(lerp(fa.gx ?? fa.vx, fb.gx ?? fb.vx, u), 0, lerp(fa.gz ?? fa.vz, fb.gz ?? fb.vz, u));
@@ -124,7 +126,8 @@ export class Recorder {
       const f = u < 0.5 || !samePose ? fa : fb;
       actor.pose = f.pose;
       actor.poseDur = f.poseDur;
-      actor.poseDir = f.poseDir;
+      // Continuo dentro la stessa posa (piega del ciclista, apertura del colpo nel tennis): si interpola.
+      actor.poseDir = samePose ? lerp(fa.poseDir, fb.poseDir, u) : f.poseDir;
       actor.gesture = f.gesture;
       actor.gestureVariant = f.gestureVariant;
       actor.previousGesture = f.previousGesture;

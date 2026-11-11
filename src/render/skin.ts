@@ -28,21 +28,28 @@ function skinReference(mesh: THREE.Mesh, texture: THREE.Texture | null) {
 }
 
 /** Keep the supplied face detail; make tattoos optional and give the imported hair a readable colour instead of multiplying black texels. */
-export function styleSkin(material: THREE.MeshStandardMaterial, mesh: THREE.Mesh, model: THREE.Group, norm: number, id: number, hair: number) {
+export function styleSkin(material: THREE.MeshStandardMaterial, mesh: THREE.Mesh, model: THREE.Group, norm: number, id: number, hair: number,
+  /** Pugili: fascia in vita sopra i pantaloncini (top = bordo dei pantaloncini, in metri) e pantaloncini allungati fin sopra il ginocchio. */
+  trunks?: { top: number; color: THREE.Color; band: THREE.Color },
+  /** Pugili: cuoio capelluto dipinto (rasatura o sfumatura ai lati), 0..1 = quanto copre la pelle. Misure della testa del modello rpg-boxer. */
+  scalp = 0) {
   model.updateWorldMatrix(true,true);
   const frame=new THREE.Matrix4().copy(model.matrixWorld).invert().multiply(mesh.matrixWorld);
   const isHair=/Hair/.test(mesh.name);
   const reference=isHair?new THREE.Color():skinReference(mesh,material.map);
   const beardColor=new THREE.Color(hair);material.userData.beardColor=beardColor;
+  if(trunks)material.userData.trunks=trunks;
   material.onBeforeCompile=shader=>{
     shader.uniforms.skinFrame={value:frame};shader.uniforms.skinNorm={value:norm};shader.uniforms.beardColor={value:beardColor};
     shader.uniforms.sourceSkinColor={value:reference};
+    if(trunks)Object.assign(shader.uniforms,{trunkTop:{value:trunks.top},trunkColor:{value:trunks.color},trunkBand:{value:trunks.band}});
     shader.vertexShader=shader.vertexShader.replace('#include <common>',`#include <common>
       uniform mat4 skinFrame;uniform float skinNorm;varying vec3 vSkinPosition;`)
       .replace('#include <begin_vertex>',`#include <begin_vertex>
       vSkinPosition=(skinFrame*vec4(position,1.0)).xyz*skinNorm;`);
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
-      varying vec3 vSkinPosition;uniform vec3 beardColor;uniform vec3 sourceSkinColor;`)
+      varying vec3 vSkinPosition;uniform vec3 beardColor;uniform vec3 sourceSkinColor;
+      ${trunks?'uniform float trunkTop;uniform vec3 trunkColor;uniform vec3 trunkBand;':''}`)
       .replace('#include <map_fragment>',`#include <map_fragment>
       ${isHair?`#ifdef USE_MAP
         float strand=max(max(sampledDiffuseColor.r,sampledDiffuseColor.g),sampledDiffuseColor.b);
@@ -55,8 +62,15 @@ export function styleSkin(material: THREE.MeshStandardMaterial, mesh: THREE.Mesh
         ${id%3===1?`float beard=(1.0-smoothstep(0.080,0.10,abs(vSkinPosition.x)))*smoothstep(0.06,0.085,vSkinPosition.z)
           *smoothstep(1.63,1.66,vSkinPosition.y)*(1.0-smoothstep(1.72,1.75,vSkinPosition.y));
           diffuseColor.rgb=mix(diffuseColor.rgb,beardColor,beard*0.8);`:''}
+        ${scalp?`float hairline=1.80-clamp((0.05-vSkinPosition.z)/0.11,0.0,1.0)*0.11;
+          float shaved=smoothstep(hairline-0.004,hairline+0.004,vSkinPosition.y)*max(step(abs(vSkinPosition.x),0.083),step(1.775,vSkinPosition.y));
+          diffuseColor.rgb=mix(diffuseColor.rgb,beardColor,shaved*${scalp.toFixed(2)});`:''}
+        ${trunks?`float hips=1.0-smoothstep(0.30,0.31,abs(vSkinPosition.x));
+          float waist=hips*smoothstep(trunkTop-0.05,trunkTop-0.04,vSkinPosition.y)*(1.0-smoothstep(trunkTop+0.085,trunkTop+0.09,vSkinPosition.y));
+          float thigh=hips*smoothstep(0.615,0.625,vSkinPosition.y)*(1.0-step(trunkTop-0.04,vSkinPosition.y));
+          diffuseColor.rgb=mix(mix(diffuseColor.rgb,trunkColor,thigh),trunkBand,waist);`:''}
       `}`);
   };
-  material.customProgramCacheKey=()=>`athlete-skin-v3-${isHair?'hair':id%12}`;
+  material.customProgramCacheKey=()=>`athlete-skin-v4-${isHair?'hair':id%12}${trunks?'-trunks':''}${scalp?`-scalp${scalp.toFixed(2)}`:''}`;
   material.needsUpdate=true;
 }

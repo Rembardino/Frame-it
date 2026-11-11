@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { radialTexture } from './stage';
 import { t } from '../i18n';
+import { RACKET_REACH } from '../animation/motion';
 const sphere = new THREE.SphereGeometry(1, 10, 7);
 const box = new RoundedBoxGeometry(1,1,1,1,.1);
 const cylinder = new THREE.CylinderGeometry(1,1,1,10);
@@ -46,20 +47,42 @@ export function ringBox() {
   return { group, sparkle };
 }
 
+/** Racchetta a grandezza vera (68 cm, ovale di 25×33 cm): manico nella mano, gola a V, centro delle corde a RACKET_REACH dal polso. */
 export function racket(color: number) {
   const group = new THREE.Group(); group.rotation.y = Math.PI / 2;
-  const frame = new THREE.TorusGeometry(0.205, 0.014, 5, 28);
-  group.add(mesh([band(0x252c39, [0, -0.16, 0], [0.02, 0.27, 0.02]),
-    band(0xebf0f6, [0, -0.31, 0], [0.014, 0.12, 0.014]),
-    { geometry: frame, color, at: [0, -0.57, 0], size: [1, 1.28, 1] }])); frame.dispose();
+  const c = -RACKET_REACH, rx = 0.125, stretch = 1.3;
+  const frame = new THREE.TorusGeometry(rx, 0.011, 5, 28);
+  const arm = (side: number) => {
+    const from = new THREE.Vector3(0, -0.2, 0), to = new THREE.Vector3(side * 0.075, c + rx * stretch * 0.72, 0), d = to.clone().sub(from);
+    return new THREE.CylinderGeometry(0.009, 0.009, d.length(), 6).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()))
+      .translate((from.x + to.x) / 2, (from.y + to.y) / 2, 0);
+  };
+  const left = arm(-1), right = arm(1);
+  group.add(mesh([band(0x252c39, [0, -0.085, 0], [0.018, 0.23, 0.018]), band(0xebf0f6, [0, 0.03, 0], [0.021, 0.014, 0.021]),
+    shaped(left, color, [0, 0, 0]), shaped(right, color, [0, 0, 0]),
+    { geometry: frame, color, at: [0, c, 0], size: [1, stretch, 1] }])); frame.dispose(); left.dispose(); right.dispose();
   const points: number[] = [];
-  for (let i = -4; i <= 4; i++) {
-    const offset = i * 0.042, extent = Math.sqrt(0.195 ** 2 - offset ** 2);
-    points.push(offset, -0.57 - extent * 1.28, 0, offset, -0.57 + extent * 1.28, 0);
-    points.push(-extent, -0.57 + offset * 1.28, 0, extent, -0.57 + offset * 1.28, 0);
+  for (let i = -3; i <= 3; i++) {
+    const offset = i * 0.034, extent = Math.sqrt((rx - 0.007) ** 2 - offset ** 2);
+    points.push(offset, c - extent * stretch, 0, offset, c + extent * stretch, 0);
+    points.push(-extent, c + offset * stretch, 0, extent, c + offset * stretch, 0);
   }
   const strings = new THREE.BufferGeometry(); strings.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
   group.add(new THREE.LineSegments(strings, new THREE.LineBasicMaterial({ color: 0xd4dedb, transparent: true, opacity: 0.75 })));
+  return group;
+}
+
+/** Guantone: polso lungo con la fascia chiara, sacco imbottito, nocche e pollice a parte (side = lato del pollice). +y = verso le dita; la punta è a 0,225. */
+export function boxingGlove(leather: THREE.Material, tape: THREE.Material, side: number) {
+  const part = (rx: number, ry: number, rz: number, x: number, y: number, z: number) => new THREE.SphereGeometry(1, 14, 10).scale(rx, ry, rz).translate(x, y, z);
+  // Guantone da 12 once: copre tutta la mano. La punta resta a 0,225 m dal polso (landPunch), il volume cresce all'indietro e ai lati.
+  const parts = [part(0.1, 0.12, 0.104, 0, 0.1, 0), part(0.094, 0.07, 0.1, 0, 0.155, 0.008), part(0.038, 0.07, 0.044, side * 0.094, 0.08, 0.026),
+    new THREE.CylinderGeometry(0.068, 0.06, 0.15, 14).translate(0, -0.03, 0)];
+  const group = new THREE.Group();
+  const glove = new THREE.Mesh(mergeGeometries(parts)!, leather); glove.name = 'team-glove';
+  parts.forEach(geometry => geometry.dispose());
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.071, 0.066, 0.045, 14), tape); band.position.y = -0.05;
+  group.add(glove, band);
   return group;
 }
 

@@ -2,7 +2,7 @@
  * Schermata della Carriera: soldi e canale in alto, poi tre schede (Lavori, Negozio, FrameTube).
  * Scegliere un lavoro o una partita in proprio chiama onPlay: la partita parte ricaricando la pagina.
  */
-import { SPORT_LIST } from '../config';
+import { HIDDEN_SPORTS, SPORT_LIST } from '../config';
 import {
   ECONOMY, SHOP, buy, canBuy, level, loadCareer, saveCareer, unlocked,
   type CareerState, type PendingMatch, type Report, type Video,
@@ -71,7 +71,7 @@ export class CareerHub {
     const offers = s.offers.map((o) => `
       <div class="cr-card"><b data-sport="${o.sport}">${sportName(o.sport)}</b><span>${o.client}</span><em>${t('Paga base')} ${euro(o.pay)}</em>
       <button class="primary" data-offer="${o.id}">${t('Accetta')}</button></div>`).join('');
-    const own = SPORT_LIST.filter((sp) => unlocked(s, sp.id)).map((sp) => `
+    const own = SPORT_LIST.filter((sp) => unlocked(s, sp.id) && !HIDDEN_SPORTS.includes(sp.id)).map((sp) => `
       <div class="cr-card"><b data-sport="${sp.id}">${t(sp.name)}</b><span>FrameTube</span>
       <button class="secondary" data-own="${sp.id}">${t('Gioca')}</button></div>`).join('');
     return `

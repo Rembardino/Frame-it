@@ -2,7 +2,7 @@
 
 Usa i fotogrammi di store/video/record.mjs e le scritte di store/video/overlays.mjs (in artifacts/video-frames/).
 Gioco 1080x1350 sotto il titolo, sfondo = lo stesso fotogramma sfocato e scurito, flash da otturatore tra le scene,
-titolo che entra con un piccolo rimbalzo, schermata finale con leggero zoom. Esce store/video/frameit-ad-modes-50s.mp4 (H.264, 30 fps).
+titolo che entra con un piccolo rimbalzo, schermata finale con leggero zoom. Esce store/video/frameit-ad-sports-50s.mp4 (H.264, 30 fps).
 Scene con il passaggio al drone (switch.txt di record.mjs): da quel fotogramma rientrano le scritte "-switch", senza flash.
 Codifica finale con ffmpeg/x264 (pip install imageio-ffmpeg): qualità alta e file leggero, traccia audio muta (la musica si aggiunge sulla piattaforma).
 """
@@ -14,17 +14,19 @@ import numpy as np
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 FRAMES = os.path.join(ROOT, 'artifacts', 'video-frames')
-OUT = os.path.join(ROOT, 'store', 'video', 'frameit-ad-modes-50s.mp4')
+OUT = os.path.join(ROOT, 'store', 'video', 'frameit-ad-sports-50s.mp4')
 RAW = os.path.join(FRAMES, 'ad-raw.mp4')
 W, H, FPS = 1080, 1920, 30
 GAME_Y = 440            # il gioco (1080x1350) va da qui a 1790; sopra il titolo (le prime ~130 px le copre l'interfaccia di TikTok)
 HEAD_Y, TAG_POS = 130, (24, GAME_Y + 86)
 # (scena, tratti di fotogrammi registrati (da, a, passo)): passo 3 = tre volte più veloce (il volo della buca in uno).
-# Totale con il finale ≈ 45 s.
-SCENES = [('h1-rigore', [(20, 135, 1)]), ('c1-pallavolo', [(30, 195, 1)]), ('c2-boxe', [(0, 160, 1)]),
-          ('s1-angolo-drone', [(8, 172, 1)]), ('d1-golf', [(20, 140, 1)]), ('s2-pallavolo-drone', [(10, 180, 1)]),
-          ('m1-basket', [(30, 75, 1)]), ('m2-tennis', [(15, 60, 1)]), ('m3-ciclismo', [(15, 60, 1)]),
-          ('e1-golf-ace', [(0, 45, 1), (45, 180, 3), (180, 252, 1)])]
+# Spot 4: calcio, boxe, golf e ciclismo (telecamera, drone, eventi rari), poi qualche secondo degli altri sport. Totale con il finale ≈ 50 s.
+SCENES = [('h1-rigore', [(30, 135, 1)]), ('d0-calcio-drone', [(15, 185, 1)]),
+          ('c2-boxe', [(14, 150, 1)]), ('b2-boxe-drone', [(0, 150, 1)]),
+          ('d1-golf', [(15, 150, 1)]), ('g3-golf-cervi', [(20, 95, 1)]),
+          ('c1-ciclismo', [(10, 170, 1)]), ('m3-ciclismo', [(0, 90, 1)]),
+          ('m1-basket', [(10, 75, 1)]), ('m2-tennis', [(0, 45, 1)]), ('m4-pallavolo', [(20, 75, 1)]),
+          ('e1-golf-ace', [(0, 40, 1), (40, 180, 3), (180, 256, 1)])]
 END_SEC = 5
 
 

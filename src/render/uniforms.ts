@@ -1,10 +1,13 @@
 import * as THREE from 'three';
 import type { TeamKit } from '../teams';
+import { SPORT } from '../config';
 
 const logos = new Map<string, Promise<THREE.Texture>>();
 const numbers = new Map<number, THREE.CanvasTexture>();
 const patterns = ['stripes', 'sash', 'hoops', 'split', 'chevron', 'diamonds', 'pinstripes'];
 const noCrest = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
+/** Banda laterale dei pantaloncini: larga negli sport di squadra, una riga sottile sui pantaloncini da boxe (accanto alla pelle nuda il bianco largo sembrava pelle). */
+const shortsPattern = SPORT === 'boxe' ? 8 : 7;
 noCrest.needsUpdate = true;
 
 export function loadCrest(kit: TeamKit) {
@@ -46,9 +49,10 @@ export async function dressUniform(mesh: THREE.Mesh, model: THREE.Group, kit: Te
   const height = bounds.max.y - bounds.min.y;
   const uniforms = {
     clubFrame: { value: frame }, clubOrigin: { value: new THREE.Vector3((bounds.min.x + bounds.max.x) / 2, bounds.min.y, (bounds.min.z + bounds.max.z) / 2) },
-    clubHeight: { value: height }, clubPattern: { value: shorts ? 7 : patterns.indexOf(kit.pattern) },
+    clubHeight: { value: height }, clubPattern: { value: shorts ? shortsPattern : patterns.indexOf(kit.pattern) },
     clubAccent: { value: new THREE.Color(keeper ? 0x172838 : kit.accent) },
-    clubCrest: { value: await loadCrest(kit) }, clubDigits: { value: numberTexture(number || 1) },
+    // Sui pantaloncini da boxe lo stemma finiva sul cavallo: niente stemma.
+    clubCrest: { value: shorts && SPORT === 'boxe' ? noCrest : await loadCrest(kit) }, clubDigits: { value: numberTexture(number || 1) },
     clubNumber: { value: !!number && !shorts }, clubFrontNumber: { value: frontNumber && !shorts },
   };
   mat.userData.club = { uniforms, keeper, shorts };
@@ -78,8 +82,9 @@ export async function dressUniform(mesh: THREE.Mesh, model: THREE.Group, kit: Te
       else if(clubPattern==5) pattern=step(0.68, abs(sin((p.x+p.y)*21.0)*sin((p.x-p.y)*21.0)))*0.65;
       else if(clubPattern==6) pattern=step(0.94, cos(p.x*80.0));
       else if(clubPattern==7) pattern=smoothstep(0.28,0.33,abs(p.x));
+      else if(clubPattern==8) pattern=smoothstep(0.41,0.44,abs(p.x));
       diffuseColor.rgb=mix(diffuseColor.rgb,clubAccent,pattern);
-      if(clubPattern!=7) diffuseColor.rgb=mix(diffuseColor.rgb,clubAccent,smoothstep(0.965,0.985,p.y)*0.8);
+      if(clubPattern<7) diffuseColor.rgb=mix(diffuseColor.rgb,clubAccent,smoothstep(0.965,0.985,p.y)*0.8);
       // Both face tests are in the garment's rest frame, so limbs cannot acquire duplicate decals as they turn.
       if(vClubNormal.z>0.45 && vClubPosition.z>0.0) {
         vec4 crest=clubDecal(clubCrest,(p-vec2(-0.18,0.68))/vec2(0.19,0.22));
@@ -102,7 +107,7 @@ export async function changeUniform(mat: THREE.MeshStandardMaterial, kit: TeamKi
   const club = mat.userData.club;
   if (!club) return;
   mat.color.setHex(club.keeper ? kit.keeper : club.shorts ? kit.shorts : kit.shirt);
-  club.uniforms.clubPattern.value = club.shorts ? 7 : patterns.indexOf(kit.pattern);
+  club.uniforms.clubPattern.value = club.shorts ? shortsPattern : patterns.indexOf(kit.pattern);
   club.uniforms.clubAccent.value.setHex(club.keeper ? 0x172838 : kit.accent);
-  club.uniforms.clubCrest.value = await loadCrest(kit);
+  club.uniforms.clubCrest.value = club.shorts && SPORT === 'boxe' ? noCrest : await loadCrest(kit);
 }

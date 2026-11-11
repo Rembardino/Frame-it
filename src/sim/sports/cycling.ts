@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../../config';
 import type { Actor, Match } from '../match';
 import type { Effect, SportAction, SportSimulation } from './types';
-import { BENDS, BRIDGE_S, FINISH_S, LENGTH, ROAD_HALF, VILLAGE, WOODS, roadAt, roadCurve, roadDir, roadGrade, terrainHeight } from './cyclingRoute';
+import { BENDS, BRIDGE_S, FINISH_S, LENGTH, ROAD_HALF, SUMMIT_S, VILLAGE, WOODS, roadAt, roadCurve, roadDir, roadGrade, terrainHeight } from './cyclingRoute';
 import { riderName } from './cyclingRiders';
 import { standardRoute, type Key, type Species } from '../fauna';
 import { inside } from './shapes';
@@ -16,9 +16,10 @@ import { t } from '../../i18n';
 
 const C = () => CONFIG.cycling;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-type Mode = 'pack' | 'attack' | 'crash' | 'chase' | 'sprint' | 'done';
-/** jit = scarto fisso dal suo posto nel gruppo (avanti, di lato): il gruppo non è una griglia. */
-interface Rider { a: Actor; s: number; lat: number; v: number; mode: Mode; slot: number; until: number; push: number; jit: [number, number]; lat0: number }
+type Mode = 'pack' | 'attack' | 'crash' | 'flat' | 'chase' | 'sprint' | 'done';
+/** jit = scarto fisso dal suo posto nel gruppo (avanti, di lato): il gruppo non è una griglia.
+ *  strength = quanto tiene in salita (1 = scalatore); drop = metri persi dal suo posto, che crescono sulle rampe e si recuperano dopo. */
+interface Rider { a: Actor; s: number; lat: number; v: number; mode: Mode; slot: number; until: number; push: number; jit: [number, number]; lat0: number; strength: number; drop: number }
 
 export class CyclingSimulation implements SportSimulation {
   readonly effects: Effect[] = [];
@@ -34,9 +35,14 @@ export class CyclingSimulation implements SportSimulation {
   private fan: { a: Actor; rider: Rider; until: number } | null = null;
   private finishedAt = Infinity;
   private finishOrder: Actor[] = [];
+  /** Forma del gruppo: file = 0 a tre affiancati, 1 in fila indiana (curve strette, discese veloci); stretch = allungato dalla salita. */
+  private file = 0;
+  private stretch = 0;
+  /** Secondi al prossimo scambio di posto fra due corridori: il gruppo si rimescola di continuo. */
+  private shuffle = 3;
 
   constructor(private match: Match) {
-    this.riders = match.actors.map((a, i) => ({ a, s: 0, lat: 0, v: this.packV, mode: 'pack', slot: i, until: 0, push: 0, jit: [rand(-0.25, 0.25), rand(-0.15, 0.15)], lat0: 0 }));
+    this.riders = match.actors.map((a, i) => ({ a, s: 0, lat: 0, v: this.packV, mode: 'pack', slot: i, until: 0, push: 0, jit: [rand(-0.25, 0.25), rand(-0.15, 0.15)], lat0: 0, strength: rand(0.72, 1), drop: 0 }));
     // Posti nel gruppo mescolati: ogni corridore gareggia per sé.
     this.riders.sort(() => Math.random() - 0.5).forEach((r, i) => { r.slot = i; r.s = this.slotS(r); r.lat = this.slotLat(r); });
     this.place(0);
@@ -52,9 +58,9 @@ export class CyclingSimulation implements SportSimulation {
   /** Distanza dalla testa del gruppo al traguardo. */
   get toFinish() { return FINISH_S - Math.max(...this.riders.map((r) => r.s)); }
   /** Quanto manca alla prossima curva stretta, al ponte, al paese (m; Infinity se già passati). */
-  ahead(what: 'bend' | 'bridge' | 'village') {
+  ahead(what: 'bend' | 'bridge' | 'village' | 'summit') {
     const lead = Math.max(...this.riders.filter((r) => r.mode !== 'crash').map((r) => r.s));
-    const at = what === 'bend' ? BENDS.find((s) => s > lead) ?? Infinity : what === 'bridge' ? BRIDGE_S : VILLAGE[0];
+    const at = what === 'bend' ? BENDS.find((s) => s > lead) ?? Infinity : what === 'bridge' ? BRIDGE_S : what === 'summit' ? (SUMMIT_S > 0 ? SUMMIT_S : -Infinity) : VILLAGE[0];
     return at - lead > 0 ? at - lead : Infinity;
   }
   get inVillage() { return this.packS > VILLAGE[0] && this.packS < VILLAGE[1] - 60; }
@@ -84,6 +90,17 @@ export class CyclingSimulation implements SportSimulation {
     want = Math.min(want, Math.max(c.packSpeed[0] - 1, Math.sqrt(c.bendGrip / Math.max(curve, 1e-4))));
     // Il gruppo che va a riprendere la fuga accelera.
     if (this.catching > time) want += this.catchRate * 0.6;
+    // In curva stretta e nelle discese veloci si va in fila indiana; la salita allunga il gruppo.
+    const grade = roadGrade(this.packS);
+    this.file += (Math.max(THREE.MathUtils.clamp((curve - 0.02) * 25, 0, 1), grade < -0.07 ? 0.7 : 0) - this.file) * Math.min(1, dt * 1.2);
+    this.stretch += (THREE.MathUtils.clamp(grade * 5, 0, 0.8) - this.stretch) * Math.min(1, dt * 0.5);
+    // Ogni pochi secondi due corridori vicini si scambiano il posto: qualcuno risale, qualcuno si lascia sfilare.
+    if ((this.shuffle -= dt) <= 0) {
+      this.shuffle = rand(1.8, 4.2);
+      const pack = this.riders.filter((r) => r.mode === 'pack'), a = pack[Math.floor(Math.random() * pack.length)];
+      const b = a && pack.find((r) => r !== a && Math.abs(r.slot - a.slot) >= 2 && Math.abs(r.slot - a.slot) <= 4);
+      if (a && b) [a.slot, b.slot] = [b.slot, a.slot];
+    }
     const quick = want < this.packV || this.catching > time;
     if (!this.riders.some((r) => r.mode === 'sprint')) this.packV += (want - this.packV) * Math.min(1, dt * (quick ? 1.2 : 0.6));
     if (!this.winner) this.packS += this.packV * dt;
@@ -109,10 +126,11 @@ export class CyclingSimulation implements SportSimulation {
 
   /** Posto nel gruppo: file da tre, sfalsate, ognuno col suo scarto e un lento andare e venire. */
   private slotS(r: Rider) {
-    return this.packS - Math.floor(r.slot / 3) * 2.2 - (r.slot % 3) * 0.4 + r.jit[0] + Math.sin(this.match.time * 0.23 + r.slot * 1.7) * 0.3;
+    return this.packS - Math.floor(r.slot / 3) * (2.2 * (1 + this.stretch) + this.file * 4.4) - (r.slot % 3) * (0.4 + this.file * 2)
+      + r.jit[0] + Math.sin(this.match.time * 0.23 + r.slot * 1.7) * 0.3 - r.drop;
   }
   private slotLat(r: Rider) {
-    return ((r.slot % 3) - 1) * 1.05 + (Math.floor(r.slot / 3) % 2) * 0.5 + r.jit[1] + Math.sin(this.match.time * 0.31 + r.slot * 2.3) * 0.2;
+    return (((r.slot % 3) - 1) * 1.05 + (Math.floor(r.slot / 3) % 2) * 0.5) * (1 - this.file * 0.85) + r.jit[1] + Math.sin(this.match.time * 0.31 + r.slot * 2.3) * 0.2;
   }
 
   private ride(r: Rider, dt: number, time: number, down: Rider[]) {
@@ -121,6 +139,10 @@ export class CyclingSimulation implements SportSimulation {
     let want = r.v, accel = c.accel, brake = c.brake;
     switch (r.mode) {
       case 'pack': {
+        // Sulle rampe chi è meno scalatore perde metri (il gruppo si sgrana) e li riprende quando spiana; qualcuno si alza sui pedali.
+        const grade = roadGrade(r.s), tired = grade > 0.05 ? (1 - r.strength) * 20 : 0;
+        r.drop += (tired - r.drop) * Math.min(1, dt * (tired > r.drop ? 0.12 : 0.3));
+        if (grade > 0.06 && r.a.pose === 'normal' && Math.sin(time * 0.9 + r.slot * 2.1) > 0.8) this.match.setPose(r.a, 'sprint', rand(1.5, 3));
         const gap = this.slotS(r) - r.s;
         want = this.packV + THREE.MathUtils.clamp(gap * 0.7, -2, 3);
         // Chi ha davanti un corridore a terra lo scansa.
@@ -144,6 +166,12 @@ export class CyclingSimulation implements SportSimulation {
         // Scivola sull'asfalto e si ferma; poi si rialza e insegue.
         want = 0; brake = 9;
         if (time > r.until) { r.mode = 'chase'; this.match.setPose(r.a, 'sprint', 2.5); }
+        break;
+      case 'flat':
+        // Foratura: accosta a destra e si ferma a testa bassa; cambiata la ruota riparte e insegue.
+        want = 0; brake = 5;
+        r.lat += (ROAD_HALF - 0.7 - r.lat) * Math.min(1, dt * 1.5);
+        if (time > r.until) { r.mode = 'chase'; this.match.setPose(r.a, 'sprint', 3.5); }
         break;
       case 'chase':
         want = this.packV + 3.5;
@@ -218,6 +246,12 @@ export class CyclingSimulation implements SportSimulation {
         m.excitement = Math.max(m.excitement, 0.7);
         break;
       }
+      case 'puncture':
+        if (!r || r.mode !== 'pack') return;
+        r.mode = 'flat'; r.until = time + 6.5;
+        m.setPose(actor, 'dejected', 6.5);
+        m.sound('ooh', actor.pos, 0.5);
+        break;
       case 'sprintFinish': {
         // Volata: chi la vince arriva allo striscione dopo sprintSec secondi esatti (l'istante decisivo dell'evento).
         // Si accelera con sprintAccel fino a push e poi la si tiene: push risolve v0·T + x·T − x²/(2a) = D, con x = push − v0.

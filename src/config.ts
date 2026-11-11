@@ -13,6 +13,12 @@ const BASE = {
     antialias: true,
     shadows: true,
     shadowMapSize: 1024,
+    /** Fluidità automatica: sotto adaptiveFps fotogrammi al secondo la ripresa perde un po' di nitidezza (un gradino alla volta,
+     *  mai sotto adaptiveMin volte la nitidezza piena) per restare fluida. false = sempre nitidezza piena. */
+    adaptive: true,
+    adaptiveFps: 48,
+    adaptiveStep: 0.15,
+    adaptiveMin: 0.55,
   },
 
   pitch: {
@@ -132,7 +138,8 @@ const BASE = {
     /** Breve raccordo fra due gesti, registrato anche nei replay. */
     poseBlendSec: 0.18,
     /** Colori di arbitro, steward e tifoso invasore. */
-    referee: { shirt: 0x161616, shorts: 0x161616, socks: 0x161616 },
+    /** Arbitro giallo fluo: nessuna squadra usa questo colore, si riconosce subito anche da lontano. */
+    referee: { shirt: 0xd8f53a, shorts: 0x161616, socks: 0x161616 },
     steward: { shirt: 0xff8a1f, shorts: 0x2a2f3a, socks: 0x2a2f3a },
     fan: { shirt: 0xff4fd8, shorts: 0x3b5bdb, socks: 0xf2f2f2 },
   },
@@ -175,7 +182,7 @@ const BASE = {
     decisiveWeight: 3,
     decisiveWindow: 0.25,
     /** Copertura minima nell'istante decisivo: sotto = "mancato", massimo 2 stelle. */
-    decisiveMissCoverage: 0.35,
+    decisiveMissCoverage: 0.3,
     /** Inquadratura N volte più larga dell'ideale nell'istante decisivo: massimo 2 stelle (0 = regola spenta).
      *  Serve nei campi piccoli (boxe, tennis), dove da fermi si vede tutto e la Copertura è piena gratis. */
     decisiveTooWide: 0,
@@ -185,9 +192,9 @@ const BASE = {
     anticipationGood: 0.6,
     maxLate: 1.0,
     /** Accelerazione media della camera (inquadrature/s²) che azzera la Fluidità. Più alto = più tollerante. */
-    smoothAccelRef: 8,
+    smoothAccelRef: 9.5,
     /** Soglie per 5, 4, 3, 2 stelle. */
-    stars: [90, 70, 50, 30],
+    stars: [88, 68, 49, 30],
     /** Secondi di permanenza della scheda voto. */
     resultSec: 3.5,
   },
@@ -435,7 +442,8 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
       scoring: { decisiveTooWide: 2 },
       match: { clockMinutes: 9, runSpeed: 2.8, sprintSpeed: 3.5, walkSpeed: 1, accel: 10 },
       /** Arbitro in camicia chiara: sul ring in penombra il nero sparisce. */
-      visuals: { playerScale: 1.05, referee: { shirt: 0xeef1f4, shorts: 0x1b1d22, socks: 0x1b1d22 } },
+      /** Arbitro del ring: camicia azzurra, pantaloni neri, papillon, occhiali e capelli grigi. */
+      visuals: { playerScale: 1.05, referee: { shirt: 0x7cc0f2, shorts: 0x111317, socks: 0x111317 } },
       director: { firstMainAt: 3, mainEvery: [9, 13], distractionMinDist: 2, goalBudget: 999 },
       crowd: { rowsFar: 5, rowsEnd: 4 },
     },
@@ -445,10 +453,11 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
     over: {
       pitch: { length: 23.77, width: 10.97, goalName: 'Rete' },
       camera: { position: { x: 1.8, y: 5, z: 18 }, startYaw: -5.7, startPitch: -12, startFov: 46, fovMax: 64 },
-      scoring: { decisiveTooWide: 2 },
+      /** Tennis più permissivo: la pallina è veloce e piccola, si può tenere un po' più larga e arrivare un filo in ritardo. */
+      scoring: { decisiveTooWide: 2, decisiveMissCoverage: 0.25, maxLate: 1.3 },
       match: { clockMinutes: 30, runSpeed: 6, sprintSpeed: 7, accel: 18 },
-      /** Palla ingrandita quanto basta per seguirla: 3,5 volte sembrava un'arancia. */
-      visuals: { ballRadius: 0.034, ballScale: 1.8 },
+      /** Palla ingrandita quanto basta per seguirla (2,2 volte): 3,5 volte sembrava un'arancia. */
+      visuals: { ballRadius: 0.034, ballScale: 2.2 },
       director: { firstMainAt: 3, mainEvery: [11, 15], distractionMinDist: 3, goalBudget: 999 },
       crowd: { rowsFar: 6, rowsEnd: 4 },
     },
@@ -536,12 +545,16 @@ const SPORTS: Record<SportId, { name: string; over: Overrides }> = {
 
 /** Sport che si riprendono solo col drone (mondi enormi, all'aperto). */
 export const DRONE_SPORTS: SportId[] = ['golf', 'ciclismo', 'vela'];
+/** Sport nascosti dal menu e dalla carriera (il codice resta: toglilo da qui per riattivarlo). */
+export const HIDDEN_SPORTS: SportId[] = ['vela'];
 
 const param = new URLSearchParams(globalThis.location?.search ?? '').get('sport');
 /** Sport della partita: ?sport=basket nell'URL (la schermata iniziale lo imposta). */
 export const SPORT: SportId = param && param in SPORTS ? (param as SportId) : 'calcio';
 export const SPORT_LIST = Object.entries(SPORTS).map(([id, s]) => ({ id: id as SportId, name: s.name }));
 export const DRONE_ONLY = DRONE_SPORTS.includes(SPORT);
+/** Quota del pavimento attorno al campo (tribune, bordo campo). Il ring della boxe è rialzato di un metro: tutto il resto sta un metro sotto. */
+export const FLOOR_Y = SPORT === 'boxe' ? -1 : 0;
 
 const over = SPORTS[SPORT].over as Record<string, unknown>;
 for (const [k, v] of Object.entries(over)) {
